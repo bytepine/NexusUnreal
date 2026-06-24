@@ -460,7 +460,7 @@
   - **`## 7/8. 自动埋点样本`**：原"平铺 20 条"拆为 4 个子节 `### 错误(tool_error)`/`### 慢(slow)`/`### 超大(oversize)`/`### 重复(repeat_pattern)`，每节最多 5 条；不同维护者的关心点（错误 vs 性能）分开展示，查找效率提升
   - **段号重排**：`## 3 错误指纹 → ## 5`、`## 4 AI 显式上报`（位置不变）、`## 5 明细分组 → ## 7`、`## 5/6 自动埋点样本 → ## 7/8`；Top 3 优先建议尾注 & Issue 预填模板尾注同步补上"AI 建议速览"与"性能摘要"
   - C++ 新增辅助：`NexusFeedbackInternal::ExtractLead`（兼容 `。`/`.`/换行，UE 4.26 下用 `static_cast<TCHAR>(0x3002)` 避免 `TEXT(0x3002)` 宏展开为 `L0x3002` 报 `C2065`）、`NexusFeedbackInternal::Percentile`（升序 Pct 位）；并把 UE 4.26 不支持的 `TArray::Add({k,v})` 大括号聚合初始化显式化为 `TPair<K,V>(k,v)` 构造
-- fix: Issue 入口 URL 修正为内网 GitLab —— 反馈报告 `## 复制到 Issue（预填模板）` 段的入口 URL 由 `https://github.com/byteyang/NexusMCP/issues/new` 改为 `https://git.woa.com/byteyang/NexusMCP/issues/new`；相关段标题与文档描述统一去掉 `GitHub` 限定词改为平台中性的"项目 Issue"（影响 `NexusFeedbackCollector.cpp` 报告正文 + `nexus-unreal/README.md` + `docs/tool-reference.md` + `docs/usage-guide.md`）
+- fix: Issue 入口 URL 修正 —— 反馈报告 `## 复制到 Issue（预填模板）` 段的入口 URL 改为可配置的项目 Issue 页；相关段标题与文档描述统一去掉平台限定词，改为「项目 Issue」（影响 `NexusFeedbackCollector.cpp` 报告正文 + `nexus-unreal/README.md` + `docs/tool-reference.md` + `docs/usage-guide.md`）
 - feat: AI 反馈报告新增"错误指纹 Top 10（去重聚合）"段 ——
   - 报告新增 `## 3. 错误指纹 Top 10（去重聚合）`，把随机变化的片段（引号字符串/UE 资源路径/数字序列）归一化为 `<str>`/`<path>`/`<n>` 占位符后分组计数，让"Actor X not found"与"Actor Y not found"合并成同一条目
   - 指纹算法 `NexusFeedbackInternal::BuildErrorFingerprint`：O(n) 单遍扫描，规则顺序 引号→路径→数字，空白折叠、首尾修剪、80 字符截断（超长末尾加 `…`）
@@ -470,7 +470,7 @@
 - feat: AI 反馈报告内容三件套（环境指纹 + 严重度评级 + Issue 预填模板）——
   - **环境指纹**：报告头固定加 `- 环境: UE <Engine> · NexusLink <Plugin> · <Platform> · <NetRole>` + `- 项目: <Name>` 两行，Issue 收件人一眼判位；来源 `FEngineVersion::Current()` + `IPluginManager::FindPlugin("NexusLink")` + `FPlatformProperties::IniPlatformName()` + `DetectCurrentNetRole()`（镜像 NexusMcpServer 实现，避免跨 TU 暴露 static）
   - **Top 痛点工具表增强**：原 2 列升级为 6 列 `工具 / 命中次数 / 严重度 / 错误 / 重复 / 慢或大`；严重度分 🔴 Critical（错误≥5）/ 🟠 High（重复≥3 或 错误≥2）/ 🟡 Medium（有错误/慢或大≥2）/ ⚪ Low（单次），由新增的 `ToolCategoryCount` 子计数表驱动；规则说明置于表格下方引用块
-  - **Issue 预填模板**：报告末尾新增 `## 复制到 Issue（预填模板）` 段落，用 Markdown code block 生成即开即用的 Issue 草稿，自动填好 环境指纹 / 时间窗 / Top 1 涉及工具 + 严重度 + 命中数 / 代表错误 / AI 描述，用户只需补 `**复现步骤**` 即可提交；内含项目 Issue 入口 URL（`https://git.woa.com/byteyang/NexusMCP/issues/new`）
+  - **Issue 预填模板**：报告末尾新增 `## 复制到 Issue（预填模板）` 段落，用 Markdown code block 生成即开即用的 Issue 草稿，自动填好 环境指纹 / 时间窗 / Top 1 涉及工具 + 严重度 + 命中数 / 代表错误 / AI 描述，用户只需补 `**复现步骤**` 即可提交；内含项目 Issue 入口 URL（可配置）
   - Build.cs 新增 `Projects` 模块依赖（`IPluginManager` 所属）
 - feat: AI 反馈闭环 v2（A+B+C 三件套）——
   - **A**：设置面板 `AI 反馈` 分类面板化：
