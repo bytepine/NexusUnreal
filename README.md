@@ -16,7 +16,7 @@
 | 游戏 C++ | `Source/Nexus/` |
 | **NexusLink 插件**（子模块） | `Plugins/Developer/NexusLink/` |
 
-插件版本：`Plugins/Developer/NexusLink/VERSION`
+插件版本：`Plugins/Developer/NexusLink/VERSION`（当前 [v1.13.1](https://github.com/bytepine/NexusLink/releases/tag/nexus-link-v1.13.1)）
 
 ---
 
