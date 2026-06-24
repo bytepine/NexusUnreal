@@ -3,15 +3,17 @@
 
 Two run modes:
 
-  Dev mode:
+  Daily / CI (default):
+    py Script/run_e2e.py  →  UEEditor-Cmd headless; skips l4_runtime / lua / requires_gui
+
+  Full regression:
+    py Script/run_e2e.py --gui|--full  →  UnrealEditor.exe; runs all markers
+
+  Dev attach:
     pytest Tests --ue-url http://127.0.0.1:45000/stream
-    — connects to an already-running Editor.
+    — GUI Editor without --headless runs full suite; with --headless skips runtime markers.
 
-  CI mode:
-    pytest Tests --ue-root <EnginePath> --uproject <...>.uproject
-    — launches UEEditor-Cmd in the background and tears it down on exit.
-
-Either mode yields the same `mcp` fixture.
+See Tests/README.md for new-feature test policy.
 """
 
 from __future__ import annotations
@@ -25,7 +27,10 @@ from typing import Generator, List, Optional
 
 import pytest
 
-from _framework.mcp_client import MCPClient, MCPError, list_asset_paths
+from _framework.capability_probe import _MissingCapabilities, require_capabilities
+from _framework.mcp_client import MCPClient, MCPError, cap_first
+from _framework.runtime_helpers import pie_is_running
+from _framework.test_cleanup import purge_disk_test_artifacts, purge_mcp_test_assets
 from _framework.ue_launcher import UELauncher, autodetect_uproject
 
 log = logging.getLogger(__name__)
@@ -58,17 +63,85 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Keep /Game/_McpTest/<ts>/ assets after the run for post-mortem.",
     )
     g.addoption(
+        "--gui",
+        action="store_true",
+        default=False,
+        help="Auto-launch UnrealEditor.exe (visible window). "
+             "Default is headless UEEditor-Cmd with -nullrhi -unattended.",
+    )
+    g.addoption(
         "--headless",
         action="store_true",
         default=False,
-        help="Auto-launch UEEditor-Cmd with -nullrhi (no window). "
-             "Default is GUI mode so the user can watch pytest drive the editor.",
+        help="命令行/headless 会话：跳过 l4_runtime、lua、requires_gui 用例。",
     )
 
 
-# ─────────────────────────────────────────────────────────────
+_HEADLESS_SKIP_MARKERS = frozenset({"l4_runtime", "lua", "requires_gui"})
+
+
+def _is_headless_session(config: pytest.Config) -> bool:
+    """headless = UEEditor-Cmd 自动拉起，或显式 --headless；--gui 或仅 --ue-url 连 GUI 不算。"""
+    if config.getoption("--gui"):
+        return False
+    if config.getoption("--headless"):
+        return True
+    if config.getoption("--ue-root"):
+        return True
+    return False
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config._nexus_headless = _is_headless_session(config)  # type: ignore[attr-defined]
+    if config._nexus_headless:
+        log.info("headless session: skipping l4_runtime / lua / requires_gui tests")
+
+
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    if not getattr(item.config, "_nexus_headless", False):
+        return
+    names = {m.name for m in item.iter_markers()}
+    blocked = names & _HEADLESS_SKIP_MARKERS
+    if blocked:
+        pytest.skip(f"headless/命令行模式跳过（{','.join(sorted(blocked))}）")
 # Session-scoped fixtures
 # ─────────────────────────────────────────────────────────────
+
+@pytest.fixture(scope="session", autouse=True)
+def _test_artifact_hygiene(
+    mcp: MCPClient,
+    pytestconfig: pytest.Config,
+) -> Generator[None, None, None]:
+    """测试前后清理磁盘临时文件与 /Game/_McpTest 下全部 UE 资产。"""
+    keep = bool(pytestconfig.getoption("--keep-artifacts"))
+    uproject = pytestconfig.getoption("--uproject")
+    resolved = Path(uproject) if uproject else autodetect_uproject()
+    project_root = resolved.parent if resolved and resolved.exists() else Path.cwd()
+
+    removed = purge_disk_test_artifacts(project_root)
+    if removed:
+        log.info("pre-run disk cleanup: %s", ", ".join(removed))
+
+    if not keep:
+        purge_mcp_test_assets(mcp)
+
+    yield
+
+    if not keep:
+        purge_mcp_test_assets(mcp)
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """UE 进程退出后再删磁盘日志，避免 WinError 32 文件占用。"""
+    if session.config.getoption("--keep-artifacts"):
+        return
+    uproject = session.config.getoption("--uproject")
+    resolved = Path(uproject) if uproject else autodetect_uproject()
+    project_root = resolved.parent if resolved and resolved.exists() else Path.cwd()
+    removed = purge_disk_test_artifacts(project_root, include_report=False)
+    if removed:
+        log.info("session-finish disk cleanup: %s", ", ".join(removed))
+
 
 @pytest.fixture(scope="session")
 def _ue_url(pytestconfig: pytest.Config) -> Generator[str, None, None]:
@@ -89,7 +162,7 @@ def _ue_url(pytestconfig: pytest.Config) -> Generator[str, None, None]:
     if not resolved_uproject or not resolved_uproject.exists():
         pytest.skip("could not locate .uproject for auto-launch mode")
 
-    headless = bool(pytestconfig.getoption("--headless"))
+    headless = not bool(pytestconfig.getoption("--gui"))
     with UELauncher(
         uproject=resolved_uproject,
         ue_root=Path(ue_root),
@@ -113,43 +186,32 @@ def tool_names(mcp: MCPClient) -> List[str]:
     return [t["name"] for t in mcp.list_tools()]
 
 
-def _require_tools(tool_names: List[str], required: List[str]) -> None:
-    missing = [t for t in required if t not in tool_names]
-    if missing:
-        pytest.skip(f"required tool(s) not registered: {missing}")
+def _require_tools(mcp: MCPClient, required: List[str]) -> None:
+    try:
+        require_capabilities(mcp, *required)
+    except _MissingCapabilities as exc:
+        pytest.skip(str(exc))
 
 
 @pytest.fixture(scope="session")
-def require_tools(tool_names: List[str]):
+def require_tools(mcp: MCPClient):
     """Callable fixture: require_tools(['search_asset', 'get_asset'])."""
 
     def _f(*required: str) -> None:
-        _require_tools(tool_names, list(required))
+        _require_tools(mcp, list(required))
 
     return _f
 
 
 @pytest.fixture(scope="session")
 def test_ns(mcp: MCPClient, pytestconfig: pytest.Config) -> Generator[str, None, None]:
-    """Session-scoped /Game/_McpTest/<ts> namespace + best-effort cleanup."""
+    """Session-scoped /Game/_McpTest/<ts> 命名空间；资产由 _test_artifact_hygiene 统一清理。"""
     ns = f"/Game/_McpTest/{int(time.time())}"
     log.info("test namespace: %s", ns)
     yield ns
 
     if pytestconfig.getoption("--keep-artifacts"):
-        log.info("--keep-artifacts set; leaving %s intact", ns)
-        return
-
-    try:
-        paths = list_asset_paths(mcp, ns)
-        if not paths:
-            return
-        log.info("cleaning up %d test assets under %s", len(paths), ns)
-        with contextlib.suppress(MCPError):
-            for p in paths:
-                mcp.call("delete_asset", assetPath=p)
-    except Exception as e:  # noqa: BLE001
-        log.warning("test_ns cleanup failed (non-fatal): %s", e)
+        log.info("--keep-artifacts set; leaving %s and siblings under /Game/_McpTest", ns)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -166,7 +228,7 @@ def pie(mcp: MCPClient) -> Generator[None, None, None]:
     """
     with contextlib.suppress(MCPError):
         status = mcp.call("control_pie", action="status")
-        if not status.get("isPIERunning") and status.get("state") != "running":
+        if not pie_is_running(status):
             mcp.call("control_pie", action="start")
             time.sleep(2.0)
     try:

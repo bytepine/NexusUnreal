@@ -102,6 +102,10 @@ venv/
 # 编辑器运行时反馈目录
 .nexus-feedback/
 
+# pytest E2E 写入的 UE 资产（磁盘镜像；主副本在 /Game/_McpTest）
+Content/_McpTest/
+Content/__nexus_*__.uasset
+
 # OS 生成文件
 .DS_Store
 Thumbs.db

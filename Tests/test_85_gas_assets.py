@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from _framework.mcp_client import MCPError
+from _framework.capability_probe import is_capability_available
+from _framework.mcp_client import MCPError, cap_first
 
 pytestmark = pytest.mark.l3_asset
 
@@ -17,14 +18,11 @@ pytestmark = pytest.mark.l3_asset
 
 @pytest.fixture(scope="module", autouse=True)
 def require_gas(mcp):
-    """若 tools/list 中不含任何 GAS capability，跳过本模块所有用例。"""
-    try:
-        tools = mcp.list_tools()
-    except Exception as e:
-        pytest.skip(f"tools/list 失败: {e}")
-    names = {t.get("name") for t in (tools or [])}
-    if "create_asset_gameplay_ability" not in names:
-        pytest.skip("WITH_GAS=0：GAS capability 未注册，跳过测试")
+    """GameplayAbilities 已在 .uproject 启用；探测 GAS capability 是否已编入 NexusLink。"""
+    if not is_capability_available(mcp, "create_asset_gameplay_ability"):
+        pytest.skip(
+            "GAS capability 未注册（请确认 GameplayAbilities 已启用并重新编译 Editor）"
+        )
 
 
 # ── GameplayAbility ──────────────────────────────────────────────────────────
@@ -33,8 +31,9 @@ def require_gas(mcp):
 def test_ga_create(test_ns, mcp):
     path = f"{test_ns}/GA_TestAbility"
     r = mcp.call("create_asset_gameplay_ability", assetPath=path)
-    assert r.get("success"), f"create_asset_gameplay_ability 返回: {r!r}"
-    assert r.get("name"), r
+    entry = cap_first(r)
+    assert entry.get("success"), f"create_asset_gameplay_ability 返回: {r!r}"
+    assert entry.get("name") or entry.get("path"), entry
 
 
 def test_ga_get_metadata(test_ns, mcp):
@@ -81,7 +80,7 @@ def test_ga_policy_readback(test_ns, mcp):
 def test_ge_create(test_ns, mcp):
     path = f"{test_ns}/GE_TestEffect"
     r = mcp.call("create_asset_gameplay_effect", assetPath=path)
-    assert r.get("success"), f"create_asset_gameplay_effect 返回: {r!r}"
+    assert cap_first(r).get("success"), f"create_asset_gameplay_effect 返回: {r!r}"
 
 
 def test_ge_get_policy(test_ns, mcp):
@@ -134,7 +133,7 @@ def test_ge_manage_tags(test_ns, mcp):
 def test_as_create(test_ns, mcp):
     path = f"{test_ns}/AS_TestStats"
     r = mcp.call("create_asset_attribute_set", assetPath=path)
-    assert r.get("success"), f"create_asset_attribute_set 返回: {r!r}"
+    assert cap_first(r).get("success"), f"create_asset_attribute_set 返回: {r!r}"
 
 
 def test_as_get_empty(test_ns, mcp):

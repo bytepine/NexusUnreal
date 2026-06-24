@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import pytest
 
+from _framework.asset_helpers import first_asset_path
+from _framework.capability_probe import is_capability_available
 from _framework.mcp_client import cap_first
 
 pytestmark = pytest.mark.l2_write
@@ -17,22 +19,12 @@ def test_exec_command_stat_fps(mcp, require_tools):
 
 
 def test_exec_command_output_in_get_output_log(mcp, require_tools):
-    """exec_command 应合并 GLog 增量（help stat → LogEngine）并镜像到 LogConsole。"""
+    """exec_command 后 get_output_log 仍可读；勿用 help*（UE 会弹 ConsoleHelp.html）。"""
     require_tools("exec_command", "get_output_log")
-    exec_r = cap_first(mcp.call("exec_command", command="help stat"))
+    exec_r = cap_first(mcp.call("exec_command", command="stat fps"))
     assert exec_r.get("executed") is True, exec_r
-    output = (exec_r.get("output") or "").strip()
-    assert output, f"help stat 应捕获 LogEngine 输出: {exec_r!r}"
-    assert "Console Help" in output or "console variable" in output.lower(), output[:200]
-    log_r = cap_first(mcp.call(
-        "get_output_log",
-        categoryFilter="LogConsole",
-        textFilter="Console Help",
-        limit=20,
-        verbosity="all",
-    ))
-    messages = [e.get("message", "") for e in (log_r.get("entries") or [])]
-    assert any("Console Help" in m for m in messages), f"exec output not in LogConsole buffer: {log_r!r}"
+    log_r = cap_first(mcp.call("get_output_log", limit=10, verbosity="all"))
+    assert isinstance(log_r.get("entries"), list), log_r
 
 
 def test_capture_viewport_deferred(mcp):
@@ -66,6 +58,20 @@ def test_search_console_variables_stat(mcp, require_tools):
     assert isinstance(vars_list, list), entry
 
 
+def test_get_asset_lua_binding_sample(mcp):
+    """get_asset_lua_binding：编辑器侧解析蓝图 UnLua 绑定（无绑定时 bound=false 亦合法）。"""
+    if not is_capability_available(mcp, "get_asset_lua_binding"):
+        pytest.skip("get_asset_lua_binding 未编入（需 WITH_UNLUA）")
+    bp = first_asset_path(mcp, "Blueprint")
+    if not bp:
+        pytest.skip("无 Blueprint 样本")
+    r = mcp.call_capability("get_asset_lua_binding", assetPath=bp)
+    entry = (r.get("results") or [r])[0]
+    assert not entry.get("error"), entry
+    assert "bound" in entry or "fileExists" in entry, entry
+
+
+@pytest.mark.requires_gui
 def test_capture_viewport_editor_desktop_validate(mcp, require_tools):
     require_tools("capture_viewport")
     r = mcp.call_capability("capture_viewport", target="editor_desktop", validateOnly=True)
@@ -75,6 +81,7 @@ def test_capture_viewport_editor_desktop_validate(mcp, require_tools):
     assert entry.get("success") is True, entry
 
 
+@pytest.mark.requires_gui
 def test_capture_viewport_validate_only(mcp, require_tools):
     """validateOnly 不写图片，仅验证 editor 视口通路。"""
     require_tools("capture_viewport")

@@ -5,33 +5,17 @@ from __future__ import annotations
 
 import pytest
 
-from _framework.mcp_client import MCPError
+from _framework.asset_helpers import first_asset_path
+from _framework.capability_probe import is_capability_available
 
 pytestmark = pytest.mark.l3_asset
 
 
-def _first_asset_path(mcp, asset_type: str) -> str | None:
-    try:
-        listing = mcp.call_capability(
-            "search_asset",
-            assetType=asset_type,
-            pathFilter="/Game/",
-            limit=5,
-        )
-    except MCPError:
-        return None
-    assets = listing.get("assets") or []
-    if not assets:
-        return None
-    row = assets[0]
-    return row.get("assetPath") or row.get("path")
-
-
 def test_get_asset_sound_wave_sample(mcp, require_tools):
     require_tools("get_asset_sound_wave")
-    path = _first_asset_path(mcp, "SoundWave")
+    path = first_asset_path(mcp, "SoundWave")
     if not path:
-        pytest.skip("项目中无 SoundWave 样本")
+        pytest.skip("无 SoundWave 样本且 NexusLink 无创建接口")
     r = mcp.call_capability("get_asset_sound_wave", assetPath=path)
     entry = (r.get("results") or [r])[0]
     assert not entry.get("error"), entry
@@ -40,9 +24,9 @@ def test_get_asset_sound_wave_sample(mcp, require_tools):
 
 def test_get_asset_sound_cue_sample(mcp, require_tools):
     require_tools("get_asset_sound_cue")
-    path = _first_asset_path(mcp, "SoundCue")
+    path = first_asset_path(mcp, "SoundCue")
     if not path:
-        pytest.skip("项目中无 SoundCue 样本")
+        pytest.skip("无 SoundCue 样本且 NexusLink 无创建接口")
     r = mcp.call_capability("get_asset_sound_cue", assetPath=path)
     entry = (r.get("results") or [r])[0]
     assert not entry.get("error"), entry
@@ -51,9 +35,11 @@ def test_get_asset_sound_cue_sample(mcp, require_tools):
 
 def test_get_asset_niagara_system_sample(mcp, require_tools):
     require_tools("get_asset_niagara_system")
-    path = _first_asset_path(mcp, "NiagaraSystem")
+    if not is_capability_available(mcp, "get_asset_niagara_system"):
+        pytest.skip("Niagara capability 未编入（WITH_NIAGARA=0）")
+    path = first_asset_path(mcp, "NiagaraSystem")
     if not path:
-        pytest.skip("项目中无 NiagaraSystem 样本或未启用 WITH_NIAGARA")
+        pytest.skip("无 NiagaraSystem 样本且 NexusLink 无创建接口")
     r = mcp.call_capability("get_asset_niagara_system", assetPath=path)
     entry = (r.get("results") or [r])[0]
     assert not entry.get("error"), entry

@@ -14,6 +14,14 @@ from _framework.assertions import (
     assert_respecting_defaults,
     merge_with_defaults,
 )
+from _framework.asset_helpers import (
+    ensure_behavior_tree,
+    ensure_blueprint,
+    ensure_material,
+    ensure_struct,
+    ensure_widget,
+    first_asset_path,
+)
 from _framework.mcp_client import MCPError, cap_first
 
 
@@ -99,6 +107,7 @@ def test_get_asset_blueprint_defaults_shape(mcp):
         )
 
 
+@pytest.mark.requires_gui
 def test_diff_actors_baseline_values_shape(mcp):
     """diff_runtime_actors 批量模式若产出任何 diff，baseline.values 必须是字符串字典，
     且 comparisons[].diffs[] 里不再出现 valueA。"""
@@ -138,24 +147,41 @@ def test_diff_actors_baseline_values_shape(mcp):
 # ─────────────────────────────────────────────────────────────
 
 
-def _first_asset_path(mcp, asset_type: str) -> str | None:
-    try:
-        r = mcp.call("search_asset", assetType=asset_type, limit=1)
-    except MCPError:
-        return None
-    assets = r.get("assets") or []
-    if not assets:
-        return None
-    merged = merge_with_defaults(assets, r.get("assets_defaults") or {})
-    first = merged[0] if merged else assets[0]
-    return first.get("path") or first.get("assetPath")
+def _probe_blueprint(mcp, test_ns: str | None = None) -> str | None:
+    path = first_asset_path(mcp, "Blueprint")
+    if not path and test_ns:
+        path = ensure_blueprint(mcp, test_ns, "BP_CompactProbe")
+    return path
 
 
-def test_get_asset_refs_defaults_shape(mcp):
+def _probe_struct(mcp, test_ns: str) -> str:
+    path = first_asset_path(mcp, "UserDefinedStruct", path_filter=test_ns)
+    if not path:
+        path = first_asset_path(mcp, "UserDefinedStruct")
+    return path or ensure_struct(mcp, test_ns, "S_CompactProbe")
+
+
+def _probe_material(mcp, test_ns: str) -> str:
+    path = first_asset_path(mcp, "Material") or first_asset_path(mcp, "MaterialInstance")
+    return path or ensure_material(mcp, test_ns, "M_CompactProbe")
+
+
+def _probe_widget(mcp, test_ns: str) -> str:
+    path = first_asset_path(mcp, "WidgetBlueprint")
+    return path or ensure_widget(mcp, test_ns, "WBP_CompactProbe")
+
+
+def _probe_behavior_tree(mcp, test_ns: str) -> str:
+    path = first_asset_path(mcp, "BehaviorTree", path_filter=test_ns)
+    if not path:
+        path = first_asset_path(mcp, "BehaviorTree")
+    return path or ensure_behavior_tree(mcp, test_ns)
+
+
+def test_get_asset_refs_defaults_shape(mcp, test_ns):
     """get_asset_refs 的 refs_defaults 嵌在每个 results[i] 内。"""
-    bp = _first_asset_path(mcp, "Blueprint")
-    if not bp:
-        pytest.skip("项目中无 Blueprint 资产可用于引用探测")
+    bp = _probe_blueprint(mcp, test_ns)
+    assert bp, "无法定位或创建 Blueprint 探测资产"
 
     try:
         r = mcp.call("get_asset_refs", assetPath=bp, direction="dependencies")
@@ -178,11 +204,10 @@ def test_get_asset_refs_defaults_shape(mcp):
         )
 
 
-def test_get_asset_graph_nodes_defaults_shape(mcp):
+def test_get_asset_graph_nodes_defaults_shape(mcp, test_ns):
     """BP sections=['graph'] 指定 graphName 的 nodes_defaults（候选 nodeClass）。"""
-    bp = _first_asset_path(mcp, "Blueprint")
-    if not bp:
-        pytest.skip("项目中无 Blueprint 资产")
+    bp = _probe_blueprint(mcp, test_ns)
+    assert bp, "无法定位或创建 Blueprint 探测资产"
 
     try:
         overview = mcp.call_capability("get_asset_blueprint", assetPath=bp, sections=["graph"])
@@ -217,11 +242,9 @@ def test_get_asset_graph_nodes_defaults_shape(mcp):
     )
 
 
-def test_get_asset_struct_fields_defaults_shape(mcp):
+def test_get_asset_struct_fields_defaults_shape(mcp, test_ns):
     """UserDefinedStruct fields_defaults（候选 type）。"""
-    path = _first_asset_path(mcp, "UserDefinedStruct")
-    if not path:
-        pytest.skip("项目中无 UserDefinedStruct 资产")
+    path = _probe_struct(mcp, test_ns)
 
     try:
         r = mcp.call_capability("get_asset_struct", assetPath=path)
@@ -242,11 +265,9 @@ def test_get_asset_struct_fields_defaults_shape(mcp):
     )
 
 
-def test_get_asset_material_params_defaults_shape(mcp):
+def test_get_asset_material_params_defaults_shape(mcp, test_ns):
     """Material/MaterialInstance params 返回体的 parameters_defaults（候选 paramType）。"""
-    path = _first_asset_path(mcp, "Material") or _first_asset_path(mcp, "MaterialInstance")
-    if not path:
-        pytest.skip("项目中无 Material/MaterialInstance 资产")
+    path = _probe_material(mcp, test_ns)
 
     try:
         r = mcp.call_capability("get_asset_material", assetPath=path, sections=["params"])
@@ -266,19 +287,18 @@ def test_get_asset_material_params_defaults_shape(mcp):
         )
 
 
-def test_get_asset_user_widget_defaults_shape(mcp):
+def test_get_asset_user_widget_defaults_shape(mcp, test_ns):
     """get_asset_user_widget widgets_defaults（候选 class）。"""
-    path = _first_asset_path(mcp, "WidgetBlueprint")
-    if not path:
-        pytest.skip("项目中无 WidgetBlueprint 资产")
+    path = _probe_widget(mcp, test_ns)
 
     try:
         r = mcp.call("get_asset_user_widget", assetPath=path)
     except MCPError as e:
         pytest.skip(f"get_asset_user_widget 调用失败：{e}")
 
+    payload = cap_first(r)
     assert_respecting_defaults(
-        r,
+        payload,
         list_key="widgets",
         defaults_prefix="widgets",
         required_fields=("name", "class"),
@@ -286,6 +306,7 @@ def test_get_asset_user_widget_defaults_shape(mcp):
     )
 
 
+@pytest.mark.requires_gui
 def test_list_runtime_widgets_defaults_shape(mcp):
     """list_runtime_widgets widgets_defaults（候选 widgetClass + class）。
     非 PIE 时可能无数据，跳过。"""
@@ -362,27 +383,13 @@ def test_get_gameplay_tags_hierarchy_childcount_defaults(mcp):
         assert "tag" in entry, f"tags[].tag missing after merge: {entry!r}"
 
 
-def test_get_behavior_tree_blackboard_type_defaults(mcp):
+def test_get_behavior_tree_blackboard_type_defaults(mcp, test_ns):
     """get_asset_behavior_tree section=blackboard：keys_defaults 候选 type。"""
-    from _framework.mcp_client import MCPError as _MCPError
-
-    # 先找一个 BehaviorTree 资产
-    try:
-        r = mcp.call("search_asset", assetType="BehaviorTree", limit=10)
-    except _MCPError as e:
-        pytest.skip(f"search_asset 调用失败：{e}")
-
-    assets = r.get("assets") or []
-    if not assets:
-        pytest.skip("项目中无 BehaviorTree 资产")
-
-    path = assets[0].get("path") or assets[0].get("assetPath") or ""
-    if not path:
-        pytest.skip("资产条目缺少 path 字段")
+    path = _probe_behavior_tree(mcp, test_ns)
 
     try:
         bt_r = mcp.call("get_behavior_tree", section="blackboard", assetPath=path)
-    except _MCPError as e:
+    except MCPError as e:
         pytest.skip(f"get_asset_behavior_tree blackboard 调用失败：{e}")
 
     keys = bt_r.get("keys") or []
@@ -395,11 +402,10 @@ def test_get_behavior_tree_blackboard_type_defaults(mcp):
         assert "name" in entry, f"keys[].name missing after merge: {entry!r}"
 
 
-def test_get_asset_bp_defaults_section_inherited_compression(mcp):
+def test_get_asset_bp_defaults_section_inherited_compression(mcp, test_ns):
     """get_asset_blueprint sections=['defaults']：inherited:true 占主导时应被抽取到 defaults_defaults。"""
-    bp = _first_asset_path(mcp, "Blueprint")
-    if not bp:
-        pytest.skip("项目中无 Blueprint 资产")
+    bp = _probe_blueprint(mcp, test_ns)
+    assert bp, "无法定位或创建 Blueprint 探测资产"
 
     try:
         payload = mcp.call_capability("get_asset_blueprint", assetPath=bp,
@@ -456,6 +462,7 @@ def test_auto_discover_undeclared_fields_in_defaults(mcp):
                 )
 
 
+@pytest.mark.requires_gui
 def test_get_actor_animation_variables_defaults_shape(mcp):
     """get_runtime_actor_animation section=variables：variables_defaults 候选 type + value。
     需要 PIE 运行中的 Actor；若无 Actor 或 AnimInstance 则跳过。"""

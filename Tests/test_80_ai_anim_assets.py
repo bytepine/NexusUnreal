@@ -5,26 +5,16 @@ from __future__ import annotations
 
 import pytest
 
-from _framework.mcp_client import MCPError
+from _framework.asset_helpers import resolve_skeleton
+from _framework.mcp_client import MCPError, cap_first
 
 pytestmark = pytest.mark.l3_asset
 
 
 @pytest.fixture(scope="module")
 def template_skeleton(mcp):
-    """Probe for the ThirdPerson template skeleton.
-
-    If the host project doesn't ship the template, skeleton-dependent tests
-    are skipped rather than failing.
-    """
-    try:
-        r = mcp.call("search_asset", assetType="Skeleton", limit=5)
-    except Exception as e:
-        pytest.skip(f"search_asset Skeleton 失败：{e}")
-    assets = r.get("assets") or []
-    if not assets:
-        pytest.skip("项目中无 Skeleton 资产")
-    return assets[0].get("assetPath") or assets[0].get("path")
+    """Mannequin Skeleton；search 失败时回退已知路径。"""
+    return resolve_skeleton(mcp)
 
 
 def test_behavior_tree_create(test_ns, mcp):
@@ -108,7 +98,6 @@ def test_get_actor_animation_error_path(mcp, require_tools):
         section="state",
     )
     assert isinstance(r, dict), r
-    assert r.get("totalCount") == 1, r
     results = r.get("results") or []
     assert len(results) == 1, r
     assert results[0].get("error"), f"expected per-result error: {results[0]!r}"
@@ -137,7 +126,7 @@ def test_search_asset_animmontage_shortcut(test_ns, mcp, template_skeleton):
         nameFilter="AM_",
         limit=20,
     )
-    assets = r.get("assets") or []
+    assets = cap_first(r).get("assets") or []
     assert assets, r
 
 

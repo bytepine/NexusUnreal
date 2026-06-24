@@ -37,7 +37,7 @@ def test_duplicate_asset(test_ns, mcp, require_tools):
     listing = mcp.call("search_asset", assetType="DataAsset", pathFilter=test_ns, limit=20)
     paths = [a.get("assetPath") or a.get("path") for a in (cap_first(listing).get("assets") or [])]
     if src not in paths:
-        pytest.skip(f"源资产 {src} 不存在，需先跑 test_create_data_asset_rename_list")
+        mcp.call("create_data_asset", assetPath=src, parentClass="PrimaryAssetLabel")
     r = mcp.call_capability("duplicate_asset", assetPath=src, newPath=dup)
     results = r.get("results") or [r]
     entry = results[0] if results else r
@@ -75,3 +75,75 @@ def test_log_health_no_crash(mcp):
     # Soft assertion — there may be fully unrelated logs containing the word.
     hard = [e for e in entries if "FATAL" in str(e).upper()]
     assert not hard, f"fatal crash lines: {hard!r}"
+
+
+# ────────────────────────────────────────────────
+# DataAsset 读写 / delete / export
+# ────────────────────────────────────────────────
+
+
+def _data_asset_entry(mcp, path: str) -> dict:
+    r = mcp.call_capability("get_asset_data_asset", assetPath=path, limit=100)
+    return (r.get("results") or [r])[0]
+
+
+def _first_editable_property_name(entry: dict) -> str | None:
+    for row in entry.get("properties") or []:
+        if not isinstance(row, dict):
+            continue
+        name = row.get("name") or row.get("propertyName")
+        if name:
+            return str(name)
+    return None
+
+
+def test_data_asset_get_and_manage_reset(test_ns, mcp, require_tools):
+    """get_asset_data_asset + manage_asset_data_asset(reset) 闭环。"""
+    require_tools("get_asset_data_asset", "manage_asset_data_asset")
+    path = f"{test_ns}/DA_McpRw"
+    mcp.call("create_data_asset", assetPath=path, parentClass="PrimaryAssetLabel")
+
+    entry = _data_asset_entry(mcp, path)
+    assert not entry.get("error"), entry
+    prop = _first_editable_property_name(entry)
+    if not prop:
+        pytest.skip(f"PrimaryAssetLabel 无可编辑属性可验 reset：{entry!r}")
+
+    r = mcp.call_capability(
+        "manage_asset_data_asset",
+        assetPath=path,
+        ops=[{"action": "reset", "propertyName": prop}],
+    )
+    assert r.get("success") is True or not (r.get("results") or [r])[0].get("error"), r
+
+
+def test_delete_asset_removes_from_search(test_ns, mcp, require_tools):
+    """delete_asset：创建后立即删除，search 不应再出现。"""
+    require_tools("delete_asset")
+    path = f"{test_ns}/DA_DeleteProbe"
+    mcp.call("create_data_asset", assetPath=path, parentClass="PrimaryAssetLabel")
+
+    dr = mcp.call_capability("delete_asset", assetPath=path)
+    del_entry = (dr.get("results") or [dr])[0]
+    assert not del_entry.get("error"), del_entry
+
+    listing = mcp.call("search_asset", assetType="DataAsset", pathFilter=test_ns, limit=50)
+    paths = [
+        a.get("assetPath") or a.get("path")
+        for a in (cap_first(listing).get("assets") or [])
+    ]
+    assert path not in paths, f"deleted asset still listed: {paths}"
+
+
+def test_export_static_mesh_smoke(mcp, require_tools):
+    """export_asset：导出模板 StaticMesh 到 Saved/Exported/（或指定路径）。"""
+    require_tools("export_asset")
+    from _framework.asset_helpers import first_asset_path
+
+    mesh = first_asset_path(mcp, "StaticMesh")
+    if not mesh:
+        pytest.skip("无 StaticMesh 样本可导出")
+    r = mcp.call_capability("export_asset", assetPath=mesh)
+    entry = (r.get("results") or [r])[0]
+    assert not entry.get("error"), entry
+    assert entry.get("outputPath") or entry.get("exportedPath") or entry.get("success"), entry

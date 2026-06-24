@@ -56,12 +56,13 @@ git clone --recurse-submodules https://github.com/bytepine/NexusUnreal.git
 |------|------|
 | 游戏 C++ 编译 | `py Script/build_test_game.py --versions UE_4.26` |
 | 跨版本插件编译 | `build_test.bat`（见 NexusLink 文档） |
-| L2 MCP 回归 | `pip install -r Tests/requirements.txt` → `py Script/run_e2e.py` |
+| L2 MCP 回归（日常，headless） | `py Script/run_e2e.py` |
+| L2 MCP 全量（GUI，含 PIE/Lua） | `py Script/run_e2e.py --gui` 或 `--full` |
 
 | 层级 | 说明 |
 |------|------|
 | L1 C++ | `Plugins/Developer/NexusLink/Source/NexusLinkTests/` |
-| L2 pytest | 本仓 `Tests/` — 见 [Tests/README.md](Tests/README.md) |
+| L2 pytest | 本仓 `Tests/` — 策略见 [Tests/README.md](Tests/README.md) |
 
 ---
 

@@ -105,10 +105,9 @@ def test_datatable_set_row_error_path(mcp, datatable_path, require_tools):
         ],
     )
     assert isinstance(r, dict), r
-    assert r.get("totalCount") == 1, r
-    assert (r.get("failCount") or 0) >= 1, r
-    per = (r.get("results") or [{}])[0]
-    assert per.get("error"), f"expected per-result error: {per!r}"
+    results = r.get("results") or []
+    assert len(results) == 1, r
+    assert results[0].get("error"), f"expected per-result error: {results[0]!r}"
 
 
 def test_datatable_row_remove(mcp, datatable_path):

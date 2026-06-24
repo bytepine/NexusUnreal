@@ -6,11 +6,11 @@ against the nexus-unreal host project, polls GET /status until the MCP server
 reports ready, and tears the process down at session end.
 
 Design notes:
-- **Default is GUI mode** (`UnrealEditor.exe`, full splash + RHI + windows) so
-  the user can actually watch asset ops / PIE / logs happen during tests. The
-  MCP server still listens on 45000..45009 exactly the same way.
-- **Headless mode** (`UELauncher(headless=True)`) switches to `UnrealEditor-Cmd`
-  with `-unattended -nullrhi -NoSplash -NoSound` for CI / low-overhead runs.
+- **Default is headless** (`UnrealEditor-Cmd` + `-unattended -nullrhi -NoSplash
+  -NoSound`) so auto-launch never pops windows or blocks on dialogs.
+- **GUI mode** (`UELauncher(headless=False)` / pytest `--gui`) uses
+  `UnrealEditor.exe` when you want to watch asset ops / PIE during tests.
+  The MCP server still listens on 45000..45009 exactly the same way.
 - We rely on NexusLink auto-starting its MCP server on OnPostEngineInit with
   a stable default port (45000). If the port is taken, NexusLink picks the
   next free port in 45000..45009 and /status exposes it, so the launcher
@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import os
 import platform
 import re
@@ -44,6 +45,8 @@ _STATUS_ENDPOINT = "/status"
 _STREAM_ENDPOINT = "/stream"
 _DEFAULT_PORT_RANGE = range(45000, 45010)
 _READY_TIMEOUT_SEC = 180.0
+_MCP_SETTINGS_SECTION = "[/Script/NexusLink.NexusLinkSettings]"
+_MCP_ENABLE_INI_LINE = "bEnableMcpServer=True"
 
 
 def _is_windows() -> bool:
@@ -54,11 +57,11 @@ def _is_macos() -> bool:
     return platform.system() == "Darwin"
 
 
-def resolve_editor_exe(ue_root: Path, headless: bool = False) -> Path:
+def resolve_editor_exe(ue_root: Path, headless: bool = True) -> Path:
     """Resolve the editor binary inside a given UE_X.Y install root.
 
-    When `headless` is True, prefer the `-Cmd` variant (console-only). Otherwise
-    prefer the GUI variant so users can actually watch the editor while pytest
+    When `headless` is True (default), prefer the `-Cmd` variant (console-only).
+    Otherwise prefer the GUI variant so users can watch the editor while pytest
     drives it."""
     if _is_windows():
         gui = [
@@ -104,7 +107,7 @@ class UELauncher:
     port_range: Iterable[int] = _DEFAULT_PORT_RANGE
     extra_args: Optional[List[str]] = None
     ready_timeout: float = _READY_TIMEOUT_SEC
-    headless: bool = False
+    headless: bool = True
 
     _proc: Optional[subprocess.Popen] = None
     _resolved_port: Optional[int] = None
@@ -133,11 +136,16 @@ class UELauncher:
         self.stop()
 
     def start(self) -> None:
+        # 宿主工程测试须编进 GAS / Niagara capability
+        os.environ["WITH_GAS"] = "1"
+        os.environ["WITH_NIAGARA"] = "1"
+
         # Pre-build the host project's Editor module when its DLL is missing
         # — UEEditor-Cmd with -unattended will NOT prompt "modules out of date,
         # rebuild?" and instead silently exits with code 1. We compile via UBT
         # first so the Editor can simply load the DLL.
         self._ensure_editor_target_built()
+        self._ensure_mcp_server_enabled()
 
         exe = resolve_editor_exe(self.ue_root, headless=self.headless)
         args: List[str] = [str(exe), str(self.uproject)]
@@ -157,6 +165,11 @@ class UELauncher:
             # mirror the engine log to our capture file for early-exit triage.
             args += ["-stdout", "-FullStdOutLogOutput"]
         args.append("-skipcompile")
+        # headless 下 DefaultEditorPerProjectUserSettings 可能尚未落盘，命令行再强制一次
+        args.append(
+            "-ini:EditorPerProjectUserSettings:"
+            "[/Script/NexusLink.NexusLinkSettings]:bEnableMcpServer=True"
+        )
         if self.extra_args:
             args.extend(self.extra_args)
         # Persist stdout/stderr so we can surface real reasons for early-exit
@@ -238,7 +251,8 @@ class UELauncher:
         # fast-path no-op when the user happens to rebuild via IDE; we only
         # need to cover the clean-checkout case.
         primary_module = target_name[:-len("Editor")] if target_name.endswith("Editor") else target_name
-        if self._editor_module_dll_exists(primary_module):
+        force_rebuild = os.environ.get("WITH_GAS") == "1"
+        if self._editor_module_dll_exists(primary_module) and not force_rebuild:
             log.info("%s module DLL present; skipping UBT pre-build",
                      primary_module)
             return
@@ -288,6 +302,35 @@ class UELauncher:
                 f"--- tail ---\n{tail}\n--- end tail ---"
             )
         log.info("UBT pre-build OK (%s)", target_name)
+
+    def _ensure_mcp_server_enabled(self) -> None:
+        """pytest 自动拉起须开启 MCP；写入 Saved 配置供 UE4Editor-Cmd 读取。"""
+        if _is_windows():
+            config_dir = self.uproject.parent / "Saved" / "Config" / "Windows"
+        elif _is_macos():
+            config_dir = self.uproject.parent / "Saved" / "Config" / "Mac"
+        else:
+            config_dir = self.uproject.parent / "Saved" / "Config" / "Linux"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        ini_path = config_dir / "EditorPerProjectUserSettings.ini"
+        block = f"{_MCP_SETTINGS_SECTION}\r\n{_MCP_ENABLE_INI_LINE}\r\n"
+        if ini_path.is_file():
+            text = ini_path.read_text(encoding="utf-8", errors="replace")
+            if _MCP_ENABLE_INI_LINE in text:
+                return
+            if _MCP_SETTINGS_SECTION in text:
+                text = text.replace(
+                    "bEnableMcpServer=False",
+                    _MCP_ENABLE_INI_LINE,
+                )
+                if _MCP_ENABLE_INI_LINE not in text:
+                    text = text.rstrip() + f"\r\n{_MCP_ENABLE_INI_LINE}\r\n"
+            else:
+                text = text.rstrip() + f"\r\n\r\n{block}"
+            ini_path.write_text(text, encoding="utf-8")
+        else:
+            ini_path.write_text(block, encoding="utf-8")
+        log.info("ensured MCP enabled in %s", ini_path)
 
     @staticmethod
     def _read_tail_file(path: Path, max_lines: int) -> str:

@@ -3,26 +3,16 @@
 # Copyright byteyang. All Rights Reserved.
 """One-shot pytest wrapper for NexusLink MCP E2E suite.
 
-Typical calls (pick one; zero args = full auto):
+Modes:
 
-    # Auto mode (default) — probe localhost 45000..45009 for a live Editor
-    # and reuse it. If none is running, auto-launch the UE version that
-    # matches Nexus.uproject's EngineAssociation and shut it down on exit.
-    python nexus-unreal/Script/run_e2e.py
+  py Script/run_e2e.py              # default: headless UEEditor-Cmd (CI / daily)
+  py Script/run_e2e.py --gui|--full # full suite: GUI UnrealEditor.exe (PIE/Lua/viewport)
+  py Script/run_e2e.py --ue-url …   # attach to a running Editor
 
-    # Dev mode — connect to a specific already-running UE Editor
-    python nexus-unreal/Script/run_e2e.py --ue-url http://127.0.0.1:45000/stream
-
-    # Force a specific UE install root (overrides auto-detection)
-    python nexus-unreal/Script/run_e2e.py --ue-root "C:/Program Files/Epic Games/UE_5.4"
-
-    # Disable auto-launch fallback (only reuse a live Editor, or exit)
-    python nexus-unreal/Script/run_e2e.py --no-launch
-
-    # Skip PIE-dependent cases (no live game session)
-    python nexus-unreal/Script/run_e2e.py --no-pie
-
-All extra args after a bare `--` are forwarded verbatim to pytest.
+Policy (see Tests/README.md):
+- New features → add pytest in Tests/test_*.py; prefer headless-capable cases.
+- Mark l4_runtime / lua / requires_gui when CLI cannot cover; verify with --gui.
+- Full regression always uses --gui or --full.
 """
 
 from __future__ import annotations
@@ -196,6 +186,19 @@ def _resolve_connection(args: argparse.Namespace) -> Tuple[List[str], str]:
     return out, f"auto: launching {ver} from {path}{matched_note}"
 
 
+def _purge_disk_artifacts(label: str, *, include_report: bool = True) -> None:
+    """删除上一轮 pytest/e2e 落在 Saved/Logs 与 Content/_McpTest 的临时文件。"""
+    sys.path.insert(0, str(TESTS_DIR))
+    from _framework.test_cleanup import purge_disk_test_artifacts
+
+    removed = purge_disk_test_artifacts(
+        NEXUS_UNREAL_DIR,
+        include_report=include_report,
+    )
+    if removed:
+        print(f"[cleanup:{label}] {', '.join(removed)}", flush=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Run NexusLink pytest E2E suite",
@@ -240,9 +243,12 @@ def main() -> int:
         help="Keep /Game/_McpTest/<ts>/ assets after the run.",
     )
     parser.add_argument(
-        "--headless", action="store_true",
-        help="Auto-launch UEEditor-Cmd with -nullrhi (no window). Default is "
-             "GUI mode so you can watch pytest drive the editor.",
+        "--gui", action="store_true",
+        help="全量回归：拉起 UnrealEditor.exe（含 PIE / Lua / requires_gui）。",
+    )
+    parser.add_argument(
+        "--full", action="store_true",
+        help="同 --gui（全量 GUI 回归别名）。",
     )
     parser.add_argument(
         "--junitxml", default=None,
@@ -251,6 +257,7 @@ def main() -> int:
     args, forwarded = parser.parse_known_args()
 
     _ensure_deps()
+    _purge_disk_artifacts("pre")
 
     audit_script = SCRIPT_DIR / "audit_capability_naming.py"
     if audit_script.is_file():
@@ -298,13 +305,17 @@ def main() -> int:
     cmd.extend(conn_args)
     if args.keep_artifacts:
         cmd.append("--keep-artifacts")
-    if args.headless:
+    if args.gui or args.full:
+        cmd.append("--gui")
+    elif "--ue-root" in conn_args:
         cmd.append("--headless")
 
     cmd.extend(forwarded)
 
     print(f"[run] {' '.join(cmd)}", flush=True)
-    return subprocess.call(cmd, cwd=str(NEXUS_UNREAL_DIR))
+    rc = subprocess.call(cmd, cwd=str(NEXUS_UNREAL_DIR))
+    _purge_disk_artifacts("post", include_report=False)
+    return rc
 
 
 if __name__ == "__main__":

@@ -132,6 +132,7 @@ def test_set_log_capture_filter_roundtrip(mcp):
     assert r3.get("captureFilter") == "all"
 
 
+@pytest.mark.requires_gui
 def test_get_slate_widget_error_path(mcp, require_tools):
     """覆盖 `get_runtime_slate_widget` 执行链 —— 真实使用要从 Widget Reflector 拿十六进制地址，
     pytest 无 UI 交互，用一个绝无可能命中的地址 `0x0` 验证工具能优雅拒绝（要么
