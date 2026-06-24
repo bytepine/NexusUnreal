@@ -1,0 +1,2 @@
+# 构建测试脚本依赖（可选，不安装也能运行）
+# charset-normalizer 已移除，改用严格 UTF-8 + GBK 回退方案

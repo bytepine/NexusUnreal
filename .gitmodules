@@ -1,0 +1,3 @@
+[submodule "Plugins/Developer/NexusLink"]
+	path = Plugins/Developer/NexusLink
+	url = ../NexusLink

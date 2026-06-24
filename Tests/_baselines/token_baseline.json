@@ -1,0 +1,35 @@
+{
+  "measured_at": "2026-04-24T04:01:58.993240+00:00",
+  "ue_url": "http://127.0.0.1:45000/stream",
+  "token_estimator": "4char_heuristic",
+  "tools_list": {
+    "structured_bytes": 29943,
+    "structured_tokens": 8049,
+    "full_response_bytes": 29943,
+    "full_response_tokens": 8049,
+    "tool_count": 53
+  },
+  "tool_responses": {
+    "list_actors": {
+      "structured_bytes": 759,
+      "structured_tokens": 204,
+      "full_response_bytes": 2150,
+      "full_response_tokens": 554,
+      "item_count": 7
+    },
+    "get_asset_section_all": {
+      "structured_bytes": 962,
+      "structured_tokens": 258,
+      "full_response_bytes": 2881,
+      "full_response_tokens": 740,
+      "asset_path": "/Game/Common/GestureLinker/BP_GestureLinker"
+    },
+    "get_output_log": {
+      "structured_bytes": 100807,
+      "structured_tokens": 26159,
+      "full_response_bytes": 239538,
+      "full_response_tokens": 60799,
+      "item_count": 500
+    }
+  }
+}
