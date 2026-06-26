@@ -6,6 +6,7 @@
 
 ## [Unreleased]
 
+- docs: README 移除 NexusLink 插件具体版本号（`v1.13.1`），改为指向 `VERSION` 文件 / Releases（避免随发版漂移）
 - chore(test): pytest / `run_e2e.py` 自动拉起 UE **默认改回 headless**（`UnrealEditor-Cmd -unattended -nullrhi -NoSplash -NoSound`），避免无窗口弹窗与对话框阻断；本地需观察编辑器时加 `--gui`
 - chore(test): 新增 `_framework/test_cleanup.py`——测试前后自动清理 `Saved/Logs` 下 `UE-auto-launch*` / `TestReport.xml` / `Automation-*.stdout.log` 与 `Content/_McpTest/`；session 级 purge `/Game/_McpTest` 下全部 UE 资产（`--keep-artifacts` 时保留）
 - fix(test): `Config/DefaultEditorPerProjectUserSettings.ini` 默认 `bEnableMcpServer=True`；`ue_launcher` 启动前写入 `Saved/Config/.../EditorPerProjectUserSettings.ini` 并追加 `-ini:...bEnableMcpServer=True`，headless 自动拉起可连 MCP
