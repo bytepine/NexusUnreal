@@ -170,6 +170,12 @@ def test_manage_behavior_tree_add_child(test_ns, mcp):
     children = root.get("children") or []
     assert children, f"expected child under root: {entry!r}"
 
+    # ── 新断言：flatIndex 先序连续 ──────────────────────────────
+    # 根节点 flatIndex=0
+    assert root.get("flatIndex") == 0, f"root flatIndex expected 0: {root!r}"
+    # 第一个子节点 flatIndex=1（先序 DFS：父节点分配后立即递归子节点）
+    assert children[0].get("flatIndex") == 1, f"child[0] flatIndex expected 1: {children[0]!r}"
+
 
 def test_manage_behavior_tree_move_node(test_ns, mcp):
     """move_node 将子节点移到指定 childIndex。"""
