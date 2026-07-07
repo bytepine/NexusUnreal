@@ -224,6 +224,12 @@ def _check_skipif_ue_below(request: pytest.FixtureRequest) -> None:
         pytest.skip(f"UE {ue_version[0]}.{ue_version[1]} < {threshold_str}，跳过")
 
 
+def skipif_ue_below(major: int, minor: int = 0):
+    """返回 pytest.mark.skipif_ue_below 标记，供 _check_skipif_ue_below autouse fixture 按版本跳过。
+    用法：@skipif_ue_below(5, 1)"""
+    return pytest.mark.skipif_ue_below(f"{major}.{minor}")
+
+
 def _require_tools(mcp: MCPClient, required: List[str]) -> None:
     try:
         require_capabilities(mcp, *required)
