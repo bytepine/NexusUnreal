@@ -216,6 +216,13 @@ def test_manage_behavior_tree_move_node(test_ns, mcp):
         f"expected moved node at index 0: {children[0]!r}"
     )
 
+    # flatIndex 兄弟节点连续性：root=0，child[0]=1，child[1]=2（先序 DFS 无跳号）
+    assert root.get("flatIndex") == 0, f"root flatIndex expected 0: {root!r}"
+    fi0 = children[0].get("flatIndex")
+    fi1 = children[1].get("flatIndex")
+    assert fi0 is not None and fi1 is not None, f"siblings missing flatIndex: {children!r}"
+    assert fi1 == fi0 + 1, f"sibling flatIndex not consecutive: {fi0}, {fi1}"
+
 
 def test_manage_asset_blackboard_enum_key(test_ns, mcp):
     """manage_asset_blackboard 支持 keyType=enum。"""
