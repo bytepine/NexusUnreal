@@ -104,6 +104,9 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     blocked = names & _HEADLESS_SKIP_MARKERS
     if blocked:
         pytest.skip(f"headless/命令行模式跳过（{','.join(sorted(blocked))}）")
+
+
+# ─────────────────────────────────────────────────────────────
 # Session-scoped fixtures
 # ─────────────────────────────────────────────────────────────
 
@@ -184,6 +187,41 @@ def mcp(_ue_url: str) -> Generator[MCPClient, None, None]:
 @pytest.fixture(scope="session")
 def tool_names(mcp: MCPClient) -> List[str]:
     return [t["name"] for t in mcp.list_tools()]
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _cache_ue_engine_version(mcp: MCPClient, pytestconfig: pytest.Config) -> None:
+    """session 启动时查询 get_editor_info 缓存 UE 版本元组，供 skipif_ue_below 使用。"""
+    try:
+        info_list = mcp.call("get_editor_info")
+        entries = info_list if isinstance(info_list, list) else [info_list]
+        for entry in entries:
+            if isinstance(entry, dict):
+                ver_str = entry.get("engineVersion", "")
+                if ver_str:
+                    parts = ver_str.split(".")
+                    if len(parts) >= 2:
+                        pytestconfig._nexus_ue_version = (int(parts[0]), int(parts[1]))  # type: ignore[attr-defined]
+                        log.info("UE version detected: %s.%s", parts[0], parts[1])
+                        break
+    except Exception as exc:
+        log.warning("无法获取 UE 版本（skipif_ue_below 将默认 skip）: %s", exc)
+
+
+@pytest.fixture(autouse=True)
+def _check_skipif_ue_below(request: pytest.FixtureRequest) -> None:
+    """每个测试前检查 skipif_ue_below marker，对版本不足的测试 skip。"""
+    marker = request.node.get_closest_marker("skipif_ue_below")
+    if marker is None:
+        return
+    threshold_str = str(marker.args[0]) if marker.args else "5.0"
+    parts = threshold_str.split(".")
+    required = (int(parts[0]), int(parts[1]) if len(parts) > 1 else 0)
+    ue_version: Optional[tuple] = getattr(request.config, "_nexus_ue_version", None)
+    if ue_version is None:
+        pytest.skip(f"UE 版本未知，跳过（需 {threshold_str}+）")
+    if ue_version < required:
+        pytest.skip(f"UE {ue_version[0]}.{ue_version[1]} < {threshold_str}，跳过")
 
 
 def _require_tools(mcp: MCPClient, required: List[str]) -> None:
