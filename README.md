@@ -16,11 +16,10 @@
 git clone --recurse-submodules https://github.com/bytepine/NexusUnreal.git
 ```
 
-作为 [NexusWork](https://github.com/bytepine/NexusWork) 工作区的子模块时：
+已克隆但未拉子模块时：
 
 ```bash
-git submodule update --init nexus-unreal
-git submodule update --init Plugins/Developer/NexusLink   # 在 nexus-unreal 目录内
+git submodule update --init --recursive
 ```
 
 引擎：`Nexus.uproject` → `EngineAssociation: 4.26`
@@ -74,7 +73,6 @@ git submodule update --init Plugins/Developer/NexusLink   # 在 nexus-unreal 目
 | [NexusLink](https://github.com/bytepine/NexusLink) | 公开 | UE MCP 插件（本仓子模块） |
 | [NexusRider](https://github.com/bytepine/NexusRider) | 公开 | Rider MCP 代理 |
 | [NexusVSCode](https://github.com/bytepine/NexusVSCode) | 公开 | VSCode / Cursor MCP 扩展 |
-| [NexusWork](https://github.com/bytepine/NexusWork) | 私有 | 内部工作区根目录（聚合本仓与 IDE 子模块） |
 
 ---
 
