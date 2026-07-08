@@ -1,25 +1,26 @@
 ﻿# NexusUnreal
 
-**私有** UE 4.26 游戏工程：ThirdPerson 示例玩法、UnLua 脚本、游戏 C++ 模块，以及 NexusLink MCP 插件挂载与回归测试宿主。
+**公开** UE 4.26 **示例工程**：演示如何在 ThirdPerson 模板项目中集成 [NexusLink](https://github.com/bytepine/NexusLink) MCP 插件。含 UnLua 脚本、游戏 C++ 模块与 MCP 回归测试宿主。
 
-> **NexusLink 插件文档与发版**不在本仓维护，见公开仓 [bytepine/NexusLink](https://github.com/bytepine/NexusLink)。
+> 本仓**不包含** NexusLink 插件本体（以 git 子模块挂载）；Fab / 商店用户请单独安装插件，或克隆时 `--recurse-submodules`。
+>
+> **NexusLink 插件文档与发版**见公开仓 [bytepine/NexusLink](https://github.com/bytepine/NexusLink)。
 
 ---
 
 ## 克隆
 
-本仓通常作为 [NexusWork](https://github.com/bytepine/NexusWork) 的 `nexus-unreal` 子模块使用：
-
-```bash
-# 在 NexusWork 根目录
-git submodule update --init nexus-unreal
-git submodule update --init Plugins/Developer/NexusLink   # 在 nexus-unreal 目录内
-```
-
-单独克隆（须同时拉 NexusLink 子模块）：
+**推荐**（同时拉取 NexusLink 子模块）：
 
 ```bash
 git clone --recurse-submodules https://github.com/bytepine/NexusUnreal.git
+```
+
+作为 [NexusWork](https://github.com/bytepine/NexusWork) 工作区的子模块时：
+
+```bash
+git submodule update --init nexus-unreal
+git submodule update --init Plugins/Developer/NexusLink   # 在 nexus-unreal 目录内
 ```
 
 引擎：`Nexus.uproject` → `EngineAssociation: 4.26`
@@ -43,7 +44,7 @@ git clone --recurse-submodules https://github.com/bytepine/NexusUnreal.git
 
 ## MCP 接入
 
-1. 安装 NexusLink：从 [NexusLink Releases](https://github.com/bytepine/NexusLink/releases) 下载 zip，或确保子模块 `Plugins/Developer/NexusLink` 已初始化
+1. 确保 NexusLink 子模块已初始化，或从 [NexusLink Releases](https://github.com/bytepine/NexusLink/releases) 下载 zip 放入 `Plugins/Developer/NexusLink`
 2. 启用：**Editor Preferences → Plugins → NexusLink → 启用 MCP 服务器**（默认关）→ HTTP `:45000` / WS `:55000`
 3. IDE 代理：[NexusVSCode](https://github.com/bytepine/NexusVSCode)（`:6900`）或 [NexusRider](https://github.com/bytepine/NexusRider)（`:6800`）
 4. 完整配置：[NexusLink 使用指南](https://github.com/bytepine/NexusLink/blob/master/docs/usage-guide.md)
@@ -70,10 +71,10 @@ git clone --recurse-submodules https://github.com/bytepine/NexusUnreal.git
 
 | 仓库 | 可见性 | 关系 |
 |------|--------|------|
-| [NexusWork](https://github.com/bytepine/NexusWork) | 私有 | 工作区根目录，聚合本仓与 IDE 子模块 |
 | [NexusLink](https://github.com/bytepine/NexusLink) | 公开 | UE MCP 插件（本仓子模块） |
 | [NexusRider](https://github.com/bytepine/NexusRider) | 公开 | Rider MCP 代理 |
 | [NexusVSCode](https://github.com/bytepine/NexusVSCode) | 公开 | VSCode / Cursor MCP 扩展 |
+| [NexusWork](https://github.com/bytepine/NexusWork) | 私有 | 内部工作区根目录（聚合本仓与 IDE 子模块） |
 
 ---
 
@@ -81,4 +82,4 @@ git clone --recurse-submodules https://github.com/bytepine/NexusUnreal.git
 
 本仓源码与文档：[MIT](LICENSE) © byteyang
 
-游戏内容、`.uasset` 等私有资产仅内部使用。NexusLink 插件许可见 [Plugins/Developer/NexusLink/LICENSE](Plugins/Developer/NexusLink/LICENSE)（MIT）。
+示例关卡与 Mannequin 等 `.uasset` 基于 UE 模板内容，使用须遵守 [Unreal Engine EULA](https://www.unrealengine.com/eula)。NexusLink 插件许可见 [Plugins/Developer/NexusLink/LICENSE](Plugins/Developer/NexusLink/LICENSE)（MIT）。
