@@ -75,6 +75,58 @@ def test_bp_component_add_remove(mcp, bp_path):
     assert isinstance(r_remove, dict), f"remove_component unexpected: {r_remove!r}"
 
 
+def test_bp_component_section_owned_inherited_native(mcp, test_ns):
+    """component section 应合并 owned/inherited/native 三类来源并正确标注：
+    父 BP（parentClass=Character）新增持久组件 ParentMesh；子 BP 派生自父 BP 并新增自己的 ChildMesh；
+    Character 作为原生祖先贡献 CapsuleComponent 等 native 组件。使用独立资产路径，不影响 bp_path 相关测试。"""
+    parent_path = f"{test_ns}/BP_CompParent"
+    parent_create = mcp.call_capability("create_asset_blueprint", assetPath=parent_path, parentClass="Character")
+    assert isinstance(parent_create, dict), f"create parent bp: {parent_create!r}"
+
+    add_parent = mcp.call_capability(
+        "manage_asset_blueprint", assetPath=parent_path,
+        action="add_component", componentName="ParentMesh", componentClass="StaticMeshComponent",
+    )
+    assert isinstance(add_parent, dict), f"add_component parent: {add_parent!r}"
+    mcp.call("save_asset", assetPaths=[parent_path])
+
+    parent_class_path = f"{parent_path}.BP_CompParent_C"
+    child_path = f"{test_ns}/BP_CompChild"
+    child_create = mcp.call_capability("create_asset_blueprint", assetPath=child_path, parentClass=parent_class_path)
+    assert isinstance(child_create, dict), f"create child bp (parentClass={parent_class_path}): {child_create!r}"
+
+    add_child = mcp.call_capability(
+        "manage_asset_blueprint", assetPath=child_path,
+        action="add_component", componentName="ChildMesh", componentClass="StaticMeshComponent",
+    )
+    assert isinstance(add_child, dict), f"add_component child: {add_child!r}"
+
+    r = mcp.call_capability("get_asset_blueprint", assetPath=child_path, sections=["component"])
+    payload = cap_first(r)
+    components = payload.get("components") or []
+    by_name = {c.get("variableName"): c for c in components}
+
+    child_mesh = by_name.get("ChildMesh")
+    assert child_mesh and child_mesh.get("source") == "owned", f"ChildMesh not owned: {components!r}"
+    assert "inherited" not in child_mesh, f"owned 组件不应带 inherited: {child_mesh!r}"
+
+    parent_mesh = by_name.get("ParentMesh")
+    assert parent_mesh, f"ParentMesh (父 BP SCS) 未出现在子 BP 组件列表中: {components!r}"
+    assert parent_mesh.get("source") == "inherited", f"ParentMesh source 应为 inherited: {parent_mesh!r}"
+    assert parent_mesh.get("inherited") is True, f"ParentMesh 缺 inherited 标记: {parent_mesh!r}"
+    assert parent_mesh.get("ownerBlueprint") == "BP_CompParent", f"ParentMesh ownerBlueprint: {parent_mesh!r}"
+
+    native_entries = [c for c in components if c.get("source") == "native"]
+    assert native_entries, f"Character 原生祖先组件（如 CapsuleComponent）未出现: {components!r}"
+    for entry in native_entries:
+        assert entry.get("inherited") is True, f"native 组件缺 inherited 标记: {entry!r}"
+
+    hierarchy = payload.get("hierarchy") or []
+    assert hierarchy, f"hierarchy 为空: {payload!r}"
+
+    mcp.call("save_asset", assetPaths=[child_path])
+
+
 def test_bp_graph_roundtrip(mcp, bp_path):
     """4.8–4.12：get graph → add_node → set_node → remove_node。
     在 all 查询之前独立查 sections=["graph"]，避免 redundant_call。"""
