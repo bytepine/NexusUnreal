@@ -62,6 +62,18 @@ def test_search_capabilities_get_asset_hint(mcp):
     assert "get_asset_" in hint, f"expected routing hint: {r!r}"
 
 
+def test_search_capabilities_query_too_broad(mcp):
+    """单用过宽词 blueprint 应硬拦截，返回 suggestedQueries 而非整类列表。"""
+    r = mcp.call("search_capabilities", query="blueprint")
+    assert r.get("errorKind") == "query_too_broad", r
+    assert r.get("totalCount") == 0, r
+    caps = r.get("capabilities") or []
+    assert caps == [], r
+    suggested = r.get("suggestedQueries") or []
+    assert any("blueprint" in str(q) for q in suggested), r
+    assert r.get("_feedbackHint"), r
+
+
 def test_search_capabilities_not_found(mcp):
     """精确名不存在时 errorKind=not_found，勿与 disabled 混用。"""
     r = mcp.call(
