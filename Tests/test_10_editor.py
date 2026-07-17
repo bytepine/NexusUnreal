@@ -43,16 +43,14 @@ def test_get_editor_context_sections(mcp, require_tools):
         sections=["selection_actors", "content_browser_path"],
         limit=10,
     )
-    results = r.get("results") or [r]
-    entry = results[0] if results else r
+    entry = cap_first(r)
     assert "sections" in entry or "actors" in entry or "path" in entry, entry
 
 
 def test_search_console_variables_stat(mcp, require_tools):
     require_tools("search_console_variables")
     r = mcp.call_capability("search_console_variables", query="stat", limit=5)
-    results = r.get("results") or [r]
-    entry = results[0] if results else r
+    entry = cap_first(r)
     assert entry.get("totalCount", 0) >= 0, entry
     vars_list = entry.get("variables") or []
     assert isinstance(vars_list, list), entry
@@ -66,7 +64,7 @@ def test_get_asset_lua_binding_sample(mcp):
     if not bp:
         pytest.skip("无 Blueprint 样本")
     r = mcp.call_capability("get_asset_lua_binding", assetPath=bp)
-    entry = (r.get("results") or [r])[0]
+    entry = cap_first(r)
     assert not entry.get("error"), entry
     assert "bound" in entry or "fileExists" in entry, entry
 
@@ -75,10 +73,9 @@ def test_get_asset_lua_binding_sample(mcp):
 def test_capture_viewport_editor_desktop_validate(mcp, require_tools):
     require_tools("capture_viewport")
     r = mcp.call_capability("capture_viewport", target="editor_desktop", validateOnly=True)
-    results = r.get("results") or [r]
-    entry = results[0] if results else r
+    entry = cap_first(r)
     assert entry.get("validateOnly") is True, entry
-    assert entry.get("success") is True, entry
+    assert not entry.get("error"), entry
 
 
 @pytest.mark.requires_gui
@@ -86,9 +83,8 @@ def test_capture_viewport_validate_only(mcp, require_tools):
     """validateOnly 不写图片，仅验证 editor 视口通路。"""
     require_tools("capture_viewport")
     r = mcp.call_capability("capture_viewport", target="editor", validateOnly=True)
-    results = r.get("results") or [r]
-    entry = results[0] if results else r
+    entry = cap_first(r)
     assert entry.get("validateOnly") is True, entry
-    assert entry.get("success") is True, entry
+    assert not entry.get("error"), entry
 
 

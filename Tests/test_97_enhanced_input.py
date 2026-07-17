@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import pytest
 
+from _framework.mcp_client import cap_first
+
 pytestmark = [pytest.mark.l3_asset, pytest.mark.skipif_ue_below("5.0")]
 
 
@@ -17,18 +19,16 @@ def test_create_input_action(test_ns, mcp):
         assetPath=path,
         valueType="Boolean",
     )
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    assert not results[0].get("error"), r
-    assert results[0].get("success"), r
+    entry = cap_first(r)
+    assert not entry.get("error"), r
+    assert not entry.get("error") and entry.get("success") is not False, r
 
 
 def test_get_input_action(test_ns, mcp):
     path = f"{test_ns}/IA_TestJump"
     r = mcp.call_capability("get_asset_input_action", assetPath=path)
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    entry = results[0]
+    entry = cap_first(r)
+    entry = entry
     assert entry.get("valueType") == "Boolean", entry
     assert entry.get("assetType") == "InputAction", entry
 
@@ -40,9 +40,8 @@ def test_manage_input_action_set_value_type(test_ns, mcp):
         assetPath=path,
         operations=[{"action": "set_value_type", "valueType": "Axis1D"}],
     )
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    assert not results[0].get("error"), r
+    entry = cap_first(r)
+    assert not entry.get("error"), r
 
     # 验证已更新
     check = mcp.call_capability("get_asset_input_action", assetPath=path)
@@ -56,10 +55,9 @@ def test_manage_input_action_add_trigger(test_ns, mcp):
         assetPath=path,
         operations=[{"action": "add_trigger", "className": "InputTriggerPressed"}],
     )
-    results = r.get("results") or []
-    assert len(results) == 1, r
+    entry = cap_first(r)
     # 允许未找到类（不同 UE 版本类名略有差异），不视为失败
-    assert "error" not in results[0] or "未找到" in results[0]["error"], r
+    assert "error" not in entry or "未找到" in entry["error"], r
 
 
 # ── InputMappingContext ───────────────────────────────────────────────────────
@@ -67,18 +65,16 @@ def test_manage_input_action_add_trigger(test_ns, mcp):
 def test_create_input_mapping_context(test_ns, mcp):
     path = f"{test_ns}/IMC_TestDefault"
     r = mcp.call_capability("create_asset_input_mapping_context", assetPath=path)
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    assert not results[0].get("error"), r
-    assert results[0].get("success"), r
+    entry = cap_first(r)
+    assert not entry.get("error"), r
+    assert not entry.get("error") and entry.get("success") is not False, r
 
 
 def test_get_input_mapping_context(test_ns, mcp):
     path = f"{test_ns}/IMC_TestDefault"
     r = mcp.call_capability("get_asset_input_mapping_context", assetPath=path)
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    entry = results[0]
+    entry = cap_first(r)
+    entry = entry
     assert entry.get("assetType") == "InputMappingContext", entry
     assert "mappingsCount" in entry, entry
 

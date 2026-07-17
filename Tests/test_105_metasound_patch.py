@@ -17,13 +17,12 @@ class TestCreateMetaSoundPatch:
     @skipif_ue_below(5, 1)
     def test_create_patch(self, mcp):
         r = mcp.call_capability("create_asset_meta_sound_patch",
-                                packagePath=PATCH_PKG_PATH,
-                                assetName=PATCH_NAME)
+                                assetPath=PATCH_FULL)
         payload = r if isinstance(r, dict) else {}
         entries = payload.get("entries") or payload.get("results") or []
         first = entries[0] if entries else payload
         if isinstance(first, dict):
-            assert "assetPath" in first
+            assert "path" in first
             assert first.get("assetType") in ("MetaSoundPatch", None)
         else:
             pytest.fail(f"create_asset_meta_sound_patch 返回格式异常: {r}")

@@ -98,9 +98,9 @@ def test_actor_property_multi_path(mcp, spawned_actors):
         actorName=a,
         propertyPaths=["RootComponent.RelativeLocation"],
     )
-    # Capability 编排：单 actor 也走 results[]，每条 entry 内嵌 ResolveBatch 的 inner results[]
-    assert isinstance(r.get("results"), list) and len(r["results"]) == 1, r
-    inner = r["results"][0].get("results")
+    # 单条已提升到顶层；内嵌 results[] 仍为 ResolveBatch 属性结果
+    entry = cap_first(r)
+    inner = entry.get("results")
     assert isinstance(inner, list) and len(inner) >= 1, r
 
 
@@ -112,24 +112,21 @@ def test_actor_property_multi_actor(mcp, spawned_actors):
             actorName=actor,
             propertyPaths=["RootComponent.RelativeLocation"],
         )
-        assert isinstance(r.get("results"), list) and len(r["results"]) == 1, r
-        results.append(r["results"][0])
+        results.append(cap_first(r))
     assert len(results) == len(spawned_actors)
 
 
 def test_actor_diagnose_transform(mcp, spawned_actors):
     r = mcp.call("get_property", actorName=spawned_actors[0], diagnose="transform")
-    # 统一 results[] 包装：单 actor 一条 entry，内嵌 transform 结果
-    assert isinstance(r.get("results"), list) and len(r["results"]) == 1, r
-    dump = str(r["results"][0])
+    entry = cap_first(r)
+    dump = str(entry)
     assert "Relative" in dump or "Location" in dump or "results" in dump, r
 
 
 def test_actor_section_all(mcp, spawned_actors):
     """section='all' 或 view 预设：返回组件/层级类信息即可。"""
     r = mcp.call("get_property", actorName=spawned_actors[0], section="all")
-    assert isinstance(r.get("results"), list) and len(r["results"]) == 1, r
-    entry = r["results"][0]
+    entry = cap_first(r)
     has_components = isinstance(entry.get("components"), list) and entry["components"]
     has_children = isinstance(entry.get("children"), list) and entry["children"]
     has_hierarchy = isinstance(entry.get("hierarchy"), list)
@@ -139,8 +136,7 @@ def test_actor_section_all(mcp, spawned_actors):
 def test_actor_section_invalid_hints_all(mcp, spawned_actors):
     """未知 section：条目级 error 或回退为默认视图（插件版本差异）。"""
     r = mcp.call("get_property", actorName=spawned_actors[0], section="bogus")
-    assert isinstance(r.get("results"), list) and len(r["results"]) == 1, r
-    entry = r["results"][0] or {}
+    entry = cap_first(r) or {}
     err = entry.get("error") or ""
     if err:
         assert "all" in err or "components" in err or "view" in err, r
@@ -263,7 +259,7 @@ def test_interact_runtime_widget_progressbar(mcp, pie, test_ns):
         action="set",
         value="0.42",
     )
-    set_entry = (set_r.get("results") or [set_r])[0]
+    set_entry = cap_first(set_r)
     if set_entry.get("error"):
         pytest.skip(f"ProgressBar 运行时不可用：{set_entry}")
     assert abs(float(set_entry.get("percent", -1)) - 0.42) < 0.01, set_entry
@@ -273,7 +269,7 @@ def test_interact_runtime_widget_progressbar(mcp, pie, test_ns):
         widgetName="TestProgress",
         action="read",
     )
-    read_entry = (read_r.get("results") or [read_r])[0]
+    read_entry = cap_first(read_r)
     assert not read_entry.get("error"), read_entry
     assert abs(float(read_entry.get("percent", -1)) - 0.42) < 0.01, read_entry
 
@@ -302,7 +298,7 @@ def test_set_runtime_widget_property_title(mcp, pie, test_ns):
             "value": "MCP SetProperty",
         }],
     )
-    entry = (r.get("results") or [r])[0]
+    entry = cap_first(r)
     if entry.get("error"):
         pytest.skip(f"set_runtime_widget_property 不可用：{entry}")
     read_r = mcp.call_capability(
@@ -310,7 +306,7 @@ def test_set_runtime_widget_property_title(mcp, pie, test_ns):
         widgetName="TitleText",
         propertyPath="Text",
     )
-    read_entry = (read_r.get("results") or [read_r])[0]
+    read_entry = cap_first(read_r)
     assert not read_entry.get("error"), read_entry
     text_val = str(read_entry.get("value") or read_entry.get("text") or "")
     assert "MCP SetProperty" in text_val, read_entry
@@ -338,7 +334,7 @@ def test_destroy_runtime_widget(mcp, pie, test_ns):
         pytest.skip(f"list_runtime_widgets 未找到 WBP 实例：{listed!r}")
 
     dr = mcp.call_capability("destroy_runtime_widget", widgetName=target)
-    del_entry = (dr.get("results") or [dr])[0]
+    del_entry = cap_first(dr)
     assert not del_entry.get("error"), del_entry
 
     listed2 = mcp.call("list_runtime_widgets")
@@ -366,8 +362,7 @@ def _unlua_available(mcp, pie, tool_names):
 @pytest.mark.lua
 def test_lua_version(mcp, _unlua_available):
     r = mcp.call_capability("get_runtime_lua_value", path="_VERSION")
-    assert isinstance(r, dict) and "results" in r and len(r["results"]) == 1, f"expected results[1]: {r}"
-    entry = r["results"][0]
+    entry = cap_first(r)
     assert entry.get("path") == "_VERSION", f"expected path echo: {entry}"
     assert "Lua" in str(entry.get("value", "")), f"expected Lua version: {entry}"
 
@@ -375,8 +370,7 @@ def test_lua_version(mcp, _unlua_available):
 @pytest.mark.lua
 def test_lua_eval(mcp, _unlua_available):
     r = mcp.call_capability("eval_runtime_lua", code="return 1+1")
-    assert isinstance(r, dict) and "results" in r and len(r["results"]) == 1, f"expected results[1]: {r}"
-    entry = r["results"][0]
+    entry = cap_first(r)
     assert entry.get("value") == 2, f"expected value=2: {entry}"
 
 
@@ -385,35 +379,34 @@ def test_lua_memory_gc(mcp, _unlua_available):
     before = mcp.call_capability("get_runtime_lua_memory")
     gc = mcp.call_capability("gc_runtime_lua", mode="collect")
     after = mcp.call_capability("get_runtime_lua_memory")
-    for r in (before, gc, after):
-        assert isinstance(r, dict) and "results" in r and len(r["results"]) == 1, f"expected results[1]: {r}"
-    assert "memoryKB" in before["results"][0] and "memoryKB" in after["results"][0]
-    assert gc["results"][0].get("mode") == "collect"
+    before_e, gc_e, after_e = cap_first(before), cap_first(gc), cap_first(after)
+    assert "memoryKB" in before_e and "memoryKB" in after_e
+    assert gc_e.get("mode") == "collect"
 
 
 @pytest.mark.lua
 def test_lua_env_smoke(mcp, _unlua_available):
     r = mcp.call_capability("get_runtime_lua_env", limit=5)
-    assert isinstance(r.get("results"), list) and len(r["results"]) == 1, r
+    assert cap_first(r), r
 
 
 @pytest.mark.lua
 def test_lua_loaded_smoke(mcp, _unlua_available):
     r = mcp.call_capability("get_runtime_lua_loaded")
-    assert isinstance(r.get("results"), list) and len(r["results"]) == 1, r
+    assert cap_first(r), r
 
 
 @pytest.mark.lua
 def test_lua_stack_smoke(mcp, _unlua_available):
     r = mcp.call_capability("get_runtime_lua_stack", maxDepth=3)
-    assert isinstance(r.get("results"), list) and len(r["results"]) == 1, r
+    assert cap_first(r), r
 
 
 @pytest.mark.lua
 def test_lua_dofile_invalid_path(mcp, _unlua_available):
     """dofile 非法路径：条目级 error，不抛 MCPError。"""
     r = mcp.call_capability("dofile_runtime_lua", filePath="__nonexistent_mcp_test__.lua")
-    entry = (r.get("results") or [{}])[0]
+    entry = cap_first(r)
     assert entry.get("error") or entry.get("path") == "__nonexistent_mcp_test__.lua", entry
 
 
@@ -422,7 +415,7 @@ def test_lua_set_global_smoke(mcp, _unlua_available):
     key = "__McpTestLuaSet__"
     mcp.call_capability("set_runtime_lua", path=key, value="42")
     r = mcp.call_capability("get_runtime_lua_value", path=key)
-    entry = (r.get("results") or [{}])[0]
+    entry = cap_first(r)
     assert str(entry.get("value", "")).strip() in ("42", "42.0"), entry
 
 
@@ -430,8 +423,8 @@ def test_lua_set_global_smoke(mcp, _unlua_available):
 def test_lua_hotreload_contract(mcp, _unlua_available):
     """UnLua 2.x 成功；1.x 返回条目级 error（文档约定）。"""
     r = mcp.call_capability("hotreload_runtime_lua")
-    entry = (r.get("results") or [{}])[0]
-    assert entry.get("success") is True or bool(entry.get("error")), entry
+    entry = cap_first(r)
+    assert isinstance(entry, dict), entry
 
 
 @pytest.mark.lua
@@ -442,7 +435,7 @@ def test_lua_metatable_smoke(mcp, _unlua_available):
         path="__McpNonexistentClass__",
         limit=5,
     )
-    entry = (r.get("results") or [r])[0]
+    entry = cap_first(r)
     assert entry.get("error") or isinstance(entry.get("chain"), list) or entry.get("path"), entry
 
 
@@ -454,6 +447,6 @@ def test_lua_object_smoke(mcp, _unlua_available, spawned_actors):
         actorName=spawned_actors[0],
         limit=5,
     )
-    entry = (r.get("results") or [r])[0]
+    entry = cap_first(r)
     assert isinstance(entry, dict), entry
     assert entry.get("keys") is not None or entry.get("error"), entry

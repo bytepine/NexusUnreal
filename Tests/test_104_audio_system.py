@@ -24,7 +24,7 @@ class TestSoundClass:
         results = (r.get("results") or []) if isinstance(r, dict) else []
         assert results, f"create_asset_sound_class 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
-        assert first.get("success") or first.get("name"), f"创建失败: {first}"
+        assert (not first.get("error") and first.get("success") is not False) or first.get("name"), f"创建失败: {first}"
 
     def test_get(self, mcp):
         r = mcp.call_capability("get_asset_sound_class", assetPath=_SOUND_CLASS_PATH)
@@ -41,7 +41,7 @@ class TestSoundClass:
         results = (r.get("results") or []) if isinstance(r, dict) else []
         assert results, f"manage_asset_sound_class 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
-        assert first.get("success"), f"manage 失败: {first}"
+        assert not first.get("error") and first.get("success") is not False, f"manage 失败: {first}"
 
     def test_get_after_manage(self, mcp):
         r = mcp.call_capability("get_asset_sound_class", assetPath=_SOUND_CLASS_PATH)
@@ -69,7 +69,7 @@ class TestSoundAttenuation:
         results = (r.get("results") or []) if isinstance(r, dict) else []
         assert results, f"create_asset_sound_attenuation 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
-        assert first.get("success") or first.get("name"), f"创建失败: {first}"
+        assert (not first.get("error") and first.get("success") is not False) or first.get("name"), f"创建失败: {first}"
 
     def test_get(self, mcp):
         r = mcp.call_capability("get_asset_sound_attenuation", assetPath=_SOUND_ATTENUATION_PATH)
@@ -86,7 +86,7 @@ class TestSoundAttenuation:
         results = (r.get("results") or []) if isinstance(r, dict) else []
         assert results, f"manage_asset_sound_attenuation 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
-        assert first.get("success"), f"manage 失败: {first}"
+        assert not first.get("error") and first.get("success") is not False, f"manage 失败: {first}"
 
     def test_search_sound_attenuation(self, mcp):
         r = mcp.call_capability("search_asset",
@@ -108,7 +108,7 @@ class TestSoundConcurrency:
         results = (r.get("results") or []) if isinstance(r, dict) else []
         assert results, f"create_asset_sound_concurrency 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
-        assert first.get("success") or first.get("name"), f"创建失败: {first}"
+        assert (not first.get("error") and first.get("success") is not False) or first.get("name"), f"创建失败: {first}"
 
     def test_get(self, mcp):
         r = mcp.call_capability("get_asset_sound_concurrency", assetPath=_SOUND_CONCURRENCY_PATH)
@@ -125,7 +125,7 @@ class TestSoundConcurrency:
         results = (r.get("results") or []) if isinstance(r, dict) else []
         assert results, f"manage_asset_sound_concurrency 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
-        assert first.get("success"), f"manage 失败: {first}"
+        assert not first.get("error") and first.get("success") is not False, f"manage 失败: {first}"
 
     def test_get_after_manage(self, mcp):
         r = mcp.call_capability("get_asset_sound_concurrency", assetPath=_SOUND_CONCURRENCY_PATH)

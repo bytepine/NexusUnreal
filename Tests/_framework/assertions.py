@@ -1,29 +1,27 @@
 # Copyright byteyang. All Rights Reserved.
 """Reusable assertion helpers for MCP tool responses.
 
-The NexusLink batch tools follow a stable response shape:
+Capability 响应形状：
+  - 单条 Entries：字段已提升到顶层（无 results 信封）
+  - 多条 Entries：{ "results": [ {...}, ... ] }
+  - 部分 manage：提升后顶层仍有内嵌 results[]（操作子结果）
 
-    {
-      "totalCount": N,
-      "successCount": M,
-      "failureCount": N - M,
-      "results": [ { "error": "..." } | { <fields> } , ... ]
-    }
-
-Tests assert on this shape frequently, so we extract the glue here.
+测试通过 cap_entries / cap_first 兼容两种形状。
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Optional
 
+from _framework.mcp_client import cap_entries
+
 
 def assert_batch_success(result: Dict[str, Any], expected_count: Optional[int] = None,
                          *, context: str = "") -> None:
-    """Fail if any entry in `results` has an error field."""
+    """Fail if any capability entry has an error field."""
     ctx = f" ({context})" if context else ""
-    results = result.get("results")
-    assert isinstance(results, list), f"missing results array{ctx}: {result!r}"
+    results = cap_entries(result)
+    assert results, f"missing capability entries{ctx}: {result!r}"
     errors = [r for r in results if isinstance(r, dict) and r.get("error")]
     assert not errors, f"batch had failures{ctx}: {errors!r}"
     if expected_count is not None:
@@ -41,24 +39,28 @@ def assert_success_count(result: Dict[str, Any], expected: int, *, context: str 
     ctx = f" ({context})" if context else ""
     sc = result.get("successCount")
     if sc is None:
-        # 新版批量 API 不再返回 successCount，回退到统计 results 中无 error 的条目数
-        results = result.get("results") or []
-        sc = sum(1 for r in results if isinstance(r, dict) and not r.get("error"))
+        # 新版批量 API 不再返回 successCount，回退到统计 entry 中无 error 且未显式 success:false
+        results = cap_entries(result)
+        sc = sum(
+            1
+            for r in results
+            if isinstance(r, dict) and not r.get("error") and r.get("success") is not False
+        )
     assert sc == expected, f"successCount={sc}, expected {expected}{ctx}: {result!r}"
 
 
 def pluck_errors(result: Dict[str, Any]) -> List[str]:
     out: List[str] = []
-    for r in result.get("results", []) or []:
+    for r in cap_entries(result):
         if isinstance(r, dict) and r.get("error"):
             out.append(str(r["error"]))
     return out
 
 
 def ids_of(result: Dict[str, Any], key: str = "nodeId") -> List[str]:
-    """Collect an id field from each result entry (missing → skipped)."""
+    """Collect an id field from each capability entry (missing → skipped)."""
     out: List[str] = []
-    for r in result.get("results", []) or []:
+    for r in cap_entries(result):
         if isinstance(r, dict):
             v = r.get(key)
             if isinstance(v, str):

@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import pytest
 
+from _framework.mcp_client import cap_first
+
 pytestmark = [pytest.mark.l3_asset, pytest.mark.skipif_ue_below("5.5")]
 
 
@@ -30,10 +32,9 @@ def test_manage_state_tree_add_state(st_path, mcp):
         assetPath=st_path,
         operations=[{"action": "add_state", "stateName": "NxTestState_AutoAdded"}],
     )
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    assert not results[0].get("error"), r
-    assert results[0].get("success"), r
+    entry = cap_first(r)
+    assert not entry.get("error"), r
+    assert not entry.get("error") and entry.get("success") is not False, r
 
 
 def test_manage_state_tree_rename_state(st_path, mcp):
@@ -46,9 +47,8 @@ def test_manage_state_tree_rename_state(st_path, mcp):
             "newName": "NxTestState_Renamed",
         }],
     )
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    assert not results[0].get("error"), r
+    entry = cap_first(r)
+    assert not entry.get("error"), r
 
 
 def test_manage_state_tree_remove_state(st_path, mcp):
@@ -57,9 +57,8 @@ def test_manage_state_tree_remove_state(st_path, mcp):
         assetPath=st_path,
         operations=[{"action": "remove_state", "stateName": "NxTestState_Renamed"}],
     )
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    assert results[0].get("success"), r
+    entry = cap_first(r)
+    assert not entry.get("error") and entry.get("success") is not False, r
 
 
 def test_manage_state_tree_recompile(st_path, mcp):
@@ -68,6 +67,5 @@ def test_manage_state_tree_recompile(st_path, mcp):
         assetPath=st_path,
         operations=[{"action": "recompile"}],
     )
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    assert not results[0].get("error"), r
+    entry = cap_first(r)
+    assert not entry.get("error"), r

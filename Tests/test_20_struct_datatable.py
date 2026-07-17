@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import pytest
 
+from _framework.mcp_client import cap_first
+
 from _framework.assertions import assert_batch_success, assert_success_count
 
 pytestmark = pytest.mark.l3_asset
@@ -105,9 +107,8 @@ def test_datatable_set_row_error_path(mcp, datatable_path, require_tools):
         ],
     )
     assert isinstance(r, dict), r
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    assert results[0].get("error"), f"expected per-result error: {results[0]!r}"
+    entry = cap_first(r)
+    assert entry.get("error"), f"expected per-result error: {entry!r}"
 
 
 def test_datatable_row_remove(mcp, datatable_path):

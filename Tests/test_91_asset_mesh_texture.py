@@ -16,10 +16,10 @@ def test_compile_blueprint_test_actor(test_ns, mcp, require_tools):
     require_tools("compile_blueprint")
     bp = ensure_blueprint(mcp, test_ns, "BP_TestActor")
     r = mcp.call_capability("compile_blueprint", assetPath=bp)
-    results = r.get("results") or [r]
-    entry = results[0] if results else r
+    entry = cap_first(r)
     assert not entry.get("error"), entry
-    assert entry.get("success") is True, entry
+    # compile 成功时可能仍带 compilerWarnings；无 error 且无显式 success:false 即可
+    assert entry.get("success") is not False, entry
 
 
 @pytest.mark.requires_gui
@@ -39,7 +39,7 @@ def test_get_asset_texture_project_sample(mcp, require_tools):
         if not candidate:
             continue
         probe = mcp.call_capability("get_asset_texture", assetPath=candidate)
-        entry = (probe.get("results") or [probe])[0]
+        entry = cap_first(probe)
         if not entry.get("error") and entry.get("width") and entry.get("height"):
             path = candidate
             break
@@ -47,7 +47,7 @@ def test_get_asset_texture_project_sample(mcp, require_tools):
         path = "/Game/Mannequin/Character/Textures/T_Male_N"
     assert path, "无法定位有效 Texture2D 样本"
     r = mcp.call_capability("get_asset_texture", assetPath=path)
-    entry = (r.get("results") or [r])[0]
+    entry = cap_first(r)
     assert not entry.get("error"), entry
     assert entry.get("width") and entry.get("height"), entry
 
@@ -58,7 +58,6 @@ def test_get_asset_static_mesh_project_sample(mcp, require_tools):
     path = first_asset_path(mcp, "StaticMesh")
     assert path, "无法定位 StaticMesh 样本"
     r = mcp.call_capability("get_asset_static_mesh", assetPath=path)
-    results = r.get("results") or [r]
-    entry = results[0] if results else r
+    entry = cap_first(r)
     assert not entry.get("error"), entry
     assert "lodCount" in entry or "materialSlots" in entry, entry

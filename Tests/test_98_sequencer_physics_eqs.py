@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import pytest
 
+from _framework.mcp_client import cap_first
+
 pytestmark = pytest.mark.l3_asset
 
 
@@ -20,7 +22,7 @@ def seq_path(test_ns, mcp):
         pathFilter="/Game/",
         limit=1,
     )
-    assets = r.get("results") or []
+    assets = r.get("assets") or []
     if not assets:
         pytest.skip("项目中无 LevelSequence 资产，跳过 Sequencer 测试")
     return assets[0].get("path") or assets[0].get("assetPath")
@@ -28,9 +30,7 @@ def seq_path(test_ns, mcp):
 
 def test_get_level_sequence(seq_path, mcp):
     r = mcp.call_capability("get_asset_level_sequence", assetPath=seq_path)
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    entry = results[0]
+    entry = cap_first(r)
     assert entry.get("assetType") == "LevelSequence", entry
     assert "bindingsCount" in entry, entry
 
@@ -41,9 +41,8 @@ def test_manage_level_sequence_set_display_rate(seq_path, mcp):
         assetPath=seq_path,
         operations=[{"action": "set_display_rate", "numerator": 24, "denominator": 1}],
     )
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    assert not results[0].get("error"), r
+    entry = cap_first(r)
+    assert not entry.get("error"), r
 
 
 # ── Physics Asset ─────────────────────────────────────────────────────────────
@@ -58,7 +57,7 @@ def pa_path(mcp):
         pathFilter="/Game/",
         limit=1,
     )
-    assets = r.get("results") or []
+    assets = r.get("assets") or []
     if not assets:
         pytest.skip("项目中无 PhysicsAsset，跳过 Physics 测试")
     return assets[0].get("path") or assets[0].get("assetPath")
@@ -66,9 +65,7 @@ def pa_path(mcp):
 
 def test_get_physics_asset(pa_path, mcp):
     r = mcp.call_capability("get_asset_physics_asset", assetPath=pa_path)
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    entry = results[0]
+    entry = cap_first(r)
     assert entry.get("assetType") == "PhysicsAsset", entry
     assert "bodiesCount" in entry, entry
     assert "constraintsCount" in entry, entry
@@ -86,9 +83,8 @@ def test_manage_physics_asset_add_sphere(pa_path, mcp):
         assetPath=pa_path,
         operations=[{"action": "add_sphere", "boneName": bone_name, "radius": 5.0}],
     )
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    assert not results[0].get("error"), r
+    entry = cap_first(r)
+    assert not entry.get("error"), r
 
 
 # ── EQS ──────────────────────────────────────────────────────────────────────
@@ -96,18 +92,15 @@ def test_manage_physics_asset_add_sphere(pa_path, mcp):
 def test_create_eqs(test_ns, mcp):
     path = f"{test_ns}/EQ_TestFindCover"
     r = mcp.call_capability("create_asset_eqs", assetPath=path)
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    assert not results[0].get("error"), r
-    assert results[0].get("success"), r
+    entry = cap_first(r)
+    assert not entry.get("error"), r
+    assert not entry.get("error") and entry.get("success") is not False, r
 
 
 def test_get_eqs(test_ns, mcp):
     path = f"{test_ns}/EQ_TestFindCover"
     r = mcp.call_capability("get_asset_eqs", assetPath=path)
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    entry = results[0]
+    entry = cap_first(r)
     assert entry.get("assetType") == "EnvQuery", entry
 
 
@@ -118,10 +111,9 @@ def test_manage_eqs_add_option(test_ns, mcp):
         assetPath=path,
         operations=[{"action": "add_option"}],
     )
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    assert not results[0].get("error"), r
-    assert results[0].get("success"), r
+    entry = cap_first(r)
+    assert not entry.get("error"), r
+    assert not entry.get("error") and entry.get("success") is not False, r
 
 
 def test_manage_eqs_set_generator(test_ns, mcp):
@@ -135,7 +127,6 @@ def test_manage_eqs_set_generator(test_ns, mcp):
             "generatorClass": "EnvQueryGenerator_ActorsOfClass",
         }],
     )
-    results = r.get("results") or []
-    assert len(results) == 1, r
+    entry = cap_first(r)
     # 生成器类名可能因版本而异，允许未找到
-    assert "error" not in results[0] or "未找到" in results[0]["error"], r
+    assert "error" not in entry or "未找到" in entry["error"], r

@@ -6,6 +6,7 @@ from __future__ import annotations
 import pytest
 
 from _framework.assertions import assert_success_count, ids_of
+from _framework.mcp_client import cap_first
 
 pytestmark = pytest.mark.l3_asset
 
@@ -97,7 +98,7 @@ def test_material_two_step_texture_param(mcp, mat_path):
     assert_success_count(r2, 2, context="material two-step")
 
     # 6.10：set_node 应已应用 parameterName=BaseTex（r2 results[0] 的 appliedFields 确认）
-    set_entry = (r2.get("results") or [{}])[0]
+    set_entry = cap_first(r2)
     assert set_entry.get("parameterName") == "BaseTex" or \
            "parameterName" in (set_entry.get("appliedFields") or []), \
            f"set_node did not apply parameterName BaseTex: {r2!r}"

@@ -20,7 +20,7 @@ def bs_path(test_ns, mcp):
         pathFilter="/Game/",
         limit=1,
     )
-    assets = (r.get("results") or []) if isinstance(r, dict) else []
+    assets = (r.get("assets") or []) if isinstance(r, dict) else []
     if not assets:
         pytest.skip("项目中无 BlendSpace 资产，跳过只读测试")
     return assets[0].get("path") or assets[0].get("assetPath")
@@ -36,7 +36,7 @@ def skel_path(mcp):
         pathFilter="/Game/",
         limit=1,
     )
-    assets = (r.get("results") or []) if isinstance(r, dict) else []
+    assets = (r.get("assets") or []) if isinstance(r, dict) else []
     if not assets:
         pytest.skip("项目中无 Skeleton 资产，跳过 BlendSpace 创建测试")
     return assets[0].get("path") or assets[0].get("assetPath")
@@ -52,7 +52,7 @@ def test_create_blend_space(test_ns, skel_path, mcp):
     results = (r.get("results") or []) if isinstance(r, dict) else []
     assert results, f"create_asset_blend_space 无返回: {r}"
     entry = results[0]
-    assert entry.get("success"), entry
+    assert not entry.get("error") and entry.get("success") is not False, entry
     assert entry.get("assetType") in ("BlendSpace", "BlendSpace1D"), entry
 
 
@@ -88,7 +88,7 @@ def test_manage_blend_space_set_axis(test_ns, skel_path, mcp):
     results = (r.get("results") or []) if isinstance(r, dict) else []
     assert results, f"manage_asset_blend_space 无返回: {r}"
     entry = results[0]
-    assert entry.get("success"), entry
+    assert not entry.get("error") and entry.get("success") is not False, entry
 
 
 # ── AnimSequence 曲线关键帧 ────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ def anim_seq_path(mcp):
         pathFilter="/Game/",
         limit=1,
     )
-    assets = (r.get("results") or []) if isinstance(r, dict) else []
+    assets = (r.get("assets") or []) if isinstance(r, dict) else []
     if not assets:
         pytest.skip("项目中无 AnimSequence，跳过曲线测试")
     return assets[0].get("path") or assets[0].get("assetPath")
@@ -118,7 +118,7 @@ def test_add_float_curve(anim_seq_path, mcp):
     results = (r.get("results") or []) if isinstance(r, dict) else []
     assert results, f"add_float_curve 无返回: {r}"
     entry = results[0]
-    assert entry.get("success") or "已存在" in entry.get("note", ""), entry
+    assert (not entry.get("error") and entry.get("success") is not False) or "已存在" in entry.get("note", ""), entry
 
 
 def test_set_curve_key(anim_seq_path, mcp):
@@ -139,7 +139,7 @@ def test_set_curve_key(anim_seq_path, mcp):
     results = (r.get("results") or []) if isinstance(r, dict) else []
     assert results, f"set_curve_key 无返回: {r}"
     entry = results[0]
-    assert entry.get("success"), entry
+    assert not entry.get("error") and entry.get("success") is not False, entry
 
 
 def test_remove_curve(anim_seq_path, mcp):

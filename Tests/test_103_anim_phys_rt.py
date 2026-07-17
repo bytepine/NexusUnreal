@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import pytest
 
+from _framework.mcp_client import cap_entries, cap_first
+
 pytestmark = pytest.mark.l3_asset
 
 # ── 资产路径常量 ────────────────────────────────────────────────────────────────
@@ -19,14 +21,14 @@ class TestAnimComposite:
     def test_create(self, mcp):
         r = mcp.call_capability("create_asset_anim_composite",
                                 assetPath=_COMPOSITE_PATH)
-        results = (r.get("results") or []) if isinstance(r, dict) else []
+        results = cap_entries(r)
         assert results, f"create_asset_anim_composite 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
-        assert first.get("success") or first.get("name"), f"创建失败: {first}"
+        assert (not first.get("error") and first.get("success") is not False) or first.get("name"), f"创建失败: {first}"
 
     def test_get_empty(self, mcp):
         r = mcp.call_capability("get_asset_anim_composite", assetPath=_COMPOSITE_PATH)
-        results = (r.get("results") or []) if isinstance(r, dict) else []
+        results = cap_entries(r)
         assert results, f"get_asset_anim_composite 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
         assert first.get("name"), f"缺少 name: {first}"
@@ -42,13 +44,13 @@ class TestAnimComposite:
                                     "animEndTime": 1.0,
                                     "playRate": 1.0,
                                 }])
-        results = (r.get("results") or []) if isinstance(r, dict) else []
-        assert any(e.get("success") for e in results if isinstance(e, dict)), \
+        results = cap_entries(r)
+        assert any(isinstance(e, dict) and not e.get("error") and e.get("success") is not False for e in results), \
             f"add_segment 无成功: {r}"
 
     def test_get_after_add(self, mcp):
         r = mcp.call_capability("get_asset_anim_composite", assetPath=_COMPOSITE_PATH)
-        results = (r.get("results") or []) if isinstance(r, dict) else []
+        results = cap_entries(r)
         first = results[0] if results and isinstance(results[0], dict) else {}
         assert first.get("segmentCount", 0) >= 1, f"add_segment 后 segmentCount 应 ≥1: {first}"
         segs = first.get("segments", [])
@@ -60,8 +62,8 @@ class TestAnimComposite:
         r = mcp.call_capability("manage_asset_anim_composite",
                                 assetPath=_COMPOSITE_PATH,
                                 operations=[{"action": "remove_segment", "segmentIndex": 0}])
-        results = (r.get("results") or []) if isinstance(r, dict) else []
-        assert any(e.get("success") for e in results if isinstance(e, dict)), \
+        results = cap_entries(r)
+        assert any(isinstance(e, dict) and not e.get("error") and e.get("success") is not False for e in results), \
             f"remove_segment 无成功: {r}"
 
     def test_search_anim_composite(self, mcp):
@@ -97,23 +99,23 @@ class TestPhysicalMaterial:
 
     def test_get(self, mcp):
         r = mcp.call_capability("get_asset_physical_material", assetPath=self._pm_path)
-        results = (r.get("results") or []) if isinstance(r, dict) else []
+        results = cap_entries(r)
         assert results, f"get_asset_physical_material 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
         assert "friction" in first and "restitution" in first, f"字段缺失: {first}"
 
     def test_manage_friction(self, mcp):
         r_before = mcp.call_capability("get_asset_physical_material", assetPath=self._pm_path)
-        original = ((r_before.get("results") or [{}])[0]).get("friction", 0.5)
+        original = (cap_first(r_before)).get("friction", 0.5)
 
         new_val = round(original + 0.01, 4) if original < 0.99 else round(original - 0.01, 4)
         r = mcp.call_capability("manage_asset_physical_material",
                                 assetPath=self._pm_path,
                                 friction=new_val)
-        results = (r.get("results") or []) if isinstance(r, dict) else []
+        results = cap_entries(r)
         assert results, f"manage_asset_physical_material 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
-        assert first.get("success") or abs(first.get("friction", 0) - new_val) < 0.001, \
+        assert (not first.get("error") and first.get("success") is not False) or abs(first.get("friction", 0) - new_val) < 0.001, \
             f"设置 friction 失败: {first}"
 
         # 恢复原值
@@ -138,14 +140,14 @@ class TestRenderTarget:
         r = mcp.call_capability("create_asset_render_target",
                                 assetPath=_RENDER_TARGET,
                                 sizeX=512, sizeY=256)
-        results = (r.get("results") or []) if isinstance(r, dict) else []
+        results = cap_entries(r)
         assert results, f"create_asset_render_target 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
-        assert first.get("success") or first.get("name"), f"创建失败: {first}"
+        assert (not first.get("error") and first.get("success") is not False) or first.get("name"), f"创建失败: {first}"
 
     def test_get(self, mcp):
         r = mcp.call_capability("get_asset_render_target", assetPath=_RENDER_TARGET)
-        results = (r.get("results") or []) if isinstance(r, dict) else []
+        results = cap_entries(r)
         assert results, f"get_asset_render_target 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
         assert first.get("sizeX") == 512, f"sizeX 不符: {first}"
@@ -156,14 +158,14 @@ class TestRenderTarget:
         r = mcp.call_capability("manage_asset_render_target",
                                 assetPath=_RENDER_TARGET,
                                 sizeX=1024, sizeY=1024)
-        results = (r.get("results") or []) if isinstance(r, dict) else []
+        results = cap_entries(r)
         assert results, f"manage_asset_render_target 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
-        assert first.get("success") or first.get("sizeX") == 1024, f"resize 失败: {first}"
+        assert (not first.get("error") and first.get("success") is not False) or first.get("sizeX") == 1024, f"resize 失败: {first}"
 
     def test_get_after_resize(self, mcp):
         r = mcp.call_capability("get_asset_render_target", assetPath=_RENDER_TARGET)
-        results = (r.get("results") or []) if isinstance(r, dict) else []
+        results = cap_entries(r)
         first = results[0] if results and isinstance(results[0], dict) else {}
         assert first.get("sizeX") == 1024 and first.get("sizeY") == 1024, \
             f"resize 后尺寸不符: {first}"
@@ -172,7 +174,7 @@ class TestRenderTarget:
         r = mcp.call_capability("manage_asset_render_target",
                                 assetPath=_RENDER_TARGET,
                                 clearColorR=1.0, clearColorG=0.0, clearColorB=0.0, clearColorA=1.0)
-        results = (r.get("results") or []) if isinstance(r, dict) else []
+        results = cap_entries(r)
         assert results, f"manage clear_color 无结果: {r}"
 
     def test_search_render_target(self, mcp):

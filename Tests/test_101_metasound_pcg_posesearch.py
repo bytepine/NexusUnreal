@@ -20,7 +20,7 @@ def metasound_path(mcp):
         pathFilter="/Game/",
         limit=1,
     )
-    assets = (r.get("results") or []) if isinstance(r, dict) else []
+    assets = (r.get("assets") or []) if isinstance(r, dict) else []
     if not assets:
         pytest.skip("项目中无 MetaSoundSource 资产，跳过只读测试")
     return assets[0].get("path") or assets[0].get("assetPath")
@@ -41,11 +41,12 @@ def test_create_metasound_asset(mcp, test_ns):
     """create_asset_meta_sound 应能创建 MetaSoundSource 资产。"""
     pkg  = f"/Game/{test_ns}"
     name = "TestMetaSound_MCP"
-    r = mcp.call_capability("create_asset_meta_sound", packagePath=pkg, assetName=name)
+    r = mcp.call_capability("create_asset_meta_sound", assetPath=f"{pkg}/{name}")
     entries = r if isinstance(r, list) else [r]
     entry = next((e for e in entries if isinstance(e, dict)), None)
     assert entry is not None
     assert entry.get("created") or entry.get("alreadyExists"), f"创建失败：{entry}"
+    assert entry.get("path"), f"缺少 path：{entry}"
 
 
 @pytest.mark.skipif_ue_below("5.3")
@@ -58,10 +59,9 @@ def test_manage_metasound_add_input(mcp, test_ns):
         operations=[{"action": "add_input", "name": "TestInput", "typeName": "float"}],
     )
     entries = r if isinstance(r, list) else [r]
-    entry = next((e for e in entries if isinstance(e, dict) and "results" in e), None)
-    assert entry is not None, f"无 results：{r}"
-    result = entry["results"][0] if entry["results"] else {}
-    assert result.get("success") or result.get("alreadyExists"), f"add_input 失败：{result}"
+    entry = next((e for e in entries if isinstance(e, dict) and e.get("action") == "add_input"), None)
+    assert entry is not None, f"无 add_input 条目：{r}"
+    assert not entry.get("error") or entry.get("alreadyExists"), f"add_input 失败：{entry}"
 
 
 # ── PCG Graph ─────────────────────────────────────────────────────────────────
@@ -76,7 +76,7 @@ def pcg_path(mcp):
         pathFilter="/Game/",
         limit=1,
     )
-    assets = (r.get("results") or []) if isinstance(r, dict) else []
+    assets = (r.get("assets") or []) if isinstance(r, dict) else []
     if not assets:
         pytest.skip("项目中无 PCGGraph 资产，跳过只读测试")
     return assets[0].get("path") or assets[0].get("assetPath")
@@ -97,11 +97,12 @@ def test_create_pcg_graph(mcp, test_ns):
     """create_asset_pcg_graph 应能创建 PCGGraph 资产。"""
     pkg  = f"/Game/{test_ns}"
     name = "TestPCGGraph_MCP"
-    r = mcp.call_capability("create_asset_pcg_graph", packagePath=pkg, assetName=name)
+    r = mcp.call_capability("create_asset_pcg_graph", assetPath=f"{pkg}/{name}")
     entries = r if isinstance(r, list) else [r]
     entry = next((e for e in entries if isinstance(e, dict)), None)
     assert entry is not None
     assert entry.get("created") or entry.get("alreadyExists"), f"创建失败：{entry}"
+    assert entry.get("path"), f"缺少 path：{entry}"
 
 
 # ── PoseSearch ────────────────────────────────────────────────────────────────
@@ -116,7 +117,7 @@ def pose_search_db_path(mcp):
         pathFilter="/Game/",
         limit=1,
     )
-    assets = (r.get("results") or []) if isinstance(r, dict) else []
+    assets = (r.get("assets") or []) if isinstance(r, dict) else []
     if not assets:
         pytest.skip("项目中无 PoseSearchDatabase 资产，跳过只读测试")
     return assets[0].get("path") or assets[0].get("assetPath")

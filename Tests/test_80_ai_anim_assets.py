@@ -33,10 +33,9 @@ def test_create_blackboard_capability(test_ns, mcp, require_tools):
         capability="create_blackboard",
         arguments={"assetPath": bb},
     )
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    assert not results[0].get("error"), r
-    assert results[0].get("path"), r
+    entry = cap_first(r)
+    assert not entry.get("error"), r
+    assert entry.get("path"), r
 
 
 def test_behavior_tree_asset(test_ns, mcp):
@@ -67,8 +66,7 @@ def test_get_asset_anim_blueprint_graph_overview(test_ns, mcp, template_skeleton
         assetPath=path,
         sections=["graphOverview"],
     )
-    results = r.get("results") or [r]
-    entry = results[0] if results else r
+    entry = cap_first(r)
     assert not entry.get("error"), entry
     assert isinstance(entry.get("graphs"), list), f"expected graphs[]: {entry!r}"
 
@@ -83,8 +81,7 @@ def test_anim_montage_create(test_ns, mcp, template_skeleton):
 def test_get_asset_anim_montage(test_ns, mcp, template_skeleton):
     path = f"{test_ns}/AM_TestAttack"
     r = mcp.call_capability("get_asset_anim_montage", assetPath=path)
-    results = r.get("results") or [r]
-    entry = results[0] if results else r
+    entry = cap_first(r)
     assert not entry.get("error"), entry
 
 
@@ -98,9 +95,8 @@ def test_get_actor_animation_error_path(mcp, require_tools):
         section="state",
     )
     assert isinstance(r, dict), r
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    assert results[0].get("error"), f"expected per-result error: {results[0]!r}"
+    entry = cap_first(r)
+    assert entry.get("error"), f"expected per-result error: {entry!r}"
 
 
 def test_save_all_anim_assets(test_ns, mcp):
@@ -164,8 +160,7 @@ def test_manage_behavior_tree_add_child(test_ns, mcp):
         parentPath="",
     )
     r = mcp.call_capability("get_asset_behavior_tree", assetPath=bt)
-    results = r.get("results") or [r]
-    entry = results[0] if results else r
+    entry = cap_first(r)
     root = entry.get("rootNode") or {}
     children = root.get("children") or []
     assert children, f"expected child under root: {entry!r}"
@@ -203,12 +198,12 @@ def test_manage_behavior_tree_move_node(test_ns, mcp):
         parentPath="",
         childIndex=0,
     )
-    move_entry = (move.get("results") or [move])[0]
+    move_entry = cap_first(move)
     assert not move_entry.get("error"), move_entry
     assert move_entry.get("movedPath") == "0", move_entry
 
     r = mcp.call_capability("get_asset_behavior_tree", assetPath=bt)
-    entry = (r.get("results") or [r])[0]
+    entry = cap_first(r)
     root = entry.get("rootNode") or {}
     children = root.get("children") or []
     assert len(children) >= 2, entry
@@ -233,11 +228,11 @@ def test_manage_asset_blackboard_enum_key(test_ns, mcp):
         assetPath=bb,
         keys=[{"action": "add", "keyName": "TestEnumKey", "keyType": "enum"}],
     )
-    add_entry = (add.get("results") or [add])[0]
+    add_entry = cap_first(add)
     assert not add_entry.get("error"), add_entry
 
     r = mcp.call_capability("get_asset_blackboard", assetPath=bb, nameFilter="TestEnum")
-    entry = (r.get("results") or [r])[0]
+    entry = cap_first(r)
     keys = entry.get("keys") or []
     assert keys, entry
     enum_keys = [k for k in keys if (k.get("name") or "") == "TestEnumKey"]
@@ -278,10 +273,9 @@ def test_interact_runtime_actor_animation_play_montage(mcp, _anim_actor, test_ns
         montagePath=montage,
         playRate=1.0,
     )
-    results = r.get("results") or []
-    assert len(results) == 1, r
-    assert not results[0].get("error"), results[0]
-    assert results[0].get("playing") is True, results[0]
+    entry = cap_first(r)
+    assert not entry.get("error"), entry
+    assert entry.get("playing") is True, entry
 
 
 @pytest.mark.l4_runtime
@@ -295,14 +289,13 @@ def test_interact_runtime_actor_animation_stop_montage(mcp, _anim_actor, test_ns
         actorName=_anim_actor,
         montagePath=montage,
     )
-    assert not (play.get("results") or [{}])[0].get("error"), play
+    assert not cap_first(play).get("error"), play
     stop = mcp.call_capability(
         "interact_runtime_actor_animation",
         action="stop_montage",
         actorName=_anim_actor,
         montagePath=montage,
     )
-    results = stop.get("results") or []
-    assert len(results) == 1, stop
-    assert not results[0].get("error"), results[0]
-    assert results[0].get("stopped") is True, results[0]
+    entry = cap_first(stop)
+    assert not entry.get("error"), entry
+    assert entry.get("stopped") is True, entry

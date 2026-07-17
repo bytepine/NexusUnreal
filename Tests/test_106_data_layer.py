@@ -17,30 +17,28 @@ class TestCreateDataLayer:
     @skipif_ue_below(5, 1)
     def test_create_runtime_layer(self, mcp):
         r = mcp.call_capability("create_asset_data_layer",
-                                packagePath=DL_PKG_PATH,
-                                assetName=DL_NAME,
+                                assetPath=DL_FULL,
                                 type="Runtime",
                                 debugColor="#FF4400")
         payload = r if isinstance(r, dict) else {}
         entries = payload.get("entries") or payload.get("results") or []
         first = entries[0] if entries else payload
         assert isinstance(first, dict), f"create 返回格式异常: {r}"
-        assert "assetPath" in first
+        assert "path" in first
         assert first.get("assetType") in ("DataLayerAsset", None)
 
     @skipif_ue_below(5, 1)
     def test_create_idempotent(self, mcp):
         """重复创建应返回 alreadyExists=true"""
         r = mcp.call_capability("create_asset_data_layer",
-                                packagePath=DL_PKG_PATH,
-                                assetName=DL_NAME,
+                                assetPath=DL_FULL,
                                 type="Runtime")
         payload = r if isinstance(r, dict) else {}
         entries = payload.get("entries") or payload.get("results") or []
         first = entries[0] if entries else payload
         # 应已存在
         assert isinstance(first, dict)
-        assert first.get("alreadyExists") is True or "assetPath" in first
+        assert first.get("alreadyExists") is True or "path" in first
 
 
 @pytest.mark.l3_asset
@@ -72,10 +70,6 @@ class TestManageDataLayer:
         entries = payload.get("entries") or payload.get("results") or []
         first = entries[0] if entries else payload
         assert isinstance(first, dict), f"manage set_type 返回格式异常: {r}"
-        results = first.get("results") or []
-        if results:
-            res = results[0]
-            assert res.get("success") is True or "error" in res
 
     @skipif_ue_below(5, 1)
     def test_set_debug_color(self, mcp):

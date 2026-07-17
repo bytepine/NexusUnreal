@@ -54,7 +54,7 @@ def test_get_asset_level_actors_and_settings(mcp, require_tools):
         sections=["actors", "settings"],
         limit=20,
     )
-    entry = (r.get("results") or [r])[0]
+    entry = cap_first(r)
     assert not entry.get("error"), entry
     assert entry.get("packagePath"), entry
     assert "actorTotalCount" in entry, entry

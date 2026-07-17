@@ -39,8 +39,7 @@ def test_duplicate_asset(test_ns, mcp, require_tools):
     if src not in paths:
         mcp.call("create_data_asset", assetPath=src, parentClass="PrimaryAssetLabel")
     r = mcp.call_capability("duplicate_asset", assetPath=src, newPath=dup)
-    results = r.get("results") or [r]
-    entry = results[0] if results else r
+    entry = cap_first(r)
     assert not entry.get("error"), entry
     assert entry.get("newPath") == dup or entry.get("path") == dup, entry
 
@@ -48,13 +47,16 @@ def test_duplicate_asset(test_ns, mcp, require_tools):
 def test_multi_asset_overview(test_ns, mcp):
     """10.4：单 Blueprint 资产概览（原 get_asset 多类型批量已拆分为类型专用 capability）。"""
     listing = mcp.call("search_asset", assetType="Blueprint", pathFilter=test_ns, limit=5)
-    assets = cap_first(listing).get("assets") or []
+    # 指定 assetType 时：assets/recommended* 在顶层；cap_first 无 results 时回退到顶层
+    payload = cap_first(listing)
+    assets = payload.get("assets") or []
     if not assets:
         pytest.skip("test_ns 中无 Blueprint 资产可查询")
     first = assets[0]
     assert first.get("assetType") == "Blueprint", first
-    assert first.get("recommendedGet") == "get_asset_blueprint", first
-    assert first.get("recommendedManage") == "manage_asset_blueprint", first
+    # recommended* 在顶层（指定类型时提升）；兼容逐条字段
+    assert (payload.get("recommendedGet") or first.get("recommendedGet")) == "get_asset_blueprint", payload
+    assert (payload.get("recommendedManage") or first.get("recommendedManage")) == "manage_asset_blueprint", payload
     bp_path = first.get("assetPath") or first.get("path")
     if not bp_path:
         pytest.skip(f"无法从资产条目解析路径：{first!r}")
@@ -88,7 +90,7 @@ def test_log_health_no_crash(mcp):
 
 def _data_asset_entry(mcp, path: str) -> dict:
     r = mcp.call_capability("get_asset_data_asset", assetPath=path, limit=100)
-    return (r.get("results") or [r])[0]
+    return cap_first(r)
 
 
 def _first_editable_property_name(entry: dict) -> str | None:
@@ -116,9 +118,9 @@ def test_data_asset_get_and_manage_reset(test_ns, mcp, require_tools):
     r = mcp.call_capability(
         "manage_asset_data_asset",
         assetPath=path,
-        ops=[{"action": "reset", "propertyName": prop}],
+        operations=[{"action": "reset", "propertyName": prop}],
     )
-    assert r.get("success") is True or not (r.get("results") or [r])[0].get("error"), r
+    assert not (r.get("error") or (cap_first(r) or {}).get("error")), r
 
 
 def test_delete_asset_removes_from_search(test_ns, mcp, require_tools):
@@ -128,7 +130,7 @@ def test_delete_asset_removes_from_search(test_ns, mcp, require_tools):
     mcp.call("create_data_asset", assetPath=path, parentClass="PrimaryAssetLabel")
 
     dr = mcp.call_capability("delete_asset", assetPath=path)
-    del_entry = (dr.get("results") or [dr])[0]
+    del_entry = cap_first(dr)
     assert not del_entry.get("error"), del_entry
 
     listing = mcp.call("search_asset", assetType="DataAsset", pathFilter=test_ns, limit=50)
@@ -148,6 +150,6 @@ def test_export_static_mesh_smoke(mcp, require_tools):
     if not mesh:
         pytest.skip("无 StaticMesh 样本可导出")
     r = mcp.call_capability("export_asset", assetPath=mesh)
-    entry = (r.get("results") or [r])[0]
+    entry = cap_first(r)
     assert not entry.get("error"), entry
-    assert entry.get("outputPath") or entry.get("exportedPath") or entry.get("success"), entry
+    assert entry.get("outputPath") or entry.get("exportedPath") or not entry.get("error"), entry

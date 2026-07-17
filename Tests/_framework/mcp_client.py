@@ -182,14 +182,35 @@ class MCPClient:
         return body.get("result", {}) or {}
 
 
-def cap_first(result: Dict[str, Any]) -> Dict[str, Any]:
-    """call_capability 单条响应：取 results[0]，否则原样返回。"""
+def cap_entries(result: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """规范化 capability 条目列表（兼容单条提升与多条 results[]）。
+
+    - 顶层已有 path/assetPath/actorName/widgetName → 整包即单条（内嵌 results 为操作列表）
+    - 否则取顶层 results[]
+    - 无 results 的业务对象（如 lua value）→ [result]
+    - search_asset / list_* 等列表信封 → []
+    """
+    if not isinstance(result, dict):
+        return []
+    if any(result.get(k) not in (None, "") for k in ("path", "assetPath", "actorName", "widgetName")):
+        return [result]
     results = result.get("results")
     if isinstance(results, list) and results:
-        first = results[0]
-        if isinstance(first, dict):
-            return first
-    return result
+        return [e for e in results if isinstance(e, dict)]
+    # 列表类顶层字段：不是单条 entry
+    if any(k in result for k in ("assets", "capabilities", "widgets", "actors", "messages")):
+        return []
+    if result:
+        return [result]
+    return []
+
+
+def cap_first(result: Dict[str, Any]) -> Dict[str, Any]:
+    """取单条 capability 载荷：已提升则原样；多条/旧信封取 results[0]。"""
+    entries = cap_entries(result)
+    if entries:
+        return entries[0]
+    return result if isinstance(result, dict) else {}
 
 
 def list_asset_paths(mcp: MCPClient, path_prefix: str) -> List[str]:
@@ -200,10 +221,10 @@ def list_asset_paths(mcp: MCPClient, path_prefix: str) -> List[str]:
     except MCPError as e:
         log.warning("search_asset failed while enumerating %s: %s", path_prefix, e)
         return out
-    # 新版返回 {"results":[{...,"assets":[...]}]}，旧版顶层 assets；cap_first 兼容两者
+    # 新版顶层 assets（无 results 信封）；旧版 results[{assets}]；cap_first 兼容两者
     payload = cap_first(r)
     for item in payload.get("assets", []) or []:
-        p = item.get("assetPath") or item.get("path")
+        p = item.get("path") or item.get("assetPath")
         if p and p.startswith(path_prefix):
             out.append(p)
     return out

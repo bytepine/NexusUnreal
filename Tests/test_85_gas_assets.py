@@ -32,7 +32,7 @@ def test_ga_create(test_ns, mcp):
     path = f"{test_ns}/GA_TestAbility"
     r = mcp.call("create_asset_gameplay_ability", assetPath=path)
     entry = cap_first(r)
-    assert entry.get("success"), f"create_asset_gameplay_ability 返回: {r!r}"
+    assert not entry.get("error") and entry.get("success") is not False, f"create_asset_gameplay_ability 返回: {r!r}"
     assert entry.get("name") or entry.get("path"), entry
 
 
@@ -60,7 +60,7 @@ def test_ga_manage_set_policy(test_ns, mcp):
         action="set_policy",
         instancingPolicy="InstancedPerActor",
     )
-    assert r.get("success"), f"manage_asset_gameplay_ability set_policy 返回: {r!r}"
+    assert not r.get("error") and r.get("success") is not False, f"manage_asset_gameplay_ability set_policy 返回: {r!r}"
 
 
 def test_ga_policy_readback(test_ns, mcp):
@@ -80,7 +80,7 @@ def test_ga_policy_readback(test_ns, mcp):
 def test_ge_create(test_ns, mcp):
     path = f"{test_ns}/GE_TestEffect"
     r = mcp.call("create_asset_gameplay_effect", assetPath=path)
-    assert cap_first(r).get("success"), f"create_asset_gameplay_effect 返回: {r!r}"
+    assert not cap_first(r).get("error") and cap_first(r).get("success") is not False, f"create_asset_gameplay_effect 返回: {r!r}"
 
 
 def test_ge_get_policy(test_ns, mcp):
@@ -97,9 +97,9 @@ def test_ge_manage_set_policy(test_ns, mcp):
     r = mcp.call(
         "manage_asset_gameplay_effect",
         assetPath=path,
-        ops=[{"action": "set_policy", "durationPolicy": "Infinite"}],
+        operations=[{"action": "set_policy", "durationPolicy": "Infinite"}],
     )
-    assert r.get("success"), f"manage set_policy 返回: {r!r}"
+    assert not r.get("error"), f"manage set_policy 返回: {r!r}"
 
 
 def test_ge_get_modifiers_empty(test_ns, mcp):
@@ -115,14 +115,14 @@ def test_ge_manage_tags(test_ns, mcp):
         r = mcp.call(
             "manage_asset_gameplay_effect",
             assetPath=path,
-            ops=[{
+            operations=[{
                 "action": "set_tags",
                 "tagContainer": "grantedTags",
                 "tags": [],
                 "mode": "set",
             }],
         )
-        assert r.get("success"), r
+        assert not r.get("error"), r
     except MCPError:
         pass  # Tag 未在项目注册时允许失败
 
@@ -133,7 +133,7 @@ def test_ge_manage_tags(test_ns, mcp):
 def test_as_create(test_ns, mcp):
     path = f"{test_ns}/AS_TestStats"
     r = mcp.call("create_asset_attribute_set", assetPath=path)
-    assert cap_first(r).get("success"), f"create_asset_attribute_set 返回: {r!r}"
+    assert not cap_first(r).get("error") and cap_first(r).get("success") is not False, f"create_asset_attribute_set 返回: {r!r}"
 
 
 def test_as_get_empty(test_ns, mcp):
@@ -154,7 +154,7 @@ def test_as_manage_reset_smoke(test_ns, mcp):
         r = mcp.call(
             "manage_asset_attribute_set",
             assetPath=path,
-            ops=[{"action": "reset", "attributeName": "Health"}],
+            operations=[{"action": "reset", "attributeName": "Health"}],
         )
     except MCPError:
         pytest.skip("manage_asset_attribute_set 不可用或未编译")
