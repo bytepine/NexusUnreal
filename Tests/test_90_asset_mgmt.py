@@ -51,9 +51,13 @@ def test_multi_asset_overview(test_ns, mcp):
     assets = cap_first(listing).get("assets") or []
     if not assets:
         pytest.skip("test_ns 中无 Blueprint 资产可查询")
-    bp_path = assets[0].get("assetPath") or assets[0].get("path")
+    first = assets[0]
+    assert first.get("assetType") == "Blueprint", first
+    assert first.get("recommendedGet") == "get_asset_blueprint", first
+    assert first.get("recommendedManage") == "manage_asset_blueprint", first
+    bp_path = first.get("assetPath") or first.get("path")
     if not bp_path:
-        pytest.skip(f"无法从资产条目解析路径：{assets[0]!r}")
+        pytest.skip(f"无法从资产条目解析路径：{first!r}")
     r = mcp.call_capability("get_asset_blueprint", assetPath=bp_path, sections=["all"])
     assert isinstance(r, dict), f"get_asset_blueprint returned unexpected type: {r!r}"
 
