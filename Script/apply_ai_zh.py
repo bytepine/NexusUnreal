@@ -22,7 +22,7 @@ CAP_DESC_ZH: dict[str, str] = {
     "set_log_capture_filter": "配置写入缓冲的日志分类。空=全部；影响 get_output_log。",
     "delete_asset": "永久删除单个资产包。尽力清理重定向器；不可逆。",
     "duplicate_asset": "复制编辑器资产到新路径。源资产不变。",
-    "get_asset_refs": "查包依赖或引用方。direction=dependencies|referencers；可选递归。",
+    "get_asset_refs": "查依赖/引用/继承。direction 含 children|ancestors；可按类型过滤。",
     "rename_asset": "移动或重命名资产。自动生成重定向器修复引用。",
     "save_asset": "将资产包持久化到磁盘。先标记 Dirty 再保存。",
     "search_asset": "查找资产路径。必须先调；指定 assetType+pathFilter；禁止猜 /Game 路径。",
