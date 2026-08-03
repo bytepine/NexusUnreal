@@ -6,6 +6,7 @@
 
 ## [Unreleased]
 
+- chore(test): `ue_launcher` 改用会话级 `-EnableNexusMcp` 开启 MCP，移除写 `EditorPerProjectUserSettings.ini` 与 `-ini:...bEnableMcpServer=True` 双路径
 - docs: 仓库改为公开，定位为 NexusLink 示例工程；README 移除私有表述
 - docs: README 移除 NexusWork 相关说明
 - chore(test): pytest / `run_e2e.py` 自动拉起 UE **默认改回 headless**（`UnrealEditor-Cmd -unattended -nullrhi -NoSplash -NoSound`），避免无窗口弹窗与对话框阻断；本地需观察编辑器时加 `--gui`
