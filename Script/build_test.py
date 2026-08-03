@@ -5,8 +5,8 @@
 build_test.py -- NexusLink cross-version build test
 
 Runs BuildPlugin against all installed UE versions:
-  Phase 1 — DevelopmentEditor (WITH_EDITOR=1, default uplugin Type: Editor)
-  Phase 2 — UnrealGame Development (WITH_EDITOR=0, temp copy Type: Runtime)
+  Phase 1 — DevelopmentEditor (WITH_EDITOR=1; NexusLink.uplugin Type: Runtime)
+  Phase 2 — UnrealGame Development (WITH_EDITOR=0, temp copy; Type 已为 Runtime 时不再改写)
 
 Writes error logs to Saved/Logs/Build.Log (+ Build.Game.Log for phase 2).
 
@@ -211,7 +211,7 @@ def _extract_warnings(lines: List[str]) -> List[str]:
 
 
 def _prepare_runtime_plugin_copy(ver: str) -> Tuple[str, str]:
-    """Copy NexusLink to temp and patch module Type Editor→Runtime."""
+    """Copy NexusLink to temp；若仍为 Editor Type 则改写为 Runtime（兼容旧仓）。"""
     src_root = PLUGIN_PATH.parent
     work = _TEMP_GAME_BASE / ver
     plugin_copy = work / "PluginSrc" / "NexusLink"
@@ -224,9 +224,13 @@ def _prepare_runtime_plugin_copy(ver: str) -> Tuple[str, str]:
     shutil.copytree(src_root, plugin_copy)
     uplugin = plugin_copy / "NexusLink.uplugin"
     content = uplugin.read_text(encoding="utf-8")
-    if _EDITOR_TYPE not in content:
-        raise RuntimeError(f"NexusLink module {_EDITOR_TYPE} not found in {uplugin}")
-    uplugin.write_text(content.replace(_EDITOR_TYPE, _RUNTIME_TYPE, 1), encoding="utf-8")
+    if _EDITOR_TYPE in content:
+        content = content.replace(_EDITOR_TYPE, _RUNTIME_TYPE, 1)
+        uplugin.write_text(content, encoding="utf-8")
+    elif _RUNTIME_TYPE not in content:
+        raise RuntimeError(
+            f"NexusLink module Type 既非 Editor 也非 Runtime: {uplugin}"
+        )
     return str(uplugin), str(package_out)
 
 
