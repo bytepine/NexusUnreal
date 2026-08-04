@@ -97,7 +97,25 @@ def pytest_configure(config: pytest.Config) -> None:
         log.info("headless session: skipping l4_runtime / lua / requires_gui tests")
 
 
+def _skip_if_ue_below_marker(item: pytest.Item) -> None:
+    """在 fixture 之前按 skipif_ue_below 跳过（避免 module fixture 先 ERROR）。"""
+    marker = item.get_closest_marker("skipif_ue_below")
+    if marker is None:
+        return
+    threshold_str = str(marker.args[0]) if marker.args else "5.0"
+    parts = threshold_str.split(".")
+    required = (int(parts[0]), int(parts[1]) if len(parts) > 1 else 0)
+    ue_version: Optional[tuple] = getattr(item.config, "_nexus_ue_version", None)
+    if ue_version is None:
+        pytest.skip(f"UE 版本未知，跳过（需 {threshold_str}+）")
+    if ue_version < required:
+        pytest.skip(f"UE {ue_version[0]}.{ue_version[1]} < {threshold_str}，跳过")
+
+
 def pytest_runtest_setup(item: pytest.Item) -> None:
+    # 必须先于任何 fixture（含 module scope），否则 StateTree/MetaSound 等会 ERROR
+    _skip_if_ue_below_marker(item)
+
     if not getattr(item.config, "_nexus_headless", False):
         return
     names = {m.name for m in item.iter_markers()}
@@ -208,24 +226,8 @@ def _cache_ue_engine_version(mcp: MCPClient, pytestconfig: pytest.Config) -> Non
         log.warning("无法获取 UE 版本（skipif_ue_below 将默认 skip）: %s", exc)
 
 
-@pytest.fixture(autouse=True)
-def _check_skipif_ue_below(request: pytest.FixtureRequest) -> None:
-    """每个测试前检查 skipif_ue_below marker，对版本不足的测试 skip。"""
-    marker = request.node.get_closest_marker("skipif_ue_below")
-    if marker is None:
-        return
-    threshold_str = str(marker.args[0]) if marker.args else "5.0"
-    parts = threshold_str.split(".")
-    required = (int(parts[0]), int(parts[1]) if len(parts) > 1 else 0)
-    ue_version: Optional[tuple] = getattr(request.config, "_nexus_ue_version", None)
-    if ue_version is None:
-        pytest.skip(f"UE 版本未知，跳过（需 {threshold_str}+）")
-    if ue_version < required:
-        pytest.skip(f"UE {ue_version[0]}.{ue_version[1]} < {threshold_str}，跳过")
-
-
 def skipif_ue_below(major: int, minor: int = 0):
-    """返回 pytest.mark.skipif_ue_below 标记，供 _check_skipif_ue_below autouse fixture 按版本跳过。
+    """返回 pytest.mark.skipif_ue_below 标记，由 pytest_runtest_setup 按版本跳过。
     用法：@skipif_ue_below(5, 1)"""
     return pytest.mark.skipif_ue_below(f"{major}.{minor}")
 

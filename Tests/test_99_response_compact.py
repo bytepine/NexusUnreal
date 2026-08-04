@@ -179,7 +179,7 @@ def _probe_behavior_tree(mcp, test_ns: str) -> str:
 
 
 def test_get_asset_refs_defaults_shape(mcp, test_ns):
-    """get_asset_refs 的 refs_defaults 嵌在每个 results[i] 内。"""
+    """get_asset_refs 的 refs_defaults 嵌在条目内（单条提升后即顶层）。"""
     bp = _probe_blueprint(mcp, test_ns)
     assert bp, "无法定位或创建 Blueprint 探测资产"
 
@@ -188,9 +188,9 @@ def test_get_asset_refs_defaults_shape(mcp, test_ns):
     except MCPError as e:
         pytest.skip(f"get_asset_refs 调用失败：{e}")
 
-    results = r.get("results") or []
-    assert results, f"get_asset_refs returned no results: {r!r}"
-    for entry in results:
+    entries = [cap_first(r)] if cap_first(r) else []
+    assert entries, f"get_asset_refs returned no results: {r!r}"
+    for entry in entries:
         if not isinstance(entry, dict) or entry.get("error"):
             continue
         if not isinstance(entry.get("refs"), list):
@@ -199,8 +199,8 @@ def test_get_asset_refs_defaults_shape(mcp, test_ns):
             entry,
             list_key="refs",
             defaults_prefix="refs",
-            required_fields=("assetPath",),
-            context=f"get_asset_refs {entry.get('assetPath')}",
+            required_fields=("path",),
+            context=f"get_asset_refs {entry.get('assetPath') or entry.get('path')}",
         )
 
 

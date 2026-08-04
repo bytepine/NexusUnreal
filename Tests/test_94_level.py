@@ -70,9 +70,11 @@ def test_manage_level_spawn_and_remove_actor(test_ns, mcp, scratch_level, requir
     spawn = mcp.call_capability(
         "manage_asset_level",
         assetPath=scratch_level,
-        action="spawn_actor",
-        blueprintPath=bp,
-        location="0,0,400",
+        operations=[{
+            "action": "spawn_actor",
+            "blueprintPath": bp,
+            "location": "0,0,400",
+        }],
     )
     spawn_entry = cap_first(spawn)
     assert not spawn_entry.get("error"), spawn_entry
@@ -98,8 +100,10 @@ def test_manage_level_spawn_and_remove_actor(test_ns, mcp, scratch_level, requir
     remove = mcp.call_capability(
         "manage_asset_level",
         assetPath=scratch_level,
-        action="remove_actor",
-        actorName=actor_name,
+        operations=[{
+            "action": "remove_actor",
+            "actorName": actor_name,
+        }],
     )
     remove_entry = cap_first(remove)
     assert not remove_entry.get("error"), remove_entry

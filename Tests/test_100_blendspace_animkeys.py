@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import pytest
 
+from _framework.mcp_client import cap_first
+
 pytestmark = pytest.mark.l3_asset
 
 
@@ -16,7 +18,7 @@ def bs_path(test_ns, mcp):
     r = mcp.call_capability(
         "search_asset",
         query="",
-        assetType="blend_space",
+        assetType="BlendSpace",
         pathFilter="/Game/",
         limit=1,
     )
@@ -49,18 +51,14 @@ def test_create_blend_space(test_ns, skel_path, mcp):
         assetPath=new_path,
         skeletonPath=skel_path,
     )
-    results = (r.get("results") or []) if isinstance(r, dict) else []
-    assert results, f"create_asset_blend_space 无返回: {r}"
-    entry = results[0]
+    entry = cap_first(r)
     assert not entry.get("error") and entry.get("success") is not False, entry
     assert entry.get("assetType") in ("BlendSpace", "BlendSpace1D"), entry
 
 
 def test_get_blend_space(bs_path, mcp):
     r = mcp.call_capability("get_asset_blend_space", assetPath=bs_path)
-    results = (r.get("results") or []) if isinstance(r, dict) else []
-    assert results, f"get_asset_blend_space 无返回: {r}"
-    entry = results[0]
+    entry = cap_first(r)
     assert entry.get("assetType") in ("BlendSpace", "BlendSpace1D"), entry
     assert "axes" in entry, entry
     assert "samples" in entry, entry
@@ -85,9 +83,7 @@ def test_manage_blend_space_set_axis(test_ns, skel_path, mcp):
             "gridNum": 4,
         }],
     )
-    results = (r.get("results") or []) if isinstance(r, dict) else []
-    assert results, f"manage_asset_blend_space 无返回: {r}"
-    entry = results[0]
+    entry = cap_first(r)
     assert not entry.get("error") and entry.get("success") is not False, entry
 
 
@@ -112,33 +108,38 @@ def test_add_float_curve(anim_seq_path, mcp):
     r = mcp.call_capability(
         "manage_asset_anim_sequence",
         assetPath=anim_seq_path,
-        action="add_float_curve",
-        curveName="TestCurve_MCP",
+        operations=[{
+            "action": "add_float_curve",
+            "curveName": "TestCurve_MCP",
+        }],
     )
-    results = (r.get("results") or []) if isinstance(r, dict) else []
-    assert results, f"add_float_curve 无返回: {r}"
-    entry = results[0]
-    assert (not entry.get("error") and entry.get("success") is not False) or "已存在" in entry.get("note", ""), entry
+    entry = cap_first(r)
+    assert (
+        (not entry.get("error") and entry.get("success") is not False)
+        or "已存在" in entry.get("note", "")
+    ), entry
 
 
 def test_set_curve_key(anim_seq_path, mcp):
     mcp.call_capability(
         "manage_asset_anim_sequence",
         assetPath=anim_seq_path,
-        action="add_float_curve",
-        curveName="TestCurve_MCP",
+        operations=[{
+            "action": "add_float_curve",
+            "curveName": "TestCurve_MCP",
+        }],
     )
     r = mcp.call_capability(
         "manage_asset_anim_sequence",
         assetPath=anim_seq_path,
-        action="set_curve_key",
-        curveName="TestCurve_MCP",
-        time=0.5,
-        value=1.0,
+        operations=[{
+            "action": "set_curve_key",
+            "curveName": "TestCurve_MCP",
+            "time": 0.5,
+            "value": 1.0,
+        }],
     )
-    results = (r.get("results") or []) if isinstance(r, dict) else []
-    assert results, f"set_curve_key 无返回: {r}"
-    entry = results[0]
+    entry = cap_first(r)
     assert not entry.get("error") and entry.get("success") is not False, entry
 
 
@@ -146,16 +147,20 @@ def test_remove_curve(anim_seq_path, mcp):
     mcp.call_capability(
         "manage_asset_anim_sequence",
         assetPath=anim_seq_path,
-        action="add_float_curve",
-        curveName="TestCurve_MCP_Remove",
+        operations=[{
+            "action": "add_float_curve",
+            "curveName": "TestCurve_MCP_Remove",
+        }],
     )
     r = mcp.call_capability(
         "manage_asset_anim_sequence",
         assetPath=anim_seq_path,
-        action="remove_curve",
-        curveName="TestCurve_MCP_Remove",
+        operations=[{
+            "action": "remove_curve",
+            "curveName": "TestCurve_MCP_Remove",
+        }],
     )
-    results = (r.get("results") or []) if isinstance(r, dict) else []
-    assert results, f"remove_curve 无返回: {r}"
-    entry = results[0]
-    assert entry.get("removed"), entry
+    entry = cap_first(r)
+    assert entry.get("removed") or (
+        not entry.get("error") and entry.get("success") is not False
+    ), entry

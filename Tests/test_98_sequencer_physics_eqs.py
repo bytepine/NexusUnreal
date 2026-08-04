@@ -89,7 +89,8 @@ def test_manage_physics_asset_add_sphere(pa_path, mcp):
 
 # ── EQS ──────────────────────────────────────────────────────────────────────
 
-def test_create_eqs(test_ns, mcp):
+def test_create_eqs(test_ns, mcp, require_tools):
+    require_tools("create_asset_eqs")
     path = f"{test_ns}/EQ_TestFindCover"
     r = mcp.call_capability("create_asset_eqs", assetPath=path)
     entry = cap_first(r)
@@ -97,14 +98,16 @@ def test_create_eqs(test_ns, mcp):
     assert not entry.get("error") and entry.get("success") is not False, r
 
 
-def test_get_eqs(test_ns, mcp):
+def test_get_eqs(test_ns, mcp, require_tools):
+    require_tools("get_asset_eqs")
     path = f"{test_ns}/EQ_TestFindCover"
     r = mcp.call_capability("get_asset_eqs", assetPath=path)
     entry = cap_first(r)
     assert entry.get("assetType") == "EnvQuery", entry
 
 
-def test_manage_eqs_add_option(test_ns, mcp):
+def test_manage_eqs_add_option(test_ns, mcp, require_tools):
+    require_tools("manage_asset_eqs")
     path = f"{test_ns}/EQ_TestFindCover"
     r = mcp.call_capability(
         "manage_asset_eqs",
@@ -116,7 +119,8 @@ def test_manage_eqs_add_option(test_ns, mcp):
     assert not entry.get("error") and entry.get("success") is not False, r
 
 
-def test_manage_eqs_set_generator(test_ns, mcp):
+def test_manage_eqs_set_generator(test_ns, mcp, require_tools):
+    require_tools("manage_asset_eqs")
     path = f"{test_ns}/EQ_TestFindCover"
     r = mcp.call_capability(
         "manage_asset_eqs",

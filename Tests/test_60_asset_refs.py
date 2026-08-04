@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import pytest
 
+from _framework.mcp_client import cap_first
+
 pytestmark = pytest.mark.l1_readonly
 
 
@@ -51,7 +53,14 @@ def test_dependencies_batch(mcp, some_assets):
 def test_referencers(mcp, some_assets):
     bp, _ = some_assets
     r = mcp.call("get_asset_refs", assetPath=bp, direction="referencers")
-    assert "results" in r or "referencers" in r, r
+    # 单条提升后顶层即含 refs/direction；兼容旧 results[] / referencers 键
+    entry = cap_first(r)
+    assert (
+        "results" in r
+        or "referencers" in r
+        or "refs" in entry
+        or entry.get("direction") == "referencers"
+    ), r
 
 
 def test_referencers_with_filter(mcp, some_assets):
@@ -67,7 +76,7 @@ def test_referencers_with_filter(mcp, some_assets):
 def test_children_direct(mcp, inheritance_chain):
     parent, child, grand = inheritance_chain
     r = mcp.call("get_asset_refs", assetPath=parent, direction="children")
-    entry = (r.get("results") or [r])[0]
+    entry = cap_first(r)
     paths = {item.get("path") for item in entry.get("refs") or []}
     assert child in paths, r
     assert grand not in paths, r
@@ -76,7 +85,7 @@ def test_children_direct(mcp, inheritance_chain):
 def test_descendants(mcp, inheritance_chain):
     parent, child, grand = inheritance_chain
     r = mcp.call("get_asset_refs", assetPath=parent, direction="descendants")
-    entry = (r.get("results") or [r])[0]
+    entry = cap_first(r)
     paths = {item.get("path") for item in entry.get("refs") or []}
     assert child in paths and grand in paths, r
     by_path = {item["path"]: item for item in entry.get("refs") or []}
@@ -87,12 +96,12 @@ def test_descendants(mcp, inheritance_chain):
 def test_parent_and_ancestors(mcp, inheritance_chain):
     parent, child, grand = inheritance_chain
     r = mcp.call("get_asset_refs", assetPath=grand, direction="parent")
-    entry = (r.get("results") or [r])[0]
+    entry = cap_first(r)
     paths = [item.get("path") for item in entry.get("refs") or []]
     assert paths and paths[0] == child, r
 
     r2 = mcp.call("get_asset_refs", assetPath=grand, direction="ancestors")
-    entry2 = (r2.get("results") or [r2])[0]
+    entry2 = cap_first(r2)
     paths2 = [item.get("path") for item in entry2.get("refs") or []]
     assert child in paths2 and parent in paths2, r2
 
@@ -105,6 +114,6 @@ def test_asset_type_filter(mcp, inheritance_chain):
         direction="descendants",
         assetTypeFilter="Blueprint",
     )
-    entry = (r.get("results") or [r])[0]
+    entry = cap_first(r)
     for item in entry.get("refs") or []:
         assert "Blueprint" in (item.get("assetType") or ""), item

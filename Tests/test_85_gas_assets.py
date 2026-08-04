@@ -40,9 +40,7 @@ def test_ga_get_metadata(test_ns, mcp):
     path = f"{test_ns}/GA_TestAbility"
     r = mcp.call("get_asset_gameplay_ability", assetPath=path, sections=["metadata"])
     assert isinstance(r, dict), r
-    entries = r.get("results") or r.get("entries") or [r]
-    assert entries, f"无 entries: {r!r}"
-    entry = entries[0]
+    entry = cap_first(r)
     assert "instancingPolicy" in entry, f"缺少 instancingPolicy: {entry!r}"
 
 
@@ -57,18 +55,22 @@ def test_ga_manage_set_policy(test_ns, mcp):
     r = mcp.call(
         "manage_asset_gameplay_ability",
         assetPath=path,
-        action="set_policy",
-        instancingPolicy="InstancedPerActor",
+        operations=[{
+            "action": "set_policy",
+            "instancingPolicy": "InstancedPerActor",
+        }],
     )
-    assert not r.get("error") and r.get("success") is not False, f"manage_asset_gameplay_ability set_policy 返回: {r!r}"
+    entry = cap_first(r)
+    assert not entry.get("error") and entry.get("success") is not False, (
+        f"manage_asset_gameplay_ability set_policy 返回: {r!r}"
+    )
 
 
 def test_ga_policy_readback(test_ns, mcp):
     """确认 set_policy 写入后可读回。"""
     path = f"{test_ns}/GA_TestAbility"
     r = mcp.call("get_asset_gameplay_ability", assetPath=path, sections=["metadata"])
-    entries = r.get("results") or r.get("entries") or [r]
-    entry = entries[0]
+    entry = cap_first(r)
     assert entry.get("instancingPolicy") == "InstancedPerActor", (
         f"期望 InstancedPerActor，实际: {entry.get('instancingPolicy')!r}"
     )
@@ -87,8 +89,7 @@ def test_ge_get_policy(test_ns, mcp):
     path = f"{test_ns}/GE_TestEffect"
     r = mcp.call("get_asset_gameplay_effect", assetPath=path, sections=["policy"])
     assert isinstance(r, dict), r
-    entries = r.get("results") or r.get("entries") or [r]
-    entry = entries[0]
+    entry = cap_first(r)
     assert "durationPolicy" in entry, f"缺少 durationPolicy: {entry!r}"
 
 
@@ -99,7 +100,7 @@ def test_ge_manage_set_policy(test_ns, mcp):
         assetPath=path,
         operations=[{"action": "set_policy", "durationPolicy": "Infinite"}],
     )
-    assert not r.get("error"), f"manage set_policy 返回: {r!r}"
+    assert not cap_first(r).get("error"), f"manage set_policy 返回: {r!r}"
 
 
 def test_ge_get_modifiers_empty(test_ns, mcp):
@@ -141,8 +142,7 @@ def test_as_get_empty(test_ns, mcp):
     path = f"{test_ns}/AS_TestStats"
     r = mcp.call("get_asset_attribute_set", assetPath=path)
     assert isinstance(r, dict), r
-    entries = r.get("results") or r.get("entries") or [r]
-    entry = entries[0]
+    entry = cap_first(r)
     assert "attributes" in entry, f"缺少 attributes 字段: {entry!r}"
     assert isinstance(entry["attributes"], list), entry
 

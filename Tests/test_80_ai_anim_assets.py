@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from _framework.asset_helpers import resolve_skeleton
+from _framework.asset_helpers import resolve_skeleton, first_asset_path
 from _framework.mcp_client import MCPError, cap_first
 
 pytestmark = pytest.mark.l3_asset
@@ -76,6 +76,20 @@ def test_anim_montage_create(test_ns, mcp, template_skeleton):
     r = mcp.call("create_anim_montage", assetPath=path,
                  skeletonPath=template_skeleton)
     assert r, f"create_anim_montage returned empty: {r!r}"
+    # 空白 Montage 时长为 0；补一段 Idle 才能 play_montage
+    seq = first_asset_path(mcp, "AnimSequence", path_filter="/Game/Mannequin")
+    assert seq, "无法定位 AnimSequence 样本以填充 Montage"
+    add = mcp.call_capability(
+        "manage_asset_anim_montage",
+        assetPath=path,
+        operations=[{
+            "action": "add_segment",
+            "animSequencePath": seq,
+        }],
+    )
+    entry = cap_first(add)
+    assert not entry.get("error"), entry
+    mcp.call("save_asset", assetPaths=[path])
 
 
 def test_get_asset_anim_montage(test_ns, mcp, template_skeleton):
@@ -83,6 +97,7 @@ def test_get_asset_anim_montage(test_ns, mcp, template_skeleton):
     r = mcp.call_capability("get_asset_anim_montage", assetPath=path)
     entry = cap_first(r)
     assert not entry.get("error"), entry
+    assert entry.get("duration", 0) > 0, entry
 
 
 def test_get_actor_animation_error_path(mcp, require_tools):
@@ -149,15 +164,19 @@ def test_manage_behavior_tree_add_child(test_ns, mcp):
     mcp.call_capability(
         "manage_asset_behavior_tree",
         assetPath=bt,
-        action="set_root",
-        nodeClass="BTComposite_Selector",
+        operations=[{
+            "action": "set_root",
+            "nodeClass": "BTComposite_Selector",
+        }],
     )
     mcp.call_capability(
         "manage_asset_behavior_tree",
         assetPath=bt,
-        action="add_node",
-        nodeClass="BTTask_Wait",
-        parentPath="",
+        operations=[{
+            "action": "add_node",
+            "nodeClass": "BTTask_Wait",
+            "parentPath": "",
+        }],
     )
     r = mcp.call_capability("get_asset_behavior_tree", assetPath=bt)
     entry = cap_first(r)
@@ -179,24 +198,30 @@ def test_manage_behavior_tree_move_node(test_ns, mcp):
     mcp.call_capability(
         "manage_asset_behavior_tree",
         assetPath=bt,
-        action="set_root",
-        nodeClass="BTComposite_Selector",
+        operations=[{
+            "action": "set_root",
+            "nodeClass": "BTComposite_Selector",
+        }],
     )
     for _ in range(2):
         mcp.call_capability(
             "manage_asset_behavior_tree",
             assetPath=bt,
-            action="add_node",
-            nodeClass="BTTask_Wait",
-            parentPath="",
+            operations=[{
+                "action": "add_node",
+                "nodeClass": "BTTask_Wait",
+                "parentPath": "",
+            }],
         )
     move = mcp.call_capability(
         "manage_asset_behavior_tree",
         assetPath=bt,
-        action="move_node",
-        targetPath="1",
-        parentPath="",
-        childIndex=0,
+        operations=[{
+            "action": "move_node",
+            "targetPath": "1",
+            "parentPath": "",
+            "childIndex": 0,
+        }],
     )
     move_entry = cap_first(move)
     assert not move_entry.get("error"), move_entry

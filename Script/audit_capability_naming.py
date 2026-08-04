@@ -23,9 +23,9 @@ RE_AT_LEAST_IN_CAP = re.compile(r"NX_UE_AT_LEAST\s*\(")
 
 ALLOWED_FIRST_VERBS = frozenset({
     "search", "list", "get", "set", "manage", "create", "delete", "rename",
-    "duplicate", "save", "spawn", "destroy", "diff", "interact", "control",
-    "exec", "eval", "dofile", "gc", "hotreload", "capture", "compile",
-    "export", "reimport",
+    "duplicate", "save", "unload", "spawn", "destroy", "diff", "interact",
+    "control", "exec", "eval", "dofile", "gc", "hotreload", "capture",
+    "compile", "export", "reimport",
 })
 
 FORBIDDEN_NAMES = frozenset({
@@ -124,9 +124,9 @@ def main() -> int:
         )
 
     cap_only = names - META_TOOLS
-    if len(cap_only) != 175:
+    if len(cap_only) != 176:
         errors.append(
-            f"expected exactly 175 capability names under Capabilities/, found {len(cap_only)}"
+            f"expected exactly 176 capability names under Capabilities/, found {len(cap_only)}"
         )
 
     for w in warnings:

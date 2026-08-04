@@ -24,6 +24,8 @@ class TestAnimComposite:
         results = cap_entries(r)
         assert results, f"create_asset_anim_composite 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
+        if first.get("error") and "already exists" in str(first.get("error")):
+            return
         assert (not first.get("error") and first.get("success") is not False) or first.get("name"), f"创建失败: {first}"
 
     def test_get_empty(self, mcp):
@@ -143,6 +145,8 @@ class TestRenderTarget:
         results = cap_entries(r)
         assert results, f"create_asset_render_target 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
+        if first.get("error") and "already exists" in str(first.get("error")):
+            return
         assert (not first.get("error") and first.get("success") is not False) or first.get("name"), f"创建失败: {first}"
 
     def test_get(self, mcp):

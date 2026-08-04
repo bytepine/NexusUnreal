@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+- fix(test): `test_bp_graph_connect_exec` 缺 BeginPlay 时经 `manage_asset_blueprint` 补 `K2Node_Event`
+- fix(test): `test_anim_montage_create` 创建后 `add_segment`（Mannequin Idle）并 save——空白 Montage 时长为 0，后续 `play_montage` 恒失败
+- fix(test): 全量 e2e 测试侧对齐——`skipif_ue_below` 移入 `pytest_runtest_setup`（避免 module fixture 先 ERROR）；用例统一 `cap_first` / `operations[]`；EQS 缺 cap 时 skip；audit 补 `unload`、期望数 176
+- fix(test): `audit_capability_naming` 补齐动词 `unload`、期望 Capability 数 175→176（对齐 `unload_asset`）
 - chore(test): `ue_launcher` 改用会话级 `-EnableNexusMcp` 开启 MCP，移除写 `EditorPerProjectUserSettings.ini` 与 `-ini:...bEnableMcpServer=True` 双路径
 - chore(test): `build_test` Game 阶段兼容 `NexusLink.uplugin` 已为 `Type: Runtime`（不再强制要求源为 Editor）
 - docs: 仓库改为公开，定位为 NexusLink 示例工程；README 移除私有表述
