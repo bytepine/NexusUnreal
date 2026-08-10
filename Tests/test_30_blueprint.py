@@ -13,7 +13,7 @@ pytestmark = pytest.mark.l3_asset
 @pytest.fixture(scope="module")
 def bp_path(test_ns, mcp):
     path = f"{test_ns}/BP_TestActor"
-    mcp.call("create_blueprint", assetPath=path, parentClass="Actor")
+    mcp.call("create_asset_blueprint", assetPath=path, parentClass="Actor")
     yield path
 
 
@@ -99,7 +99,7 @@ def test_bp_component_section_owned_inherited_native(mcp, test_ns):
         }],
     )
     assert isinstance(add_parent, dict), f"add_component parent: {add_parent!r}"
-    mcp.call("save_asset", assetPaths=[parent_path])
+    mcp.call("save_asset", assetPath=parent_path)
 
     parent_class_path = f"{parent_path}.BP_CompParent_C"
     child_path = f"{test_ns}/BP_CompChild"
@@ -139,7 +139,7 @@ def test_bp_component_section_owned_inherited_native(mcp, test_ns):
     hierarchy = payload.get("hierarchy") or []
     assert hierarchy, f"hierarchy 为空: {payload!r}"
 
-    mcp.call("save_asset", assetPaths=[child_path])
+    mcp.call("save_asset", assetPath=child_path)
 
 
 def test_bp_graph_roundtrip(mcp, bp_path):
@@ -302,7 +302,7 @@ def test_bp_graph_connect_exec(mcp, bp_path):
 
 
 def test_bp_get_asset_all_section(mcp, bp_path):
-    """4.3：section=all 应覆盖 variables/components/functions/graphOverview/defaults。
+    """4.3：sections=["all"] 应覆盖 variables/components/functions/graphOverview/defaults。
     全成功时不再回显 sections[]；置于末尾以免触发 redundant_call。"""
     r = mcp.call_capability("get_asset_blueprint", assetPath=bp_path, sections=["all"])
     first = cap_first(r)
@@ -314,5 +314,5 @@ def test_bp_get_asset_all_section(mcp, bp_path):
 
 
 def test_bp_save(mcp, bp_path):
-    r = mcp.call("save_asset", assetPaths=[bp_path])
+    r = mcp.call("save_asset", assetPath=bp_path)
     assert (r.get("saved") or 0) == 1, f"save_asset bp: {r!r}"

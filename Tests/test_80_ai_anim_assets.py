@@ -20,41 +20,38 @@ def template_skeleton(mcp):
 def test_behavior_tree_create(test_ns, mcp):
     bt = f"{test_ns}/BT_TestAI"
     bb = f"{test_ns}/BB_TestAI"
-    r = mcp.call("create_behavior_tree", assetPath=bt, blackboardPath=bb)
-    assert r, f"create_behavior_tree returned empty: {r!r}"
+    # create_asset_behavior_tree 仅 assetPath；BB 另建后可用 manage set_blackboard 关联
+    mcp.call("create_asset_blackboard", assetPath=bb)
+    r = mcp.call("create_asset_behavior_tree", assetPath=bt)
+    assert r, f"create_asset_behavior_tree returned empty: {r!r}"
 
 
 def test_create_blackboard_capability(test_ns, mcp, require_tools):
-    """`create_blackboard` 仅经全局 `call_capability` 暴露。"""
+    """`create_asset_blackboard` 经全局 `call_capability` 调用。"""
     require_tools("call_capability")
     bb = f"{test_ns}/BB_CreateBlackboardCap"
-    r = mcp.call(
-        "call_capability",
-        capability="create_blackboard",
-        arguments={"assetPath": bb},
-    )
+    r = mcp.call_capability("create_asset_blackboard", assetPath=bb)
     entry = cap_first(r)
     assert not entry.get("error"), r
     assert entry.get("path"), r
 
 
 def test_behavior_tree_asset(test_ns, mcp):
-    r = mcp.call("get_behavior_tree", section="overview",
+    r = mcp.call("get_asset_behavior_tree",
                  assetPath=f"{test_ns}/BT_TestAI")
     assert isinstance(r, dict)
 
 
 def test_behavior_tree_blackboard(test_ns, mcp):
-    r = mcp.call("get_behavior_tree", section="blackboard",
-                 assetPath=f"{test_ns}/BT_TestAI")
+    r = mcp.call("get_asset_blackboard", assetPath=f"{test_ns}/BB_TestAI")
     assert isinstance(r, dict)
 
 
 def test_anim_blueprint_create(test_ns, mcp, template_skeleton):
     path = f"{test_ns}/ABP_TestAnim"
-    r = mcp.call("create_anim_blueprint", assetPath=path,
+    r = mcp.call("create_asset_anim_blueprint", assetPath=path,
                  skeletonPath=template_skeleton)
-    assert r, f"create_anim_blueprint returned empty: {r!r}"
+    assert r, f"create_asset_anim_blueprint returned empty: {r!r}"
 
 
 def test_get_asset_anim_blueprint_graph_overview(test_ns, mcp, template_skeleton):
@@ -73,9 +70,9 @@ def test_get_asset_anim_blueprint_graph_overview(test_ns, mcp, template_skeleton
 
 def test_anim_montage_create(test_ns, mcp, template_skeleton):
     path = f"{test_ns}/AM_TestAttack"
-    r = mcp.call("create_anim_montage", assetPath=path,
+    r = mcp.call("create_asset_anim_montage", assetPath=path,
                  skeletonPath=template_skeleton)
-    assert r, f"create_anim_montage returned empty: {r!r}"
+    assert r, f"create_asset_anim_montage returned empty: {r!r}"
     # 空白 Montage 时长为 0；补一段 Idle 才能 play_montage
     seq = first_asset_path(mcp, "AnimSequence", path_filter="/Game/Mannequin")
     assert seq, "无法定位 AnimSequence 样本以填充 Montage"
@@ -89,7 +86,7 @@ def test_anim_montage_create(test_ns, mcp, template_skeleton):
     )
     entry = cap_first(add)
     assert not entry.get("error"), entry
-    mcp.call("save_asset", assetPaths=[path])
+    mcp.call("save_asset", assetPath=path)
 
 
 def test_get_asset_anim_montage(test_ns, mcp, template_skeleton):
@@ -101,13 +98,13 @@ def test_get_asset_anim_montage(test_ns, mcp, template_skeleton):
 
 
 def test_get_actor_animation_error_path(mcp, require_tools):
-    """覆盖 `get_actor_animation` —— 不存在的 Actor：`totalCount/results[].error`，
+    """覆盖 `get_runtime_actor_animation` —— 不存在的 Actor：`totalCount/results[].error`，
     而非 top-level `MCPError`。"""
-    require_tools("get_actor_animation")
+    require_tools("get_runtime_actor_animation")
     r = mcp.call(
-        "get_actor_animation",
+        "get_runtime_actor_animation",
         actorName="__NonExistentActor_Animation__",
-        section="state",
+        sections=["state"],
     )
     assert isinstance(r, dict), r
     entry = cap_first(r)
@@ -122,9 +119,9 @@ def test_save_all_anim_assets(test_ns, mcp):
         f"{test_ns}/ABP_TestAnim",
         f"{test_ns}/AM_TestAttack",
     ]
-    r = mcp.call("save_asset", assetPaths=paths)
-    # Some may be skipped if created_anim_* was skipped; just assert shape.
-    assert "saved" in r or "results" in r, r
+    results = [mcp.call("save_asset", assetPath=path) for path in paths]
+    # Some may be skipped if create_asset_anim_* was skipped; just assert shape.
+    assert all("saved" in r or "results" in r for r in results), results
 
 
 def test_search_asset_animmontage_shortcut(test_ns, mcp, template_skeleton):
@@ -194,7 +191,7 @@ def test_manage_behavior_tree_add_child(test_ns, mcp):
 def test_manage_behavior_tree_move_node(test_ns, mcp):
     """move_node 将子节点移到指定 childIndex。"""
     bt = f"{test_ns}/BT_MoveNode"
-    mcp.call("create_behavior_tree", assetPath=bt)
+    mcp.call("create_asset_behavior_tree", assetPath=bt)
     mcp.call_capability(
         "manage_asset_behavior_tree",
         assetPath=bt,
@@ -247,11 +244,11 @@ def test_manage_behavior_tree_move_node(test_ns, mcp):
 def test_manage_asset_blackboard_enum_key(test_ns, mcp):
     """manage_asset_blackboard 支持 keyType=enum。"""
     bb = f"{test_ns}/BB_EnumKey"
-    mcp.call("create_blackboard", assetPath=bb)
+    mcp.call("create_asset_blackboard", assetPath=bb)
     add = mcp.call_capability(
         "manage_asset_blackboard",
         assetPath=bb,
-        keys=[{"action": "add", "keyName": "TestEnumKey", "keyType": "enum"}],
+        operations=[{"action": "add", "keyName": "TestEnumKey", "keyType": "enum"}],
     )
     add_entry = cap_first(add)
     assert not add_entry.get("error"), add_entry

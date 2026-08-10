@@ -266,6 +266,16 @@ def main() -> int:
         if audit_rc != 0:
             return audit_rc
 
+    params_audit = (
+        NEXUS_UNREAL_DIR
+        / "Plugins/Developer/NexusLink/scripts/audit_capability_params.py"
+    )
+    if params_audit.is_file():
+        print(f"[audit] {params_audit}", flush=True)
+        params_rc = subprocess.call([sys.executable, str(params_audit)])
+        if params_rc != 0:
+            return params_rc
+
     conn_args, mode = _resolve_connection(args)
     if not conn_args:
         eng = _uproject_engine_association(_HOST_UPROJECT) if _HOST_UPROJECT.exists() else None

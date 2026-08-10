@@ -2,8 +2,8 @@
 """旧 MCP 工具名 → 当前 Capability 名映射表。
 
 在 v1.8–v1.10 的 Capability 命名规范化重构中，多个工具被重命名。
-此映射由 MCPClient.call() 使用，以便旧测试代码可在不改调用形式的情况下
-自动路由到正确的新 capability，避免大规模批量修改。
+此映射由 MCPClient.call() 使用，仅为外部旧调用保留兼容路由；测试代码应直接使用
+规范 Capability 名。
 
 对于真正已拆分（原工具变成多个 capability）的情况（get_lua / manage_lua 等），
 此处不做映射，需在对应测试文件中显式改写。
@@ -11,7 +11,8 @@
 
 from typing import Dict
 
-# 旧工具名 → 新 capability 名（1:1 rename，参数名称未变）
+# 旧工具名 → 新 capability 名（1:1 rename）。
+# 注意：参数契约已 Breaking（单目标、旧键不兼容）；本表只做能力名路由，不映射旧参数键。
 LEGACY_CAP_NAMES: Dict[str, str] = {
     # Asset 创建类
     "create_blueprint":      "create_asset_blueprint",
@@ -24,9 +25,6 @@ LEGACY_CAP_NAMES: Dict[str, str] = {
     "create_blackboard":     "create_asset_blackboard",
     "create_anim_blueprint": "create_asset_anim_blueprint",
     "create_anim_montage":   "create_asset_anim_montage",
-
-    # Asset 读取类（注意 get_asset 拆分为按类型，不在此处统一映射）
-    "get_behavior_tree":       "get_asset_behavior_tree",
 
     # Asset 管理类
     "manage_struct_field":     "manage_asset_struct_field",

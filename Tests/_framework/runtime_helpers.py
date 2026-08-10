@@ -20,7 +20,7 @@ def pie_is_running(status: dict) -> bool:
 
 
 def spawn_runtime_actors(mcp: MCPClient, specs: List[Dict[str, Any]]) -> List[str]:
-    """逐条 spawn_runtime_actor；每条 spec 含 blueprintPath/className 与可选位置/旋转。"""
+    """逐条 spawn_runtime_actor；每条 spec 含 assetPath/className 与可选位置/旋转。"""
     names: List[str] = []
     for spec in specs:
         r = mcp.call("spawn_actor", **spec)
@@ -38,7 +38,4 @@ def destroy_runtime_actors(mcp: MCPClient, names: List[str]) -> None:
         try:
             mcp.call("destroy_actor", actorName=name)
         except Exception:
-            try:
-                mcp.call("destroy_actor", actorNames=[name])
-            except Exception:
-                pass
+            pass

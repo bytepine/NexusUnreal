@@ -15,8 +15,8 @@ def test_create_data_asset_rename_list(test_ns, mcp):
     orig = f"{test_ns}/DA_TestConfig"
     renamed = f"{test_ns}/DA_TestConfig_Renamed"
 
-    mcp.call("create_data_asset", assetPath=orig, parentClass="PrimaryAssetLabel")
-    r = mcp.call("rename_asset", assetPath=orig, newPath=renamed)
+    mcp.call("create_asset_data_asset", assetPath=orig, parentClass="PrimaryAssetLabel")
+    r = mcp.call("rename_asset", assetPath=orig, destAssetPath=renamed)
     assert r, f"rename returned empty: {r!r}"
 
     listing = mcp.call("search_asset", assetType="all", pathFilter=test_ns, limit=200)
@@ -37,11 +37,11 @@ def test_duplicate_asset(test_ns, mcp, require_tools):
     listing = mcp.call("search_asset", assetType="DataAsset", pathFilter=test_ns, limit=20)
     paths = [a.get("assetPath") or a.get("path") for a in (cap_first(listing).get("assets") or [])]
     if src not in paths:
-        mcp.call("create_data_asset", assetPath=src, parentClass="PrimaryAssetLabel")
-    r = mcp.call_capability("duplicate_asset", assetPath=src, newPath=dup)
+        mcp.call("create_asset_data_asset", assetPath=src, parentClass="PrimaryAssetLabel")
+    r = mcp.call_capability("duplicate_asset", assetPath=src, destAssetPath=dup)
     entry = cap_first(r)
     assert not entry.get("error"), entry
-    assert entry.get("newPath") == dup or entry.get("path") == dup, entry
+    assert entry.get("destAssetPath") == dup or entry.get("path") == dup, entry
 
 
 def test_multi_asset_overview(test_ns, mcp):
@@ -107,7 +107,7 @@ def test_data_asset_get_and_manage_reset(test_ns, mcp, require_tools):
     """get_asset_data_asset + manage_asset_data_asset(reset) 闭环。"""
     require_tools("get_asset_data_asset", "manage_asset_data_asset")
     path = f"{test_ns}/DA_McpRw"
-    mcp.call("create_data_asset", assetPath=path, parentClass="PrimaryAssetLabel")
+    mcp.call("create_asset_data_asset", assetPath=path, parentClass="PrimaryAssetLabel")
 
     entry = _data_asset_entry(mcp, path)
     assert not entry.get("error"), entry
@@ -127,7 +127,7 @@ def test_delete_asset_removes_from_search(test_ns, mcp, require_tools):
     """delete_asset：创建后立即删除，search 不应再出现。"""
     require_tools("delete_asset")
     path = f"{test_ns}/DA_DeleteProbe"
-    mcp.call("create_data_asset", assetPath=path, parentClass="PrimaryAssetLabel")
+    mcp.call("create_asset_data_asset", assetPath=path, parentClass="PrimaryAssetLabel")
 
     dr = mcp.call_capability("delete_asset", assetPath=path)
     del_entry = cap_first(dr)

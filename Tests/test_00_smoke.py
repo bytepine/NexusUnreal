@@ -29,29 +29,29 @@ def test_search_capabilities_roundtrip(mcp):
 
 
 def test_search_capabilities_nested_widget_action_enum(mcp):
-    """manage_asset_user_widget 的 widgets[].action 须在 parameters[] 中带 enum。"""
+    """manage_asset_user_widget 的 operations[].action 须在 parameters[] 中带 enum。"""
     r = mcp.call("search_capabilities", capabilityName="manage_asset_user_widget")
     # 新版返回 {"capability":{"parameters":[...]}}，旧版顶层 parameters
     cap = r.get("capability") or r
     params = cap.get("parameters") or []
     by_name = {p.get("name"): p for p in params if isinstance(p, dict)}
-    action = by_name.get("widgets[].action")
-    assert action is not None, f"widgets[].action missing in parameters: {by_name.keys()!r}"
+    action = by_name.get("operations[].action")
+    assert action is not None, f"operations[].action missing in parameters: {by_name.keys()!r}"
     assert action.get("type") == "string (enum)" or action.get("enum"), action
 
 
-def test_call_capability_legacy_blackboard_not_unknown(mcp):
-    """create_blackboard 旧名应解析为 create_asset_blackboard，不得 errorKind=unknown。"""
+def test_call_capability_create_blackboard_not_unknown(mcp):
+    """规范名 create_asset_blackboard 应可路由，不得 errorKind=unknown。"""
     try:
-        r = mcp.call(
-            "call_capability",
-            capability="create_blackboard",
-            arguments={"assetPath": "/Game/__nexus_pytest_nonexistent_bb__", "save": False},
+        r = mcp.call_capability(
+            "create_asset_blackboard",
+            assetPath="/Game/__nexus_pytest_nonexistent_bb__",
+            save=False,
         )
     except MCPError as exc:
-        r = exc.data if isinstance(exc.data, dict) else {}
+        r = exc.raw or {}
     if isinstance(r, dict) and r.get("errorKind") == "unknown":
-        pytest.fail(f"legacy name should resolve, got: {r!r}")
+        pytest.fail(f"canonical name should resolve, got: {r!r}")
 
 
 def test_search_capabilities_get_asset_hint(mcp):

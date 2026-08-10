@@ -23,15 +23,15 @@ def scratch_level(test_ns, mcp) -> str:
     with contextlib.suppress(MCPError):
         mcp.call_capability("delete_asset", assetPath=dup)
     try:
-        dup_r = mcp.call_capability("duplicate_asset", assetPath=src, newPath=dup)
+        dup_r = mcp.call_capability("duplicate_asset", assetPath=src, destAssetPath=dup)
     except MCPError as e:
         pytest.skip(f"duplicate 关卡失败：{e}")
     dup_entry = cap_first(dup_r)
-    actual = dup_entry.get("newPath") or dup_entry.get("path") or dup
+    actual = dup_entry.get("destAssetPath") or dup_entry.get("path") or dup
     if dup_entry.get("error"):
         pytest.skip(f"duplicate 关卡返回 error：{dup_entry}")
     with contextlib.suppress(MCPError):
-        mcp.call_capability("save_asset", assetPaths=[actual])
+        mcp.call_capability("save_asset", assetPath=actual)
     probe = mcp.call_capability(
         "get_asset_level",
         assetPath=actual,
@@ -72,7 +72,7 @@ def test_manage_level_spawn_and_remove_actor(test_ns, mcp, scratch_level, requir
         assetPath=scratch_level,
         operations=[{
             "action": "spawn_actor",
-            "blueprintPath": bp,
+            "assetPath": bp,
             "location": "0,0,400",
         }],
     )

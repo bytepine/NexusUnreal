@@ -117,7 +117,7 @@ def ensure_test_hud_widget(mcp: MCPClient, test_ns: str) -> str:
     mcp.call(
         "manage_widget",
         assetPath=path,
-        widgets=[
+        operations=[
             {"action": "add", "widgetClass": "CanvasPanel", "widgetName": "RootCanvas"},
             {"action": "add", "widgetClass": "TextBlock", "widgetName": "TitleText", "parentWidget": "RootCanvas"},
             {"action": "add", "widgetClass": "Button", "widgetName": "ClickBtn", "parentWidget": "RootCanvas"},
@@ -128,7 +128,7 @@ def ensure_test_hud_widget(mcp: MCPClient, test_ns: str) -> str:
         ],
     )
     with contextlib.suppress(MCPError):
-        mcp.call("save_asset", assetPaths=[path])
+        mcp.call("save_asset", assetPath=path)
     return path
 
 

@@ -14,16 +14,16 @@ pytestmark = pytest.mark.l3_asset
 @pytest.fixture(scope="module")
 def wbp_path(test_ns, mcp):
     path = f"{test_ns}/WBP_TestHUD"
-    mcp.call("create_widget", assetPath=path)
+    mcp.call("create_asset_user_widget", assetPath=path)
     yield path
 
 
 def test_widget_tree_batch_build(mcp, wbp_path):
     """5.2：一次批量建完整控件树（关键用例）。"""
     r = mcp.call(
-        "manage_widget",
+        "manage_asset_user_widget",
         assetPath=wbp_path,
-        widgets=[
+        operations=[
             {"action": "add", "widgetClass": "CanvasPanel",    "widgetName": "RootCanvas"},
             {"action": "add", "widgetClass": "TextBlock",      "widgetName": "TitleText",   "parentWidget": "RootCanvas"},
             {"action": "add", "widgetClass": "Button",         "widgetName": "ClickBtn",    "parentWidget": "RootCanvas"},
@@ -64,13 +64,13 @@ def test_widget_set_text(mcp, wbp_path):
 
 def test_widget_remove_one(mcp, wbp_path):
     r = mcp.call(
-        "manage_widget",
+        "manage_asset_user_widget",
         assetPath=wbp_path,
-        widgets=[{"action": "remove", "widgetName": "RemoveMe"}],
+        operations=[{"action": "remove", "widgetName": "RemoveMe"}],
     )
     assert_success_count(r, 1, context="widget remove")
 
 
 def test_widget_save(mcp, wbp_path):
-    save = mcp.call("save_asset", assetPaths=[wbp_path])
+    save = mcp.call("save_asset", assetPath=wbp_path)
     assert (save.get("saved") or 0) == 1, f"wbp save: {save!r}"

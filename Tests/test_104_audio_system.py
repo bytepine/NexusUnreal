@@ -40,7 +40,7 @@ class TestSoundClass:
     def test_manage_volume(self, mcp):
         r = mcp.call_capability("manage_asset_sound_class",
                                 assetPath=_SOUND_CLASS_PATH,
-                                volume=0.5, pitch=1.2)
+                                operations=[{"action": "set", "volume": 0.5, "pitch": 1.2}])
         first = cap_first(r)
         assert not first.get("error") and first.get("success") is not False, f"manage 失败: {first}"
 
@@ -82,7 +82,7 @@ class TestSoundAttenuation:
     def test_manage(self, mcp):
         r = mcp.call_capability("manage_asset_sound_attenuation",
                                 assetPath=_SOUND_ATTENUATION_PATH,
-                                innerRadius=800.0, falloffDistance=5000.0)
+                                operations=[{"action": "set", "innerRadius": 800.0, "falloffDistance": 5000.0}])
         first = cap_first(r)
         assert not first.get("error") and first.get("success") is not False, f"manage 失败: {first}"
 
@@ -119,7 +119,7 @@ class TestSoundConcurrency:
     def test_manage(self, mcp):
         r = mcp.call_capability("manage_asset_sound_concurrency",
                                 assetPath=_SOUND_CONCURRENCY_PATH,
-                                maxCount=4, retriggerTime=0.1)
+                                operations=[{"action": "set", "maxCount": 4, "retriggerTime": 0.1}])
         first = cap_first(r)
         assert not first.get("error") and first.get("success") is not False, f"manage 失败: {first}"
 

@@ -15,7 +15,6 @@ from _framework.assertions import (
     merge_with_defaults,
 )
 from _framework.asset_helpers import (
-    ensure_behavior_tree,
     ensure_blueprint,
     ensure_material,
     ensure_struct,
@@ -60,13 +59,13 @@ def test_search_asset_all_still_valid(mcp):
 
 def test_list_actors_defaults_shape(mcp):
     """list_runtime_actors 返回体若产生 actors_defaults，必须是合法 dict 且合并后字段完整。"""
-    r = mcp.call("list_actors", limit=200)
+    r = mcp.call("list_runtime_actors", limit=200)
     assert_respecting_defaults(
         cap_first(r),
         list_key="actors",
         defaults_prefix="actors",
         required_fields=("name", "class", "location"),
-        context="list_actors",
+        context="list_runtime_actors",
     )
 
 
@@ -111,18 +110,22 @@ def test_get_asset_blueprint_defaults_shape(mcp):
 def test_diff_actors_baseline_values_shape(mcp):
     """diff_runtime_actors 批量模式若产出任何 diff，baseline.values 必须是字符串字典，
     且 comparisons[].diffs[] 里不再出现 valueA。"""
-    listing = mcp.call("list_actors", limit=10)
+    listing = mcp.call("list_runtime_actors", limit=10)
     payload = cap_first(listing)
     actors = payload.get("actors") or []
     merged = merge_with_defaults(actors, payload.get("actors_defaults") or {})
     names = [a.get("name") for a in merged if a.get("name")]
     if len(names) < 2:
-        pytest.skip(f"need at least 2 actors for diff_actors: {names!r}")
+        pytest.skip(f"need at least 2 actors for diff_runtime_actors: {names!r}")
 
     try:
-        r = mcp.call("diff_actors", actorNames=names[:3])
+        r = mcp.call(
+            "diff_runtime_actors",
+            actorNameA=names[0],
+            actorNameB=names[1],
+        )
     except MCPError as e:
-        pytest.skip(f"diff_actors rejected: {e}")
+        pytest.skip(f"diff_runtime_actors rejected: {e}")
 
     baseline = r.get("baseline") or {}
     values = baseline.get("values")
@@ -171,11 +174,15 @@ def _probe_widget(mcp, test_ns: str) -> str:
     return path or ensure_widget(mcp, test_ns, "WBP_CompactProbe")
 
 
-def _probe_behavior_tree(mcp, test_ns: str) -> str:
-    path = first_asset_path(mcp, "BehaviorTree", path_filter=test_ns)
+def _probe_blackboard(mcp, test_ns: str) -> str:
+    path = first_asset_path(mcp, "Blackboard", path_filter=test_ns)
     if not path:
-        path = first_asset_path(mcp, "BehaviorTree")
-    return path or ensure_behavior_tree(mcp, test_ns)
+        path = first_asset_path(mcp, "Blackboard")
+    if path:
+        return path
+    path = f"{test_ns}/BB_CompactProbe"
+    mcp.call("create_asset_blackboard", assetPath=path)
+    return path
 
 
 def test_get_asset_refs_defaults_shape(mcp, test_ns):
@@ -366,9 +373,9 @@ def test_get_output_log_category_filter_forced_default(mcp):
 
 
 def test_get_gameplay_tags_hierarchy_childcount_defaults(mcp):
-    """get_gameplay_tags section=hierarchy：tags_defaults 候选 childCount。"""
+    """get_gameplay_tags view=hierarchy：tags_defaults 候选 childCount。"""
     try:
-        r = mcp.call("get_gameplay_tags", section="hierarchy", limit=200)
+        r = mcp.call("get_gameplay_tags", sections=["hierarchy"], limit=200)
     except MCPError as e:
         pytest.skip(f"get_gameplay_tags 调用失败：{e}")
 
@@ -383,12 +390,12 @@ def test_get_gameplay_tags_hierarchy_childcount_defaults(mcp):
         assert "tag" in entry, f"tags[].tag missing after merge: {entry!r}"
 
 
-def test_get_behavior_tree_blackboard_type_defaults(mcp, test_ns):
-    """get_asset_behavior_tree section=blackboard：keys_defaults 候选 type。"""
-    path = _probe_behavior_tree(mcp, test_ns)
+def test_get_asset_blackboard_type_defaults(mcp, test_ns):
+    """get_asset_blackboard：keys_defaults 候选 type。"""
+    path = _probe_blackboard(mcp, test_ns)
 
     try:
-        bt_r = mcp.call("get_behavior_tree", section="blackboard", assetPath=path)
+        bt_r = mcp.call("get_asset_blackboard", assetPath=path)
     except MCPError as e:
         pytest.skip(f"get_asset_behavior_tree blackboard 调用失败：{e}")
 
@@ -464,10 +471,10 @@ def test_auto_discover_undeclared_fields_in_defaults(mcp):
 
 @pytest.mark.requires_gui
 def test_get_actor_animation_variables_defaults_shape(mcp):
-    """get_runtime_actor_animation section=variables：variables_defaults 候选 type + value。
+    """get_runtime_actor_animation view=variables：variables_defaults 候选 type + value。
     需要 PIE 运行中的 Actor；若无 Actor 或 AnimInstance 则跳过。"""
     try:
-        actors_r = mcp.call("list_actors", limit=50)
+        actors_r = mcp.call("list_runtime_actors", limit=50)
     except MCPError as e:
         pytest.skip(f"list_runtime_actors 失败：{e}")
 
@@ -491,7 +498,7 @@ def test_get_actor_animation_variables_defaults_shape(mcp):
         pytest.skip("PIE 世界中无 Actor")
 
     try:
-        r = mcp.call("get_actor_animation", actorName=target, section="variables")
+        r = mcp.call("get_runtime_actor_animation", actorName=target, sections=["variables"])
     except MCPError as e:
         pytest.skip(f"get_runtime_actor_animation 调用失败：{e}")
 

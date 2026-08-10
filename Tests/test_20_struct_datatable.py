@@ -15,14 +15,14 @@ pytestmark = pytest.mark.l3_asset
 @pytest.fixture(scope="module")
 def struct_path(test_ns, mcp):
     path = f"{test_ns}/S_TestItem"
-    mcp.call("create_struct", assetPath=path)
+    mcp.call("create_asset_struct", assetPath=path)
     yield path
 
 
 @pytest.fixture(scope="module")
 def datatable_path(test_ns, mcp, struct_asset_name):
     path = f"{test_ns}/DT_TestItems"
-    mcp.call("create_data_table", assetPath=path, rowStructName=struct_asset_name)
+    mcp.call("create_asset_data_table", assetPath=path, rowStructName=struct_asset_name)
     yield path
 
 
@@ -35,9 +35,9 @@ def struct_asset_name(struct_path):
 def test_struct_field_batch_init(mcp, struct_path):
     """3.1–3.2：批量 add/remove/add/add — 关键批量用例。"""
     r = mcp.call(
-        "manage_struct_field",
+        "manage_asset_struct_field",
         assetPath=struct_path,
-        fields=[
+        operations=[
             {"action": "add", "fieldName": "ItemName", "fieldType": "string"},
             {"action": "remove", "fieldName": "MemberVar_0"},
             {"action": "add", "fieldName": "ItemCount", "fieldType": "int"},
@@ -57,9 +57,9 @@ def test_struct_fields_visible(mcp, struct_path):
 
 def test_struct_field_rename_retype(mcp, struct_path):
     r = mcp.call(
-        "manage_struct_field",
+        "manage_asset_struct_field",
         assetPath=struct_path,
-        fields=[
+        operations=[
             {"action": "set", "fieldName": "ItemCount",
              "newName": "ItemPrice", "newType": "float"},
         ],
@@ -68,7 +68,7 @@ def test_struct_field_rename_retype(mcp, struct_path):
 
 
 def test_save_struct(mcp, struct_path):
-    r = mcp.call("save_asset", assetPaths=[struct_path])
+    r = mcp.call("save_asset", assetPath=struct_path)
     assert (r.get("saved") or 0) == 1, f"save_asset struct: {r!r}"
 
 
@@ -76,7 +76,7 @@ def test_datatable_row_batch_add(mcp, datatable_path):
     r = mcp.call(
         "manage_asset_data_table",
         assetPath=datatable_path,
-        rows=[
+        operations=[
             {"action": "add", "rowName": "Row_001"},
             {"action": "add", "rowName": "Row_002"},
         ],
@@ -101,7 +101,7 @@ def test_datatable_set_row_error_path(mcp, datatable_path, require_tools):
     r = mcp.call(
         "manage_asset_data_table",
         assetPath=datatable_path,
-        rows=[
+        operations=[
             {"action": "set", "rowName": "__NoSuchRow__",
              "fieldName": "__NoSuchField__", "value": "x"},
         ],
@@ -115,11 +115,11 @@ def test_datatable_row_remove(mcp, datatable_path):
     r = mcp.call(
         "manage_asset_data_table",
         assetPath=datatable_path,
-        rows=[{"action": "remove", "rowName": "Row_002"}],
+        operations=[{"action": "remove", "rowName": "Row_002"}],
     )
     assert_success_count(r, 1, context="datatable remove")
 
 
 def test_save_datatable(mcp, datatable_path):
-    r = mcp.call("save_asset", assetPaths=[datatable_path])
+    r = mcp.call("save_asset", assetPath=datatable_path)
     assert (r.get("saved") or 0) == 1, f"save_asset datatable: {r!r}"

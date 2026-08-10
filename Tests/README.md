@@ -24,6 +24,8 @@
 
 **原则**：能写在 headless 里的用例不要强依赖 GUI；确实离不开 PIE/视口再打标，并保证 `--gui` 全量能跑到。
 
+**参数契约（与 NexusLink Breaking 对齐）**：Capability 单目标（`assetPath`/`actorName`/`widgetName`）；跨目标用多次调用或 `call_capability.calls[]`；manage 用 `operations[]`；get 用 `propertyPaths[]`；spawn 用 `assetPath`（非 `blueprintPath`）；duplicate/rename 用 `destAssetPath`（非 `newPath`）。旧键不兼容。
+
 **`exec_command` 勿用 `help *`**：UE 会在系统浏览器打开 `ConsoleHelp.html`（GUI/headless 均可能）。
 
 ## 快速开始

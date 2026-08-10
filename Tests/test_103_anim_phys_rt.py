@@ -113,7 +113,7 @@ class TestPhysicalMaterial:
         new_val = round(original + 0.01, 4) if original < 0.99 else round(original - 0.01, 4)
         r = mcp.call_capability("manage_asset_physical_material",
                                 assetPath=self._pm_path,
-                                friction=new_val)
+                                operations=[{"action": "set", "friction": new_val}])
         results = cap_entries(r)
         assert results, f"manage_asset_physical_material 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
@@ -123,7 +123,7 @@ class TestPhysicalMaterial:
         # 恢复原值
         mcp.call_capability("manage_asset_physical_material",
                             assetPath=self._pm_path,
-                            friction=float(original))
+                            operations=[{"action": "set", "friction": float(original)}])
 
     def test_search_physical_material(self, mcp):
         r = mcp.call_capability("search_asset",
@@ -161,7 +161,7 @@ class TestRenderTarget:
     def test_manage_resize(self, mcp):
         r = mcp.call_capability("manage_asset_render_target",
                                 assetPath=_RENDER_TARGET,
-                                sizeX=1024, sizeY=1024)
+                                operations=[{"action": "set", "sizeX": 1024, "sizeY": 1024}])
         results = cap_entries(r)
         assert results, f"manage_asset_render_target 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
@@ -177,7 +177,9 @@ class TestRenderTarget:
     def test_manage_clear_color(self, mcp):
         r = mcp.call_capability("manage_asset_render_target",
                                 assetPath=_RENDER_TARGET,
-                                clearColorR=1.0, clearColorG=0.0, clearColorB=0.0, clearColorA=1.0)
+                                operations=[{"action": "set",
+                                             "clearColorR": 1.0, "clearColorG": 0.0,
+                                             "clearColorB": 0.0, "clearColorA": 1.0}])
         results = cap_entries(r)
         assert results, f"manage clear_color 无结果: {r}"
 

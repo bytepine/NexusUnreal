@@ -15,8 +15,8 @@ def some_assets(test_ns, mcp):
     """Create a minimal BP + material to have deterministic ref graph."""
     bp = f"{test_ns}/BP_RefTest"
     mat = f"{test_ns}/M_RefTest"
-    mcp.call("create_blueprint", assetPath=bp, parentClass="Actor")
-    mcp.call("create_material", assetPath=mat)
+    mcp.call("create_asset_blueprint", assetPath=bp, parentClass="Actor")
+    mcp.call("create_asset_material", assetPath=mat)
     return bp, mat
 
 
@@ -26,14 +26,14 @@ def inheritance_chain(test_ns, mcp):
     parent = f"{test_ns}/BP_RefParent"
     child = f"{test_ns}/BP_RefChild"
     grand = f"{test_ns}/BP_RefGrand"
-    mcp.call("create_blueprint", assetPath=parent, parentClass="Actor")
-    mcp.call("save_asset", assetPaths=[parent])
+    mcp.call("create_asset_blueprint", assetPath=parent, parentClass="Actor")
+    mcp.call("save_asset", assetPath=parent)
     parent_class = f"{parent}.BP_RefParent_C"
-    mcp.call("create_blueprint", assetPath=child, parentClass=parent_class)
-    mcp.call("save_asset", assetPaths=[child])
+    mcp.call("create_asset_blueprint", assetPath=child, parentClass=parent_class)
+    mcp.call("save_asset", assetPath=child)
     child_class = f"{child}.BP_RefChild_C"
-    mcp.call("create_blueprint", assetPath=grand, parentClass=child_class)
-    mcp.call("save_asset", assetPaths=[grand])
+    mcp.call("create_asset_blueprint", assetPath=grand, parentClass=child_class)
+    mcp.call("save_asset", assetPath=grand)
     return parent, child, grand
 
 

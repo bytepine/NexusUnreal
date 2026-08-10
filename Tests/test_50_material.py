@@ -14,18 +14,18 @@ pytestmark = pytest.mark.l3_asset
 @pytest.fixture(scope="module")
 def mat_path(test_ns, mcp):
     p = f"{test_ns}/M_TestMat"
-    mcp.call("create_material", assetPath=p)
+    mcp.call("create_asset_material", assetPath=p)
     yield p
 
 
 def test_create_decal(test_ns, mcp):
     p = f"{test_ns}/M_TestDecal"
-    mcp.call("create_material", assetPath=p, materialDomain="DeferredDecal")
+    mcp.call("create_asset_material", assetPath=p, materialDomain="DeferredDecal")
 
 
 def test_material_node_add_connect_remove(mcp, mat_path):
     add = mcp.call(
-        "manage_material",
+        "manage_asset_material",
         assetPath=mat_path,
         operations=[{"action": "add_node", "expressionClass": "Constant3Vector"}],
     )
@@ -46,7 +46,7 @@ def test_material_node_add_connect_remove(mcp, mat_path):
     assert_success_count(connect, 1, context="material connect")
 
     recompile = mcp.call(
-        "manage_material",
+        "manage_asset_material",
         assetPath=mat_path,
         operations=[{"action": "recompile"}],
     )
@@ -63,7 +63,7 @@ def test_material_node_add_connect_remove(mcp, mat_path):
     assert_success_count(disconnect, 2, context="material disconnect batch")
 
     remove = mcp.call(
-        "manage_material",
+        "manage_asset_material",
         assetPath=mat_path,
         operations=[{"action": "remove_node", "nodeId": nid}],
     )
@@ -75,7 +75,7 @@ def test_material_two_step_texture_param(mcp, mat_path):
     置于 overview 之前：overview 的 sections=["all"] 会令后续 section 查询触发
     redundant_call 保护，故 parameters 校验先于 all。"""
     r = mcp.call(
-        "manage_material",
+        "manage_asset_material",
         assetPath=mat_path,
         operations=[
             {"action": "add_node",
@@ -88,7 +88,7 @@ def test_material_two_step_texture_param(mcp, mat_path):
     nid = ids[0]
 
     r2 = mcp.call(
-        "manage_material",
+        "manage_asset_material",
         assetPath=mat_path,
         operations=[
             {"action": "set_node", "nodeId": nid, "parameterName": "BaseTex"},
@@ -126,5 +126,5 @@ def test_material_overview(mcp, mat_path):
 
 def test_material_save_all(mcp, mat_path, test_ns):
     paths = [mat_path, f"{test_ns}/M_TestDecal"]
-    r = mcp.call("save_asset", assetPaths=paths)
-    assert (r.get("saved") or 0) >= 1, f"material save: {r!r}"
+    results = [mcp.call("save_asset", assetPath=path) for path in paths]
+    assert all((r.get("saved") or 0) == 1 for r in results), f"material save: {results!r}"

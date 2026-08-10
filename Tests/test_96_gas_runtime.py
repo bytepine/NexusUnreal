@@ -30,9 +30,11 @@ def gas_runtime_assets(test_ns, mcp) -> dict:
         mcp.call_capability(
             "manage_asset_blueprint",
             assetPath=bp,
-            action="add_component",
-            componentClass="AbilitySystemComponent",
-            componentName="AbilitySystem",
+            operations=[{
+                "action": "add_component",
+                "componentClass": "AbilitySystemComponent",
+                "componentName": "AbilitySystem",
+            }],
         )
     except MCPError as e:
         pytest.skip(f"无法添加 AbilitySystemComponent：{e}")
@@ -46,7 +48,7 @@ def gas_runtime_assets(test_ns, mcp) -> dict:
 def gas_runtime_actor(mcp, pie, gas_runtime_assets) -> str:
     names = spawn_runtime_actors(
         mcp,
-        [{"blueprintPath": gas_runtime_assets["bp"], "locationZ": 120}],
+        [{"assetPath": gas_runtime_assets["bp"], "locationZ": 120}],
     )
     if not names:
         pytest.skip("GAS 角色 spawn 失败")
