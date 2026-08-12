@@ -5,8 +5,8 @@
 build_test.py -- NexusLink cross-version build test
 
 Runs BuildPlugin against all installed UE versions:
-  Phase 1 — DevelopmentEditor (WITH_EDITOR=1; NexusLink.uplugin Type: Runtime)
-  Phase 2 — UnrealGame Development (WITH_EDITOR=0, temp copy; Type 已为 Runtime 时不再改写)
+  Phase 1 — DevelopmentEditor (WITH_EDITOR=1; NexusLink.uplugin Type: Editor)
+  Phase 2 — UnrealGame Development (WITH_EDITOR=0, temp copy; Editor→Runtime rewrite for compile check)
 
 Writes error logs to Saved/Logs/Build.Log (+ Build.Game.Log for phase 2).
 
