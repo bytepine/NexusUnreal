@@ -334,7 +334,7 @@ def _scenarios(mcp: MCPClient) -> List[Tuple[str, Dict[str, Any], List[Tuple[str
     except MCPError as e:
         print(f"[skip] get_output_log categoryFilter: {e}", file=sys.stderr)
 
-    # get_gameplay_tags hierarchy（P1：childCount 叶节点扎堆）
+    # get_gameplay_tags hierarchy（树 children 或扁平 tags）
     try:
         r = mcp.call("get_gameplay_tags", section="hierarchy", limit=500)
         if r.get("tags"):

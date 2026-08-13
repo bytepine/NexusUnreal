@@ -372,8 +372,8 @@ def test_get_output_log_category_filter_forced_default(mcp):
     )
 
 
-def test_get_gameplay_tags_hierarchy_childcount_defaults(mcp):
-    """get_gameplay_tags view=hierarchy：tags_defaults 候选 childCount。"""
+def test_get_gameplay_tags_hierarchy_defaults_shape(mcp):
+    """get_gameplay_tags sections=['hierarchy']：扁平 tags 或树 children 均可；合并后每条含 tag。"""
     try:
         r = mcp.call("get_gameplay_tags", sections=["hierarchy"], limit=200)
     except MCPError as e:
@@ -383,11 +383,15 @@ def test_get_gameplay_tags_hierarchy_childcount_defaults(mcp):
     if len(tags) < 3:
         pytest.skip(f"tag 数量不足以触发压缩（{len(tags)} 条）")
 
-    # 若触发压缩，childCount 应在 tags_defaults 里；若未触发允许 tags_defaults 不存在
-    defaults = r.get("tags_defaults") or {}
-    merged = merge_with_defaults(tags, defaults)
-    for entry in merged:
-        assert "tag" in entry, f"tags[].tag missing after merge: {entry!r}"
+    def _walk(nodes, defaults):
+        merged = merge_with_defaults(nodes, defaults)
+        for entry in merged:
+            assert "tag" in entry, f"tags[].tag missing after merge: {entry!r}"
+            children = entry.get("children") or []
+            if isinstance(children, list) and children:
+                _walk(children, entry.get("children_defaults") or {})
+
+    _walk(tags, r.get("tags_defaults") or {})
 
 
 def test_get_asset_blackboard_type_defaults(mcp, test_ns):
@@ -410,7 +414,8 @@ def test_get_asset_blackboard_type_defaults(mcp, test_ns):
 
 
 def test_get_asset_bp_defaults_section_inherited_compression(mcp, test_ns):
-    """get_asset_blueprint sections=['defaults']：inherited:true 占主导时应被抽取到 defaults_defaults。"""
+    """get_asset_blueprint sections=['defaults']：inherited 为稀疏字段（仅 true 时写出），
+    不得因部分条目持有而被抽到 defaults_defaults。"""
     bp = _probe_blueprint(mcp, test_ns)
     assert bp, "无法定位或创建 Blueprint 探测资产"
 
