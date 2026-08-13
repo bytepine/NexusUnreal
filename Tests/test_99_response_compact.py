@@ -355,7 +355,7 @@ def test_get_output_log_defaults_shape(mcp):
 
 
 def test_get_output_log_category_filter_forced_default(mcp):
-    """categoryFilter 有值时 category 强制默认，entries_defaults.category 应等于 filter 值。"""
+    """categoryFilter 命中后，仅当本页实际 category 全员一致才 ForcedDefault 该值（不是过滤子串）。"""
     try:
         r = mcp.call("get_output_log", categoryFilter="LogTemp", limit=100, verbosity="all")
     except MCPError as e:
@@ -365,10 +365,15 @@ def test_get_output_log_category_filter_forced_default(mcp):
     if not entries:
         pytest.skip("无 LogTemp 日志条目")
 
+    merged = merge_with_defaults(entries, r.get("entries_defaults") or {})
+    cats = {e.get("category") for e in merged if e.get("category")}
+    if len(cats) != 1:
+        pytest.skip(f"本页 category 不唯一，无法断言 ForcedDefault: {cats!r}")
+
+    only = next(iter(cats))
     defaults = r.get("entries_defaults") or {}
-    # ForcedDefault 不依赖统计阈值，只要有条目就应命中
-    assert defaults.get("category") == "LogTemp", (
-        f"expected entries_defaults.category='LogTemp' but got: {defaults!r}"
+    assert defaults.get("category") == only, (
+        f"expected entries_defaults.category={only!r} (actual unanimous), got: {defaults!r}"
     )
 
 
@@ -414,8 +419,8 @@ def test_get_asset_blackboard_type_defaults(mcp, test_ns):
 
 
 def test_get_asset_bp_defaults_section_inherited_compression(mcp, test_ns):
-    """get_asset_blueprint sections=['defaults']：inherited 为稀疏字段（仅 true 时写出），
-    不得因部分条目持有而被抽到 defaults_defaults。"""
+    """get_asset_blueprint sections=['defaults']：inherited 全员写出（true/false），
+    主流值可抽到 defaults_defaults；合并后每条均为 bool。"""
     bp = _probe_blueprint(mcp, test_ns)
     assert bp, "无法定位或创建 Blueprint 探测资产"
 
@@ -432,20 +437,16 @@ def test_get_asset_bp_defaults_section_inherited_compression(mcp, test_ns):
     if len(defs_list) < 3:
         pytest.skip(f"too few defaults to trigger compaction (got {len(defs_list)})")
 
-    # 若触发压缩则校验 defaults_defaults 契约
-    assert_respecting_defaults(
+    merged = assert_respecting_defaults(
         payload,
         list_key="defaults",
         defaults_prefix="defaults",
-        required_fields=("path", "type"),
+        required_fields=("path", "type", "inherited"),
         context=f"get_asset_blueprint defaults {bp}",
     )
-
-    # inherited 出现在 defaults_defaults 里时必须是 bool 且为 True
-    defs_defaults = payload.get("defaults_defaults") or {}
-    if "inherited" in defs_defaults:
-        assert defs_defaults["inherited"] is True, (
-            f"defaults_defaults.inherited should be True, got: {defs_defaults['inherited']!r}"
+    for entry in merged:
+        assert isinstance(entry.get("inherited"), bool), (
+            f"defaults[].inherited must be bool after merge: {entry!r}"
         )
 
 

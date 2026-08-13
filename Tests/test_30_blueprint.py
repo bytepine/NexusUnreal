@@ -6,6 +6,7 @@ from __future__ import annotations
 import pytest
 
 from _framework.mcp_client import cap_first
+from _framework.assertions import merge_with_defaults
 
 pytestmark = pytest.mark.l3_asset
 
@@ -118,12 +119,15 @@ def test_bp_component_section_owned_inherited_native(mcp, test_ns):
 
     r = mcp.call_capability("get_asset_blueprint", assetPath=child_path, sections=["component"])
     payload = cap_first(r)
-    components = payload.get("components") or []
+    components = merge_with_defaults(
+        payload.get("components") or [],
+        payload.get("components_defaults") or {},
+    )
     by_name = {c.get("variableName"): c for c in components}
 
     child_mesh = by_name.get("ChildMesh")
     assert child_mesh and child_mesh.get("source") == "owned", f"ChildMesh not owned: {components!r}"
-    assert "inherited" not in child_mesh, f"owned 组件不应带 inherited: {child_mesh!r}"
+    assert child_mesh.get("inherited") is False, f"owned 组件 inherited 应为 false: {child_mesh!r}"
 
     parent_mesh = by_name.get("ParentMesh")
     assert parent_mesh, f"ParentMesh (父 BP SCS) 未出现在子 BP 组件列表中: {components!r}"
@@ -316,3 +320,46 @@ def test_bp_get_asset_all_section(mcp, bp_path):
 def test_bp_save(mcp, bp_path):
     r = mcp.call("save_asset", assetPath=bp_path)
     assert (r.get("saved") or 0) == 1, f"save_asset bp: {r!r}"
+
+
+def test_bp_interface_create_function_and_implement(mcp, test_ns):
+    """BPI：parentClass=Interface 创建；add_function 声明方法；普通 BP add_interface 实现。"""
+    iface_path = f"{test_ns}/BPI_Test"
+    created = mcp.call_capability(
+        "create_asset_blueprint", assetPath=iface_path, parentClass="Interface",
+    )
+    created_first = cap_first(created)
+    assert created_first.get("blueprintType") == "interface", created
+
+    add_fn = mcp.call_capability(
+        "manage_asset_blueprint",
+        assetPath=iface_path,
+        operations=[{"action": "add_function", "functionName": "DoThing"}],
+    )
+    add_fn_first = cap_first(add_fn)
+    assert not add_fn_first.get("error"), add_fn
+
+    fn_get = mcp.call_capability(
+        "get_asset_blueprint", assetPath=iface_path, sections=["function"],
+    )
+    fn_first = cap_first(fn_get)
+    assert fn_first.get("blueprintType") == "interface", fn_get
+    fn_names = [f.get("name") for f in (fn_first.get("functions") or [])]
+    assert "DoThing" in fn_names, fn_get
+
+    actor_path = f"{test_ns}/BP_IfaceUser"
+    mcp.call_capability("create_asset_blueprint", assetPath=actor_path, parentClass="Actor")
+    add_iface = mcp.call_capability(
+        "manage_asset_blueprint",
+        assetPath=actor_path,
+        operations=[{"action": "add_interface", "interfaceName": iface_path}],
+    )
+    add_iface_first = cap_first(add_iface)
+    assert not add_iface_first.get("error"), add_iface
+
+    actor_get = mcp.call_capability(
+        "get_asset_blueprint", assetPath=actor_path, sections=["function"],
+    )
+    actor_first = cap_first(actor_get)
+    ifaces = actor_first.get("implementedInterfaces") or []
+    assert any("BPI_Test" in str(x) for x in ifaces), actor_get
