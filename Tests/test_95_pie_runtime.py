@@ -450,3 +450,82 @@ def test_lua_object_smoke(mcp, _unlua_available, spawned_actors):
     entry = cap_first(r)
     assert isinstance(entry, dict), entry
     assert entry.get("keys") is not None or entry.get("error"), entry
+
+
+def test_control_pie_pause_resume(mcp, pie):
+    r = mcp.call_capability("control_pie", action="pause")
+    entry = cap_first(r)
+    assert not entry.get("error"), r
+    mcp.call_capability("control_pie", action="resume")
+
+
+def test_interact_runtime_widget_combobox(mcp, pie, test_ns):
+    wbp = ensure_test_hud_widget(mcp, test_ns)
+    try:
+        mcp.call_capability(
+            "manage_asset_user_widget",
+            assetPath=wbp,
+            operations=[{
+                "action": "add",
+                "widgetClass": "ComboBoxString",
+                "widgetName": "TestCombo",
+                "parentWidget": "RootCanvas",
+            }],
+        )
+        mcp.call("save_asset", assetPath=wbp)
+        mcp.call("spawn_runtime_widget", assetPath=wbp)
+    except MCPError as e:
+        pytest.skip(f"ComboBox 运行时前置失败：{e}")
+    read_r = mcp.call_capability(
+        "interact_runtime_widget",
+        widgetName="TestCombo",
+        action="read",
+    )
+    entry = cap_first(read_r)
+    if entry.get("error"):
+        pytest.skip(f"ComboBox 运行时不可用：{entry}")
+    assert "optionCount" in entry or "selected" in entry, entry
+
+
+def test_interact_runtime_actor_audio(mcp, pie):
+    from _framework.capability_probe import is_capability_available
+    from _framework.asset_helpers import first_asset_path
+    if not is_capability_available(mcp, "interact_runtime_actor_audio"):
+        pytest.skip("interact_runtime_actor_audio 未编入")
+    path = first_asset_path(mcp, "SoundWave") or first_asset_path(mcp, "SoundCue")
+    if not path:
+        pytest.skip("无音效样本")
+    r = mcp.call_capability(
+        "interact_runtime_actor_audio",
+        action="play_sound",
+        assetPath=path,
+    )
+    entry = cap_first(r)
+    assert not entry.get("error"), r
+
+
+def test_interact_runtime_actor_niagara(mcp, pie, spawned_actors):
+    from _framework.capability_probe import is_capability_available
+    if not is_capability_available(mcp, "interact_runtime_actor_niagara"):
+        pytest.skip("interact_runtime_actor_niagara 未编入")
+    r = mcp.call_capability(
+        "interact_runtime_actor_niagara",
+        action="deactivate",
+        actorName=spawned_actors[0],
+    )
+    entry = cap_first(r)
+    assert isinstance(entry, dict), r
+
+
+def test_interact_runtime_actor_ai_no_controller(mcp, pie, spawned_actors):
+    from _framework.capability_probe import is_capability_available
+    if not is_capability_available(mcp, "interact_runtime_actor_ai"):
+        pytest.skip("interact_runtime_actor_ai 未编入")
+    r = mcp.call_capability(
+        "interact_runtime_actor_ai",
+        action="move_to",
+        actorName=spawned_actors[0],
+        x=0, y=0, z=0,
+    )
+    entry = cap_first(r)
+    assert entry.get("error"), r

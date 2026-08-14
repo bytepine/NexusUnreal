@@ -38,6 +38,50 @@ def test_get_material_function(test_ns, mcp):
     assert entry, r
 
 
+def test_manage_material_function_add_connect_remove(test_ns, mcp):
+    """MaterialFunction 走 manage_asset_material 图操作（非 Material 属性针脚）。"""
+    from _framework.assertions import assert_success_count, ids_of
+
+    path = f"{test_ns}/MF_TestFunc"
+    add = mcp.call_capability(
+        "manage_asset_material",
+        assetPath=path,
+        operations=[
+            {"action": "add_node", "expressionClass": "Constant"},
+            {"action": "add_node", "expressionClass": "FunctionOutput"},
+        ],
+    )
+    node_ids = ids_of(add, "nodeId")
+    assert len(node_ids) >= 2, f"add_node MF missing nodeId: {add!r}"
+    const_id, out_id = node_ids[0], node_ids[1]
+
+    connect = mcp.call_capability(
+        "manage_asset_material",
+        assetPath=path,
+        operations=[{
+            "action": "connect",
+            "sourceNodeId": const_id,
+            "targetNodeId": out_id,
+        }],
+    )
+    assert_success_count(connect, 1, context="mf connect")
+
+    graph = mcp.call_capability(
+        "get_asset_material",
+        assetPath=path,
+        sections=["graph"],
+    )
+    g = cap_first(graph)
+    assert g.get("totalCount", 0) >= 2 or len(g.get("nodes") or []) >= 2, graph
+
+    remove = mcp.call_capability(
+        "manage_asset_material",
+        assetPath=path,
+        operations=[{"action": "remove_node", "nodeId": const_id}],
+    )
+    assert_success_count(remove, 1, context="mf remove")
+
+
 # ── MaterialParameterCollection ───────────────────────────────────────────────
 
 def test_create_mpc(test_ns, mcp):

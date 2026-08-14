@@ -363,3 +363,19 @@ def test_bp_interface_create_function_and_implement(mcp, test_ns):
     actor_first = cap_first(actor_get)
     ifaces = actor_first.get("implementedInterfaces") or []
     assert any("BPI_Test" in str(x) for x in ifaces), actor_get
+
+
+def test_bp_add_macro_timeline_dispatcher(mcp, bp_path):
+    r = mcp.call_capability(
+        "manage_asset_blueprint",
+        assetPath=bp_path,
+        operations=[
+            {"action": "add_macro", "functionName": "NxMacro"},
+            {"action": "add_timeline", "functionName": "NxTimeline"},
+            {"action": "add_dispatcher", "variableName": "NxDisp"},
+            {"action": "add_local_variable", "functionName": "NxMacro", "variableName": "NxLocal"},
+        ],
+    )
+    entry = cap_first(r)
+    assert isinstance(entry, dict), r
+    assert not entry.get("error"), r

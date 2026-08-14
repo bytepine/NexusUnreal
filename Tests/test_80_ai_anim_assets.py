@@ -54,6 +54,44 @@ def test_anim_blueprint_create(test_ns, mcp, template_skeleton):
     assert r, f"create_asset_anim_blueprint returned empty: {r!r}"
 
 
+def test_anim_blueprint_animgraph_sequence_player(test_ns, mcp, template_skeleton):
+    """SM + SequencePlayer 往返（AnimGraph，不走 K2）。"""
+    _ = template_skeleton
+    path = f"{test_ns}/ABP_TestAnim"
+    add_sm = mcp.call_capability(
+        "manage_asset_anim_blueprint",
+        assetPath=path,
+        operations=[{"action": "add_state_machine", "stateMachineName": "Locomotion", "posX": 0, "posY": 0}],
+    )
+    sm_entry = cap_first(add_sm)
+    assert not sm_entry.get("error"), add_sm
+
+    add_node = mcp.call_capability(
+        "manage_asset_anim_blueprint",
+        assetPath=path,
+        operations=[{
+            "action": "add_node",
+            "nodeClass": "SequencePlayer",
+            "posX": 400,
+            "posY": 0,
+        }],
+    )
+    node_entry = cap_first(add_node)
+    assert not node_entry.get("error"), add_node
+    node_id = node_entry.get("nodeId")
+    assert node_id, add_node
+
+    graph = mcp.call_capability(
+        "get_asset_anim_blueprint",
+        assetPath=path,
+        sections=["graph"],
+    )
+    g_entry = cap_first(graph)
+    assert not g_entry.get("error"), graph
+    nodes = g_entry.get("nodes") or []
+    assert any(n.get("nodeId") == node_id for n in nodes if isinstance(n, dict)), g_entry
+
+
 def test_get_asset_anim_blueprint_graph_overview(test_ns, mcp, template_skeleton):
     """get_asset_anim_blueprint sections=graphOverview。"""
     _ = template_skeleton

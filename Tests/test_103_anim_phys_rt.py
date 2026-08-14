@@ -134,6 +134,21 @@ class TestPhysicalMaterial:
         assets = payload.get("assets") or payload.get("results") or []
         assert isinstance(assets, list), f"search_asset PhysicalMaterial 格式错误: {r}"
 
+    def test_create(self, mcp, test_ns):
+        path = f"{test_ns}/PM_Created"
+        r = mcp.call_capability(
+            "create_asset_physical_material",
+            assetPath=path,
+            friction=0.7,
+            restitution=0.2,
+        )
+        first = cap_first(r)
+        if first.get("error") and "already exists" in str(first.get("error")):
+            return
+        assert not first.get("error"), r
+        got = cap_first(mcp.call_capability("get_asset_physical_material", assetPath=path))
+        assert "friction" in got, got
+
 
 # ── TextureRenderTarget2D ──────────────────────────────────────────────────────
 

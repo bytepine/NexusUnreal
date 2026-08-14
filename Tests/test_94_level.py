@@ -119,3 +119,14 @@ def test_manage_level_spawn_and_remove_actor(test_ns, mcp, scratch_level, requir
     )
     remaining = gone.get("actors") or []
     assert not remaining, f"remove 后 Actor 仍在关卡中：{gone!r}"
+
+
+def test_create_asset_level(test_ns, mcp):
+    path = f"{test_ns}/Maps/L_Created"
+    r = mcp.call_capability("create_asset_level", assetPath=path)
+    entry = cap_first(r)
+    if entry.get("error") and "already exists" in str(entry.get("error")):
+        return
+    assert not entry.get("error"), r
+    got = cap_first(mcp.call_capability("get_asset_level", assetPath=path, sections=["settings"]))
+    assert not got.get("error"), got

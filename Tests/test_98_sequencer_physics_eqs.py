@@ -14,18 +14,12 @@ pytestmark = pytest.mark.l3_asset
 
 @pytest.fixture(scope="module")
 def seq_path(test_ns, mcp):
-    """动态发现或跳过。"""
-    r = mcp.call_capability(
-        "search_asset",
-        query="LevelSequence",
-        assetType="LevelSequence",
-        pathFilter="/Game/",
-        limit=1,
-    )
-    assets = r.get("assets") or []
-    if not assets:
-        pytest.skip("项目中无 LevelSequence 资产，跳过 Sequencer 测试")
-    return assets[0].get("path") or assets[0].get("assetPath")
+    path = f"{test_ns}/LS_Created"
+    r = mcp.call_capability("create_asset_level_sequence", assetPath=path)
+    entry = cap_first(r)
+    if entry.get("error") and "already exists" not in str(entry.get("error", "")):
+        pytest.skip(f"create_asset_level_sequence 失败: {entry}")
+    return path
 
 
 def test_get_level_sequence(seq_path, mcp):
@@ -43,6 +37,24 @@ def test_manage_level_sequence_set_display_rate(seq_path, mcp):
     )
     entry = cap_first(r)
     assert not entry.get("error"), r
+
+
+def test_manage_level_sequence_possessable_track_key(seq_path, mcp):
+    r = mcp.call_capability(
+        "manage_asset_level_sequence",
+        assetPath=seq_path,
+        operations=[
+            {"action": "add_possessable", "objectClass": "Actor", "bindingName": "NxActor"},
+            {"action": "add_track", "bindingName": "NxActor", "trackType": "MovieSceneFloatTrack"},
+            {"action": "add_float_key", "bindingName": "NxActor", "time": 0.0, "value": 1.0},
+        ],
+    )
+    entry = cap_first(r)
+    assert isinstance(entry, dict), r
+    got = cap_first(mcp.call_capability(
+        "get_asset_level_sequence", assetPath=seq_path, sections=["bindings", "tracks"],
+    ))
+    assert not got.get("error"), got
 
 
 # ── Physics Asset ─────────────────────────────────────────────────────────────

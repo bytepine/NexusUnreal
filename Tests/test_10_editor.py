@@ -88,3 +88,25 @@ def test_capture_viewport_validate_only(mcp, require_tools):
     assert not entry.get("error"), entry
 
 
+def test_manage_asset_lua_binding(test_ns, mcp):
+    if not is_capability_available(mcp, "manage_asset_lua_binding"):
+        pytest.skip("manage_asset_lua_binding 未编入（需 WITH_UNLUA）")
+    bp = f"{test_ns}/BP_LuaBind"
+    mcp.call_capability("create_asset_blueprint", assetPath=bp, parentClass="Actor")
+    r = mcp.call_capability(
+        "manage_asset_lua_binding",
+        assetPath=bp,
+        operations=[{"action": "bind", "moduleName": "Script.BP_LuaBind"}],
+    )
+    entry = cap_first(r)
+    assert not entry.get("error"), r
+    got = cap_first(mcp.call_capability("get_asset_lua_binding", assetPath=bp))
+    assert not got.get("error"), got
+    bad = mcp.call_capability(
+        "manage_asset_lua_binding",
+        assetPath=bp,
+        operations=[{"action": "not_a_real_action"}],
+    )
+    assert cap_first(bad).get("error"), bad
+
+

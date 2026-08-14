@@ -74,3 +74,54 @@ def test_widget_remove_one(mcp, wbp_path):
 def test_widget_save(mcp, wbp_path):
     save = mcp.call("save_asset", assetPath=wbp_path)
     assert (save.get("saved") or 0) == 1, f"wbp save: {save!r}"
+
+
+def test_widget_animation_crud(mcp, wbp_path):
+    """动画 CRUD：add_animation → add_track → add_key → get tracks → remove。"""
+    r = mcp.call(
+        "manage_asset_user_widget",
+        assetPath=wbp_path,
+        operations=[
+            {"action": "add_animation", "animationName": "FadeIn"},
+            {"action": "add_track", "animationName": "FadeIn", "trackName": "Alpha"},
+            {"action": "add_key", "animationName": "FadeIn", "time": 0.5, "keyValue": 1.0},
+        ],
+    )
+    assert_success_count(r, 3, context="widget animation crud")
+
+    got = mcp.call_capability(
+        "get_asset_user_widget",
+        assetPath=wbp_path,
+        sections=["animations"],
+    )
+    payload = cap_first(got)
+    anims = payload.get("animations") or []
+    names = [a.get("name") for a in anims if isinstance(a, dict)]
+    assert any("FadeIn" in (n or "") for n in names), f"FadeIn missing: {payload!r}"
+    fade = next((a for a in anims if isinstance(a, dict) and "FadeIn" in (a.get("name") or "")), None)
+    assert fade and fade.get("tracks"), f"tracks missing: {payload!r}"
+
+    rm = mcp.call(
+        "manage_asset_user_widget",
+        assetPath=wbp_path,
+        operations=[{"action": "remove_animation", "animationName": "FadeIn"}],
+    )
+    assert_success_count(rm, 1, context="remove_animation")
+
+
+def test_wbp_event_graph_via_blueprint(mcp, wbp_path):
+    """WBP EventGraph 走 manage_asset_blueprint，不在 user_widget 复制图 API。"""
+    add = mcp.call_capability(
+        "manage_asset_blueprint",
+        assetPath=wbp_path,
+        operations=[{
+            "action": "add_node",
+            "graphName": "EventGraph",
+            "nodeClass": "K2Node_CallFunction",
+            "functionName": "PrintString",
+            "posX": 200,
+            "posY": 100,
+        }],
+    )
+    pn_id = cap_first(add).get("nodeId")
+    assert pn_id, f"WBP EventGraph add_node: {add!r}"

@@ -84,3 +84,34 @@ def test_interact_runtime_apply_effect_smoke(mcp, gas_runtime_actor, gas_runtime
         pytest.skip(f"apply_effect 被拒绝（ASC 未初始化？）：{e}")
     entry = cap_first(r)
     assert isinstance(entry, dict), entry
+
+
+def test_interact_runtime_give_ability_and_tags(mcp, gas_runtime_actor, test_ns):
+    ga = f"{test_ns}/GA_RuntimeGive"
+    try:
+        mcp.call_capability("create_asset_gameplay_ability", assetPath=ga)
+    except MCPError as e:
+        pytest.skip(f"无法创建 GA：{e}")
+    give = mcp.call_capability(
+        "interact_runtime_actor_ability_system",
+        action="give_ability",
+        actorName=gas_runtime_actor,
+        abilityPath=ga,
+    )
+    ge = cap_first(give)
+    if ge.get("error"):
+        pytest.skip(f"give_ability 被拒绝：{ge}")
+    tag_r = mcp.call_capability(
+        "interact_runtime_actor_ability_system",
+        action="add_loose_tag",
+        actorName=gas_runtime_actor,
+        tag="Ability.Jump",
+    )
+    assert isinstance(cap_first(tag_r), dict), tag_r
+    cue = mcp.call_capability(
+        "interact_runtime_actor_ability_system",
+        action="execute_cue",
+        actorName=gas_runtime_actor,
+        tag="GameplayCue.Ability.Activate",
+    )
+    assert isinstance(cap_first(cue), dict), cue
