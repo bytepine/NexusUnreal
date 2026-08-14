@@ -159,3 +159,26 @@ def test_as_manage_reset_smoke(test_ns, mcp):
     except MCPError:
         pytest.skip("manage_asset_attribute_set 不可用或未编译")
     assert isinstance(r, dict), r
+
+
+# ── GameplayCueNotify ────────────────────────────────────────────────────────
+
+
+def test_gc_notify_create_get(test_ns, mcp):
+    if not is_capability_available(mcp, "create_asset_gameplay_cue_notify"):
+        pytest.skip("create_asset_gameplay_cue_notify 未编入")
+    path = f"{test_ns}/GCN_Created"
+    r = mcp.call("create_asset_gameplay_cue_notify", assetPath=path)
+    entry = cap_first(r)
+    if entry.get("error") and "already exists" not in str(entry.get("error")).lower():
+        pytest.fail(f"create_asset_gameplay_cue_notify 失败: {entry}")
+    got = cap_first(mcp.call("get_asset_gameplay_cue_notify", assetPath=path))
+    assert not got.get("error"), got
+    man = cap_first(
+        mcp.call(
+            "manage_asset_gameplay_cue_notify",
+            assetPath=path,
+            operations=[{"action": "set_cue_name", "cueName": "GameplayCue.Nx.Test"}],
+        )
+    )
+    assert isinstance(man, dict), man

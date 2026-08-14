@@ -96,3 +96,10 @@ pytest Tests --ue-url http://127.0.0.1:45000/stream
 | PIE Runtime + Lua | `test_95_pie_runtime.py` |
 | GAS Runtime | `test_96_gas_runtime.py` |
 | 响应压缩 | `test_99_response_compact.py` |
+| StringTable / Font | `test_108_string_table_font.py` |
+| FoliageType | `test_109_foliage.py` |
+| Paper2D | `test_110_paper2d.py` |
+| GeometryCollection | `test_111_geometry_collection.py` |
+| FileMediaSource | `test_112_media.py` |
+| CommonUI Style | `test_113_common_ui.py` |
+| MoviePipeline | `test_114_movie_pipeline.py` |

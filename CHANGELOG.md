@@ -6,6 +6,7 @@
 
 ## [Unreleased]
 
+- test(e2e): 新领域 Capability — `test_108` StringTable/Font、`test_109` FoliageType、`test_110` Paper2D、`test_111` GeometryCollection、`test_112` Media、`test_113` CommonUI、`test_114` MoviePipeline；GAS 扩 CueNotify
 - fix(test): `test_bp_graph_connect_exec` 缺 BeginPlay 时经 `manage_asset_blueprint` 补 `K2Node_Event`
 - fix(test): `test_anim_montage_create` 创建后 `add_segment`（Mannequin Idle）并 save——空白 Montage 时长为 0，后续 `play_montage` 恒失败
 - fix(test): 全量 e2e 测试侧对齐——`skipif_ue_below` 移入 `pytest_runtest_setup`（避免 module fixture 先 ERROR）；用例统一 `cap_first` / `operations[]`；EQS 缺 cap 时 skip；audit 补 `unload`、期望数 176
