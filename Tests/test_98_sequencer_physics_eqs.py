@@ -40,21 +40,49 @@ def test_manage_level_sequence_set_display_rate(seq_path, mcp):
 
 
 def test_manage_level_sequence_possessable_track_key(seq_path, mcp):
-    r = mcp.call_capability(
+    add_pos = mcp.call_capability(
+        "manage_asset_level_sequence",
+        assetPath=seq_path,
+        operations=[{"action": "add_possessable", "possessableName": "NxActor", "className": "Actor"}],
+    )
+    pos = cap_first(add_pos)
+    assert not pos.get("error"), add_pos
+    guid = pos.get("bindingGuid")
+    assert guid, add_pos
+
+    add_tracks = mcp.call_capability(
         "manage_asset_level_sequence",
         assetPath=seq_path,
         operations=[
-            {"action": "add_possessable", "objectClass": "Actor", "bindingName": "NxActor"},
-            {"action": "add_track", "bindingName": "NxActor", "trackType": "MovieSceneFloatTrack"},
-            {"action": "add_float_key", "bindingName": "NxActor", "time": 0.0, "value": 1.0},
+            {"action": "add_track", "bindingGuid": guid, "trackClass": "Float"},
+            {"action": "add_track", "bindingGuid": guid, "trackClass": "Transform"},
         ],
     )
-    entry = cap_first(r)
-    assert isinstance(entry, dict), r
-    got = cap_first(mcp.call_capability(
-        "get_asset_level_sequence", assetPath=seq_path, sections=["bindings", "tracks"],
-    ))
-    assert not got.get("error"), got
+    for e in (add_tracks.get("results") or [cap_first(add_tracks)]):
+        if isinstance(e, dict):
+            assert not e.get("error"), add_tracks
+
+    keys = mcp.call_capability(
+        "manage_asset_level_sequence",
+        assetPath=seq_path,
+        operations=[
+            {"action": "add_float_key", "bindingGuid": guid, "time": 0.5, "keyValue": 1.0},
+            {
+                "action": "set_transform_key",
+                "bindingGuid": guid,
+                "time": 1.0,
+                "x": 10,
+                "y": 20,
+                "z": 30,
+                "pitch": 5,
+                "yaw": 15,
+                "roll": 0,
+            },
+        ],
+    )
+    for e in (keys.get("results") or [cap_first(keys)]):
+        if isinstance(e, dict):
+            assert not e.get("error"), keys
 
 
 # ── Physics Asset ─────────────────────────────────────────────────────────────

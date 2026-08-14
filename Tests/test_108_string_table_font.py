@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from _framework.mcp_client import cap_first
+from _framework.mcp_client import MCPError, cap_first
 
 pytestmark = pytest.mark.l3_asset
 
@@ -30,13 +30,16 @@ def test_string_table_roundtrip(test_ns, mcp):
     keys = got.get("keys") or []
     assert any(isinstance(k, dict) and k.get("key") == "Hello" for k in keys), got
 
-    bad = cap_first(
-        mcp.call_capability(
-            "manage_asset_string_table",
-            assetPath=path,
-            operations=[{"action": "not_a_real_action", "key": "x"}],
+    try:
+        bad = cap_first(
+            mcp.call_capability(
+                "manage_asset_string_table",
+                assetPath=path,
+                operations=[{"action": "not_a_real_action", "key": "x"}],
+            )
         )
-    )
+    except MCPError as exc:
+        bad = {"error": str(exc)}
     assert bad.get("error"), bad
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pytest
 
+from _framework.assertions import merge_with_defaults
 from _framework.mcp_client import cap_first
 
 pytestmark = pytest.mark.l3_asset
@@ -52,7 +53,10 @@ def test_multi_asset_overview(test_ns, mcp):
     assets = payload.get("assets") or []
     if not assets:
         pytest.skip("test_ns 中无 Blueprint 资产可查询")
-    first = assets[0]
+    first = merge_with_defaults(
+        [assets[0]],
+        payload.get("assets_defaults") or payload.get("defaults") or {},
+    )[0]
     assert first.get("assetType") == "Blueprint", first
     # recommended* 在顶层（指定类型时提升）；兼容逐条字段
     assert (payload.get("recommendedGet") or first.get("recommendedGet")) == "get_asset_blueprint", payload

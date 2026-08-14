@@ -117,6 +117,51 @@ def test_material_two_step_texture_param(mcp, mat_path):
     assert_success_count(r4, 1, context="material node param rename")
 
 
+def test_material_function_add_connect(test_ns, mcp):
+    """MaterialFunction 写图：add_node + connect 到 FunctionOutput（禁止 targetNodeId=Material）。"""
+    path = f"{test_ns}/MF_WriteGraph"
+    created = mcp.call_capability("create_asset_material_function", assetPath=path)
+    entry = cap_first(created)
+    if entry.get("error") and "already exists" not in str(entry.get("error")).lower() and "已存在" not in str(entry.get("error")):
+        assert not entry.get("error"), created
+
+    add = mcp.call(
+        "manage_asset_material",
+        assetPath=path,
+        operations=[
+            {"action": "add_node", "expressionClass": "Constant3Vector"},
+            {"action": "add_node", "expressionClass": "FunctionOutput"},
+        ],
+    )
+    node_ids = ids_of(add, "nodeId")
+    assert node_ids, f"MF add_node missing nodeId: {add!r}"
+    nid = node_ids[0]
+
+    bad = mcp.call_capability(
+        "manage_asset_material",
+        assetPath=path,
+        operations=[{
+            "action": "connect",
+            "sourceNodeId": nid,
+            "targetNodeId": "Material",
+            "targetInputName": "BaseColor",
+        }],
+    )
+    assert cap_first(bad).get("error"), f"MF connect to Material should fail: {bad!r}"
+
+    connect = mcp.call_capability(
+        "manage_asset_material",
+        assetPath=path,
+        operations=[{
+            "action": "connect",
+            "sourceNodeId": nid,
+            "targetNodeId": "output",
+        }],
+    )
+    assert_success_count(connect, 1, context="MF connect to FunctionOutput")
+    mcp.call("save_asset", assetPath=path)
+
+
 def test_material_overview(mcp, mat_path):
     """6.x：material 全量概览。置于末尾：all 查询会令后续子 section 查询触发
     redundant_call 保护，故放在 parameters 校验之后。"""

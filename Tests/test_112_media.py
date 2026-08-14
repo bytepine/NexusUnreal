@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from _framework.mcp_client import cap_first
+from _framework.mcp_client import MCPError, cap_first
 
 pytestmark = pytest.mark.l3_asset
 
@@ -30,11 +30,14 @@ def test_media_source_roundtrip(test_ns, mcp):
     assert not got.get("error"), got
     assert "mediaPath" in got, got
 
-    bad = cap_first(
-        mcp.call_capability(
-            "manage_asset_media_source",
-            assetPath=path,
-            operations=[{"action": "not_real"}],
+    try:
+        bad = cap_first(
+            mcp.call_capability(
+                "manage_asset_media_source",
+                assetPath=path,
+                operations=[{"action": "not_real"}],
+            )
         )
-    )
+    except MCPError as exc:
+        bad = {"error": str(exc)}
     assert bad.get("error"), bad

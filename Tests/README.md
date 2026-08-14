@@ -95,6 +95,8 @@ pytest Tests --ue-url http://127.0.0.1:45000/stream
 | 关卡 | `test_94_level.py` |
 | PIE Runtime + Lua | `test_95_pie_runtime.py` |
 | GAS Runtime | `test_96_gas_runtime.py` |
+| StateTree | `test_97_statetree_manage.py`（UE 5.5+，4.26 skip） |
+| Sequencer / Physics / EQS | `test_98_sequencer_physics_eqs.py` |
 | 响应压缩 | `test_99_response_compact.py` |
 | StringTable / Font | `test_108_string_table_font.py` |
 | FoliageType | `test_109_foliage.py` |

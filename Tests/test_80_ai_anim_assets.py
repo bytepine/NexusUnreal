@@ -92,6 +92,78 @@ def test_anim_blueprint_animgraph_sequence_player(test_ns, mcp, template_skeleto
     assert any(n.get("nodeId") == node_id for n in nodes if isinstance(n, dict)), g_entry
 
 
+def test_anim_blueprint_animgraph_slot_and_blend(test_ns, mcp, template_skeleton):
+    """Slot / Blend / LayeredBoneBlend / ApplyAdditive / CachedPose 可 spawn。"""
+    _ = template_skeleton
+    path = f"{test_ns}/ABP_TestAnim"
+    classes = ["Slot", "Blend", "LayeredBoneBlend", "ApplyAdditive", "SaveCachedPose", "UseCachedPose"]
+    for i, node_class in enumerate(classes):
+        add = mcp.call_capability(
+            "manage_asset_anim_blueprint",
+            assetPath=path,
+            operations=[{
+                "action": "add_node",
+                "nodeClass": node_class,
+                "posX": 200,
+                "posY": 80 * (i + 1),
+            }],
+        )
+        entry = cap_first(add)
+        assert not entry.get("error"), f"{node_class}: {add!r}"
+        assert entry.get("nodeId"), add
+        if node_class == "Slot":
+            setr = mcp.call_capability(
+                "manage_asset_anim_blueprint",
+                assetPath=path,
+                operations=[{
+                    "action": "set_node",
+                    "nodeId": entry["nodeId"],
+                    "slotName": "DefaultSlot",
+                }],
+            )
+            assert not cap_first(setr).get("error"), setr
+
+
+def test_anim_blueprint_animgraph_ik_and_aimoffset(test_ns, mcp, template_skeleton):
+    """TwoBoneIK / LookAt / ModifyBone / AimOffset 可 spawn；IK 可写 boneName。"""
+    path = f"{test_ns}/ABP_TestAnim"
+    created = mcp.call(
+        "create_asset_anim_blueprint",
+        assetPath=path,
+        skeletonPath=template_skeleton,
+    )
+    create_entry = cap_first(created) if isinstance(created, dict) else {}
+    if create_entry.get("error") and "already exists" not in str(create_entry.get("error")).lower() and "已存在" not in str(create_entry.get("error")):
+        assert not create_entry.get("error"), created
+    classes = ["TwoBoneIK", "LookAt", "ModifyBone", "AimOffset"]
+    for i, node_class in enumerate(classes):
+        add = mcp.call_capability(
+            "manage_asset_anim_blueprint",
+            assetPath=path,
+            operations=[{
+                "action": "add_node",
+                "nodeClass": node_class,
+                "posX": 480,
+                "posY": 80 * (i + 1),
+                "boneName": "pelvis",
+            }],
+        )
+        entry = cap_first(add)
+        assert not entry.get("error"), f"{node_class}: {add!r}"
+        assert entry.get("nodeId"), add
+        if node_class == "TwoBoneIK":
+            setr = mcp.call_capability(
+                "manage_asset_anim_blueprint",
+                assetPath=path,
+                operations=[{
+                    "action": "set_node",
+                    "nodeId": entry["nodeId"],
+                    "boneName": "hand_r",
+                }],
+            )
+            assert not cap_first(setr).get("error"), setr
+
+
 def test_get_asset_anim_blueprint_graph_overview(test_ns, mcp, template_skeleton):
     """get_asset_anim_blueprint sections=graphOverview。"""
     _ = template_skeleton

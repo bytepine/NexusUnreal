@@ -109,6 +109,76 @@ def test_widget_animation_crud(mcp, wbp_path):
     assert_success_count(rm, 1, context="remove_animation")
 
 
+def test_widget_graph_overview(mcp, wbp_path):
+    r = mcp.call_capability(
+        "get_asset_user_widget",
+        assetPath=wbp_path,
+        sections=["graphOverview"],
+    )
+    entry = cap_first(r)
+    assert not entry.get("error"), entry
+    graphs = entry.get("graphs") or []
+    assert isinstance(graphs, list), entry
+    names = [g.get("name") or g.get("graphName") for g in graphs if isinstance(g, dict)]
+    joined = " ".join(n or "" for n in names)
+    assert "EventGraph" in joined or graphs, f"expected EventGraph in graphOverview: {entry!r}"
+
+
+def test_widget_animation_bind_and_remove_key(mcp, wbp_path):
+    """绑定控件 RenderOpacity 轨，打 key 后再 remove_key / remove_track。"""
+    r = mcp.call(
+        "manage_asset_user_widget",
+        assetPath=wbp_path,
+        operations=[
+            {"action": "add_animation", "animationName": "FadeBound"},
+            {
+                "action": "add_track",
+                "animationName": "FadeBound",
+                "widgetName": "TitleText",
+                "propertyPath": "RenderOpacity",
+                "trackName": "Opacity",
+            },
+            {
+                "action": "add_key",
+                "animationName": "FadeBound",
+                "trackName": "Opacity",
+                "time": 0.25,
+                "keyValue": 0.5,
+            },
+        ],
+    )
+    assert_success_count(r, 3, context="bound animation track")
+
+    rm_key = mcp.call(
+        "manage_asset_user_widget",
+        assetPath=wbp_path,
+        operations=[{
+            "action": "remove_key",
+            "animationName": "FadeBound",
+            "trackName": "Opacity",
+            "time": 0.25,
+        }],
+    )
+    assert_success_count(rm_key, 1, context="remove_key")
+
+    rm_track = mcp.call(
+        "manage_asset_user_widget",
+        assetPath=wbp_path,
+        operations=[{
+            "action": "remove_track",
+            "animationName": "FadeBound",
+            "trackName": "Opacity",
+        }],
+    )
+    assert_success_count(rm_track, 1, context="remove_track")
+
+    mcp.call(
+        "manage_asset_user_widget",
+        assetPath=wbp_path,
+        operations=[{"action": "remove_animation", "animationName": "FadeBound"}],
+    )
+
+
 def test_wbp_event_graph_via_blueprint(mcp, wbp_path):
     """WBP EventGraph 走 manage_asset_blueprint，不在 user_widget 复制图 API。"""
     add = mcp.call_capability(

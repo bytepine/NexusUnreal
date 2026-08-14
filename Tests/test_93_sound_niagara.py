@@ -1,5 +1,5 @@
 # Copyright byteyang. All Rights Reserved.
-"""阶段十四：SoundWave / SoundCue / Niagara 只读（P5）。"""
+"""阶段十四：SoundWave / SoundCue / Niagara（含 create 与 Emitter CRUD）。"""
 
 from __future__ import annotations
 
@@ -89,3 +89,73 @@ def test_create_asset_niagara_system(test_ns, mcp):
     assert not entry.get("error"), r
     got = cap_first(mcp.call_capability("get_asset_niagara_system", assetPath=path))
     assert not got.get("error"), got
+
+
+def test_niagara_add_emitter(test_ns, mcp):
+    if not is_capability_available(mcp, "create_asset_niagara_system"):
+        pytest.skip("create_asset_niagara_system 未编入")
+    if not is_capability_available(mcp, "manage_asset_niagara_system"):
+        pytest.skip("manage_asset_niagara_system 未编入")
+    path = f"{test_ns}/NS_WithEmitter"
+    created = mcp.call_capability("create_asset_niagara_system", assetPath=path)
+    entry = cap_first(created)
+    if entry.get("error") and "already exists" not in str(entry.get("error")).lower() and "已存在" not in str(entry.get("error")):
+        assert not entry.get("error"), created
+    add = mcp.call_capability(
+        "manage_asset_niagara_system",
+        assetPath=path,
+        operations=[{"action": "add_emitter", "emitterName": "TestEmitter"}],
+    )
+    assert not cap_first(add).get("error"), add
+    got = cap_first(mcp.call_capability("get_asset_niagara_system", assetPath=path))
+    names = [e.get("name") for e in (got.get("emitters") or []) if isinstance(e, dict)]
+    assert any(n and "TestEmitter" in n for n in names) or got.get("emitterCount", 0) >= 1, got
+
+
+def test_niagara_add_remove_module(test_ns, mcp):
+    if not is_capability_available(mcp, "create_asset_niagara_system"):
+        pytest.skip("create_asset_niagara_system 未编入")
+    if not is_capability_available(mcp, "manage_asset_niagara_system"):
+        pytest.skip("manage_asset_niagara_system 未编入")
+    module = first_asset_path(mcp, "NiagaraScript", path_filter="/Niagara/Modules")
+    if not module:
+        module = "/Niagara/Modules/Emitter/SpawnRate.SpawnRate"
+    path = f"{test_ns}/NS_WithModule"
+    created = mcp.call_capability("create_asset_niagara_system", assetPath=path)
+    entry = cap_first(created)
+    if entry.get("error") and "already exists" not in str(entry.get("error")).lower() and "已存在" not in str(entry.get("error")):
+        assert not entry.get("error"), created
+    add_em = mcp.call_capability(
+        "manage_asset_niagara_system",
+        assetPath=path,
+        operations=[{"action": "add_emitter", "emitterName": "ModEmitter"}],
+    )
+    assert not cap_first(add_em).get("error"), add_em
+    add_mod = mcp.call_capability(
+        "manage_asset_niagara_system",
+        assetPath=path,
+        operations=[{
+            "action": "add_module",
+            "emitterName": "ModEmitter",
+            "modulePath": module,
+            "usage": "EmitterUpdate",
+        }],
+    )
+    mod_entry = cap_first(add_mod)
+    if mod_entry.get("error") and ("未找到" in str(mod_entry.get("error")) or "not found" in str(mod_entry.get("error")).lower()):
+        pytest.skip(f"无 Niagara 模块资产: {module}")
+    assert not mod_entry.get("error"), add_mod
+    got = cap_first(mcp.call_capability("get_asset_niagara_system", assetPath=path))
+    emitters = [e for e in (got.get("emitters") or []) if isinstance(e, dict)]
+    mods = []
+    for e in emitters:
+        mods.extend(e.get("modules") or [])
+    assert mods, got
+    mod_name = mod_entry.get("moduleName") or (mods[0].get("name") if isinstance(mods[0], dict) else None)
+    assert mod_name, add_mod
+    rm = mcp.call_capability(
+        "manage_asset_niagara_system",
+        assetPath=path,
+        operations=[{"action": "remove_module", "emitterName": "ModEmitter", "moduleName": mod_name}],
+    )
+    assert not cap_first(rm).get("error"), rm

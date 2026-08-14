@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 
 from _framework.asset_helpers import first_asset_path
-from _framework.mcp_client import cap_first
+from _framework.mcp_client import MCPError, cap_first
 
 pytestmark = pytest.mark.l3_asset
 
@@ -45,11 +45,14 @@ def test_foliage_type_roundtrip(test_ns, mcp):
     assert not got.get("error"), got
     assert "density" in got, got
 
-    bad = cap_first(
-        mcp.call_capability(
-            "manage_asset_foliage_type",
-            assetPath=path,
-            operations=[{"action": "nope"}],
+    try:
+        bad = cap_first(
+            mcp.call_capability(
+                "manage_asset_foliage_type",
+                assetPath=path,
+                operations=[{"action": "nope"}],
+            )
         )
-    )
+    except MCPError as exc:
+        bad = {"error": str(exc)}
     assert bad.get("error"), bad
