@@ -21,14 +21,14 @@ def test_media_source_roundtrip(test_ns, mcp):
         mcp.call_capability(
             "manage_asset_media_source",
             assetPath=path,
-            operations=[{"action": "set_file_path", "filePath": "C:/tmp/nx_dummy.mp4"}],
+            operations=[{"action": "set_file_path", "mediaPath": "C:/tmp/nx_dummy.mp4"}],
         )
     )
     assert not man.get("error"), man
 
     got = cap_first(mcp.call_capability("get_asset_media_source", assetPath=path))
     assert not got.get("error"), got
-    assert "filePath" in got, got
+    assert "mediaPath" in got, got
 
     bad = cap_first(
         mcp.call_capability(
