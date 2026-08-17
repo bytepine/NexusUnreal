@@ -159,3 +159,76 @@ def test_niagara_add_remove_module(test_ns, mcp):
         operations=[{"action": "remove_module", "emitterName": "ModEmitter", "moduleName": mod_name}],
     )
     assert not cap_first(rm).get("error"), rm
+
+
+def test_create_asset_sound_submix(test_ns, mcp):
+    if not is_capability_available(mcp, "create_asset_sound_submix"):
+        pytest.skip("create_asset_sound_submix 未编入")
+    path = f"{test_ns}/SS_NxTest"
+    r = mcp.call_capability("create_asset_sound_submix", assetPath=path)
+    entry = cap_first(r)
+    if entry.get("error") and "already exists" not in str(entry.get("error")).lower():
+        assert not entry.get("error"), r
+    got = cap_first(mcp.call_capability("get_asset_sound_submix", assetPath=path))
+    assert not got.get("error"), got
+
+
+def test_create_asset_font(test_ns, mcp):
+    if not is_capability_available(mcp, "create_asset_font"):
+        pytest.skip("create_asset_font 未编入")
+    path = f"{test_ns}/Font_NxTest"
+    r = mcp.call_capability("create_asset_font", assetPath=path)
+    entry = cap_first(r)
+    if entry.get("error") and "already exists" not in str(entry.get("error")).lower():
+        assert not entry.get("error"), r
+    got = cap_first(mcp.call_capability("get_asset_font", assetPath=path))
+    assert not got.get("error"), got
+
+
+def test_movie_pipeline_config_settings(test_ns, mcp):
+    if not is_capability_available(mcp, "create_asset_movie_pipeline_config"):
+        pytest.skip("MoviePipeline 未编入")
+    path = f"{test_ns}/MPC_NxTest"
+    created = mcp.call_capability("create_asset_movie_pipeline_config", assetPath=path)
+    entry = cap_first(created)
+    if entry.get("error") and "already exists" not in str(entry.get("error")).lower():
+        assert not entry.get("error"), created
+    ops = mcp.call_capability(
+        "manage_asset_movie_pipeline_config",
+        assetPath=path,
+        operations=[
+            {"action": "set_output", "width": 1280, "height": 720, "fileNameFormat": "{sequence_name}"},
+            {"action": "set_anti_aliasing", "spatialSampleCount": 1, "temporalSampleCount": 2},
+            {"action": "add_setting", "settingClass": "HighRes"},
+        ],
+    )
+    for e in (ops.get("results") or [cap_first(ops)]):
+        if isinstance(e, dict):
+            assert not e.get("error"), ops
+    got = cap_first(mcp.call_capability("get_asset_movie_pipeline_config", assetPath=path))
+    assert not got.get("error"), got
+    assert got.get("width") == 1280, got
+    assert isinstance(got.get("settings"), list) and got["settings"], got
+    assert got.get("antiAliasing"), got
+
+
+def test_create_asset_pose_search(test_ns, mcp):
+    if not is_capability_available(mcp, "create_asset_pose_search"):
+        pytest.skip("PoseSearch 未编入")
+    schema = f"{test_ns}/PSS_NxTest"
+    db = f"{test_ns}/PSD_NxTest"
+    s = mcp.call_capability("create_asset_pose_search", assetPath=schema, assetKind="Schema")
+    se = cap_first(s)
+    if se.get("error") and "already exists" not in str(se.get("error")).lower():
+        assert not se.get("error"), s
+    d = mcp.call_capability(
+        "create_asset_pose_search",
+        assetPath=db,
+        assetKind="Database",
+        schemaPath=schema,
+    )
+    de = cap_first(d)
+    if de.get("error") and "already exists" not in str(de.get("error")).lower():
+        assert not de.get("error"), d
+    got = cap_first(mcp.call_capability("get_asset_pose_search", assetPath=db))
+    assert not got.get("error"), got
