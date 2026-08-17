@@ -164,6 +164,46 @@ def test_anim_blueprint_animgraph_ik_and_aimoffset(test_ns, mcp, template_skelet
             assert not cap_first(setr).get("error"), setr
 
 
+def test_anim_blueprint_animgraph_extended_nodes(test_ns, mcp, template_skeleton):
+    """P1：BlendSpace1D 别名 + FABRIK/CCDIK/CopyBone/空间转换/混合枚举等可 spawn。"""
+    _ = template_skeleton
+    path = f"{test_ns}/ABP_TestAnim"
+    classes = [
+        "BlendSpace1D",
+        "SequenceEvaluator",
+        "BlendListByEnum",
+        "BlendListByInt",
+        "MultiWayBlend",
+        "RandomPlayer",
+        "PoseBlendNode",
+        "Inertialization",
+        "ComponentToLocalSpace",
+        "LocalToComponentSpace",
+        "FABRIK",
+        "CCDIK",
+        "CopyBone",
+        "HandIKRetargeting",
+        "AimOffsetLookAt",
+    ]
+    for i, node_class in enumerate(classes):
+        op = {
+            "action": "add_node",
+            "nodeClass": node_class,
+            "posX": 700,
+            "posY": 40 * (i + 1),
+        }
+        if node_class in ("FABRIK", "CCDIK", "CopyBone"):
+            op["boneName"] = "hand_r"
+        add = mcp.call_capability(
+            "manage_asset_anim_blueprint",
+            assetPath=path,
+            operations=[op],
+        )
+        entry = cap_first(add)
+        assert not entry.get("error"), f"{node_class}: {add!r}"
+        assert entry.get("nodeId"), add
+
+
 def test_get_asset_anim_blueprint_graph_overview(test_ns, mcp, template_skeleton):
     """get_asset_anim_blueprint sections=graphOverview。"""
     _ = template_skeleton

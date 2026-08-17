@@ -38,6 +38,34 @@ def test_get_asset_skeletal_mesh_sample(mcp, require_tools):
     assert "lodCount" in entry or "materialSlots" in entry, entry
 
 
+def test_manage_skeletal_mesh_socket_and_lod(mcp, require_tools):
+    """P1：SkeletalMesh mesh-only Socket + LOD ScreenSize。"""
+    require_tools("manage_asset_skeletal_mesh", "get_asset_skeletal_mesh")
+    path = first_asset_path(mcp, "SkeletalMesh", path_filter="/Game/Mannequin")
+    assert path, "无法定位 SkeletalMesh 样本"
+    sock = "NxSkSocket"
+    add = mcp.call_capability(
+        "manage_asset_skeletal_mesh",
+        assetPath=path,
+        operations=[
+            {"action": "add_socket", "socketName": sock, "boneName": "pelvis", "locX": 5},
+            {"action": "set_lod_screen_size", "lodIndex": 0, "screenSize": 0.85},
+        ],
+    )
+    for e in (add.get("results") or [cap_first(add)]):
+        if isinstance(e, dict):
+            assert not e.get("error"), add
+    got = cap_first(mcp.call_capability("get_asset_skeletal_mesh", assetPath=path))
+    names = [s.get("name") for s in (got.get("sockets") or []) if isinstance(s, dict)]
+    assert sock in names, got
+    rm = mcp.call_capability(
+        "manage_asset_skeletal_mesh",
+        assetPath=path,
+        operations=[{"action": "remove_socket", "socketName": sock}],
+    )
+    assert not cap_first(rm).get("error"), rm
+
+
 def test_get_asset_skeleton_sample(mcp, require_tools):
     require_tools("get_asset_skeleton")
     path = first_asset_path(mcp, "Skeleton", path_filter="/Game/Mannequin")

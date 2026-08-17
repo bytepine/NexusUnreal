@@ -85,6 +85,44 @@ def test_manage_level_sequence_possessable_track_key(seq_path, mcp):
             assert not e.get("error"), keys
 
 
+def test_manage_level_sequence_extended_tracks(seq_path, mcp):
+    """P1：Master Fade/Event + Binding SkeletalAnimation/Visibility。"""
+    master = mcp.call_capability(
+        "manage_asset_level_sequence",
+        assetPath=seq_path,
+        operations=[
+            {"action": "add_master_track", "trackClass": "Fade"},
+            {"action": "add_master_track", "trackClass": "Event"},
+        ],
+    )
+    for e in (master.get("results") or [cap_first(master)]):
+        if isinstance(e, dict):
+            assert not e.get("error"), master
+
+    add_pos = mcp.call_capability(
+        "manage_asset_level_sequence",
+        assetPath=seq_path,
+        operations=[{"action": "add_possessable", "possessableName": "NxAnimActor", "className": "Actor"}],
+    )
+    pos = cap_first(add_pos)
+    assert not pos.get("error"), add_pos
+    guid = pos.get("bindingGuid")
+    assert guid, add_pos
+
+    binding = mcp.call_capability(
+        "manage_asset_level_sequence",
+        assetPath=seq_path,
+        operations=[
+            {"action": "add_track", "bindingGuid": guid, "trackClass": "SkeletalAnimation"},
+            {"action": "add_track", "bindingGuid": guid, "trackClass": "Visibility"},
+            {"action": "add_track", "bindingGuid": guid, "trackClass": "Particle"},
+        ],
+    )
+    for e in (binding.get("results") or [cap_first(binding)]):
+        if isinstance(e, dict):
+            assert not e.get("error"), binding
+
+
 # ── Physics Asset ─────────────────────────────────────────────────────────────
 
 @pytest.fixture(scope="module")
