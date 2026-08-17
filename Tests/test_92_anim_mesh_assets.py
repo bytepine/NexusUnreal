@@ -21,6 +21,11 @@ def test_get_asset_anim_sequence_sample(mcp, require_tools):
     assert entry.get("numFrames") is not None or entry.get("length") is not None, entry
     assert "notifies" in entry, f"expected notifies[] in response: {entry!r}"
     assert isinstance(entry.get("notifies"), list), entry
+    assert "curves" in entry, f"expected curves[] in response: {entry!r}"
+    assert isinstance(entry.get("curves"), list), entry
+    for c in entry["curves"]:
+        assert "name" in c and "keys" in c, c
+        assert isinstance(c.get("keys"), list), c
 
 
 def test_get_asset_skeletal_mesh_sample(mcp, require_tools):

@@ -305,6 +305,74 @@ def test_bp_graph_connect_exec(mcp, bp_path):
     assert linked, f"wire not visible after connect: {begin_pins!r}"
 
 
+def test_bp_promote_pin(mcp, bp_path):
+    """promote_pin：PrintString.InString → 成员变量 + VariableGet 并自动连线。"""
+    add = mcp.call_capability(
+        "manage_asset_blueprint",
+        assetPath=bp_path,
+        operations=[{
+            "action": "add_node",
+            "graphName": "EventGraph",
+            "nodeClass": "K2Node_CallFunction",
+            "functionName": "PrintString",
+            "posX": 600, "posY": 200,
+        }],
+    )
+    print_id = cap_first(add).get("nodeId")
+    assert print_id, f"add_node PrintString: {add!r}"
+
+    graph = mcp.call_capability(
+        "get_asset_blueprint",
+        assetPath=bp_path,
+        sections=["graph"],
+        graphName="EventGraph",
+    )
+    nodes = cap_first(graph).get("nodes") or []
+    print_node = next((n for n in nodes if n.get("nodeId") == print_id), None)
+    assert print_node, f"PrintString missing: {graph!r}"
+    in_string = None
+    for pin in print_node.get("pins") or []:
+        if pin.get("direction") == "input" and pin.get("pinCategory") != "exec":
+            name = pin.get("pinName") or ""
+            if "string" in name.lower() or name in ("InString", "In String"):
+                in_string = name
+                break
+    if not in_string:
+        for pin in print_node.get("pins") or []:
+            if pin.get("direction") == "input" and pin.get("pinCategory") == "string":
+                in_string = pin.get("pinName")
+                break
+    assert in_string, f"PrintString string input pin missing: {print_node!r}"
+
+    promote = mcp.call_capability(
+        "manage_asset_blueprint",
+        assetPath=bp_path,
+        operations=[{
+            "action": "promote_pin",
+            "graphName": "EventGraph",
+            "nodeId": print_id,
+            "pinName": in_string,
+            "variableName": "PromotedMsg",
+        }],
+    )
+    entry = cap_first(promote)
+    assert not entry.get("error"), f"promote_pin failed: {promote!r}"
+    assert entry.get("variableName") == "PromotedMsg", entry
+    var_node_id = entry.get("nodeId")
+    assert var_node_id, f"promote_pin missing Get nodeId: {entry!r}"
+    assert entry.get("isLocal") is False, entry
+
+    vars_r = mcp.call_capability(
+        "get_asset_blueprint", assetPath=bp_path, sections=["variable"],
+    )
+    vars_payload = cap_first(vars_r)
+    var_names = [
+        (v.get("name") or v.get("variableName") or "")
+        for v in (vars_payload.get("variables") or vars_payload.get("variable") or [])
+    ]
+    assert "PromotedMsg" in var_names, f"PromotedMsg not in variables: {vars_payload!r}"
+
+
 def test_bp_get_asset_all_section(mcp, bp_path):
     """4.3：sections=["all"] 应覆盖 variables/components/functions/graphOverview/defaults。
     全成功时不再回显 sections[]；置于末尾以免触发 redundant_call。"""
