@@ -161,6 +161,112 @@ def test_niagara_add_remove_module(test_ns, mcp):
     assert not cap_first(rm).get("error"), rm
 
 
+def test_niagara_set_module_parameter_roundtrip(test_ns, mcp):
+    if not is_capability_available(mcp, "create_asset_niagara_system"):
+        pytest.skip("create_asset_niagara_system 未编入")
+    if not is_capability_available(mcp, "manage_asset_niagara_system"):
+        pytest.skip("manage_asset_niagara_system 未编入")
+    module = first_asset_path(mcp, "NiagaraScript", path_filter="/Niagara/Modules")
+    if not module:
+        module = "/Niagara/Modules/Emitter/SpawnRate.SpawnRate"
+    path = f"{test_ns}/NS_ModuleParam"
+    created = mcp.call_capability("create_asset_niagara_system", assetPath=path)
+    entry = cap_first(created)
+    if entry.get("error") and "already exists" not in str(entry.get("error")).lower() and "已存在" not in str(entry.get("error")):
+        assert not entry.get("error"), created
+    add_em = mcp.call_capability(
+        "manage_asset_niagara_system",
+        assetPath=path,
+        operations=[{"action": "add_emitter", "emitterName": "ParamEmitter"}],
+    )
+    assert not cap_first(add_em).get("error"), add_em
+    add_mod = mcp.call_capability(
+        "manage_asset_niagara_system",
+        assetPath=path,
+        operations=[{
+            "action": "add_module",
+            "emitterName": "ParamEmitter",
+            "modulePath": module,
+            "usage": "EmitterUpdate",
+        }],
+    )
+    mod_entry = cap_first(add_mod)
+    if mod_entry.get("error") and ("未找到" in str(mod_entry.get("error")) or "not found" in str(mod_entry.get("error")).lower()):
+        pytest.skip(f"无 Niagara 模块资产: {module}")
+    assert not mod_entry.get("error"), add_mod
+    mod_name = mod_entry.get("moduleName")
+    assert mod_name, add_mod
+    set_r = mcp.call_capability(
+        "manage_asset_niagara_system",
+        assetPath=path,
+        operations=[{
+            "action": "set_module_parameter",
+            "emitterName": "ParamEmitter",
+            "moduleName": mod_name,
+            "parameterName": "SpawnRate",
+            "value": "42",
+            "usage": "EmitterUpdate",
+        }],
+    )
+    assert not cap_first(set_r).get("error"), set_r
+    got = cap_first(mcp.call_capability("get_asset_niagara_system", assetPath=path))
+    assert not got.get("error"), got
+    mods = []
+    for e in (got.get("emitters") or []):
+        if isinstance(e, dict):
+            mods.extend(e.get("modules") or [])
+    target = next((m for m in mods if isinstance(m, dict) and m.get("name") == mod_name), None)
+    assert target, got
+    assert target.get("usage"), target
+    inputs = target.get("inputs") or []
+    assert isinstance(inputs, list), target
+    spawn = next((i for i in inputs if isinstance(i, dict) and "SpawnRate" in (i.get("name") or "")), None)
+    if spawn:
+        assert "42" in str(spawn.get("value") or ""), spawn
+
+
+def test_niagara_set_module_parameter_unknown(test_ns, mcp):
+    if not is_capability_available(mcp, "create_asset_niagara_system"):
+        pytest.skip("create_asset_niagara_system 未编入")
+    if not is_capability_available(mcp, "manage_asset_niagara_system"):
+        pytest.skip("manage_asset_niagara_system 未编入")
+    path = f"{test_ns}/NS_BadModuleParam"
+    created = mcp.call_capability("create_asset_niagara_system", assetPath=path)
+    entry = cap_first(created)
+    if entry.get("error") and "already exists" not in str(entry.get("error")).lower() and "已存在" not in str(entry.get("error")):
+        assert not entry.get("error"), created
+    add_em = mcp.call_capability(
+        "manage_asset_niagara_system",
+        assetPath=path,
+        operations=[{"action": "add_emitter", "emitterName": "BadEmitter"}],
+    )
+    assert not cap_first(add_em).get("error"), add_em
+    bad_mod = mcp.call_capability(
+        "manage_asset_niagara_system",
+        assetPath=path,
+        operations=[{
+            "action": "set_module_parameter",
+            "emitterName": "BadEmitter",
+            "moduleName": "NoSuchModule",
+            "parameterName": "SpawnRate",
+            "value": "1",
+        }],
+    )
+    assert cap_first(bad_mod).get("error"), bad_mod
+    bad_em = mcp.call_capability(
+        "manage_asset_niagara_system",
+        assetPath=path,
+        operations=[{
+            "action": "set_module_parameter",
+            "emitterName": "MissingEmitter",
+            "moduleName": "SpawnRate",
+            "parameterName": "SpawnRate",
+            "value": "1",
+        }],
+    )
+    assert cap_first(bad_em).get("error"), bad_em
+
+
 def test_create_asset_sound_submix(test_ns, mcp):
     if not is_capability_available(mcp, "create_asset_sound_submix"):
         pytest.skip("create_asset_sound_submix 未编入")
@@ -210,6 +316,15 @@ def test_movie_pipeline_config_settings(test_ns, mcp):
     assert got.get("width") == 1280, got
     assert isinstance(got.get("settings"), list) and got["settings"], got
     assert got.get("antiAliasing"), got
+
+
+def test_control_movie_pipeline_status(mcp):
+    if not is_capability_available(mcp, "control_movie_pipeline"):
+        pytest.skip("control_movie_pipeline 未编入（4.26 / 无 MRQ）")
+    r = mcp.call_capability("control_movie_pipeline", action="status")
+    entry = cap_first(r)
+    assert not entry.get("error"), r
+    assert "isRendering" in entry, entry
 
 
 def test_create_asset_pose_search(test_ns, mcp):

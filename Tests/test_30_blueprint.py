@@ -447,3 +447,164 @@ def test_bp_add_macro_timeline_dispatcher(mcp, bp_path):
     entry = cap_first(r)
     assert isinstance(entry, dict), r
     assert not entry.get("error"), r
+
+
+def test_bp_compile_status(mcp, bp_path):
+    r = mcp.call_capability("get_asset_blueprint", assetPath=bp_path)
+    payload = cap_first(r)
+    assert payload.get("compileStatus"), payload
+    assert "hasCompilerErrors" in payload, payload
+
+
+def test_bp_orphaned_pins(test_ns, mcp):
+    path = f"{test_ns}/BP_OrphanPins"
+    mcp.call_capability("create_asset_blueprint", assetPath=path, parentClass="Actor")
+    add = mcp.call_capability(
+        "manage_asset_blueprint",
+        assetPath=path,
+        operations=[{
+            "action": "add_variable",
+            "variableName": "OrphanProbe",
+            "variableType": "float",
+        }],
+    )
+    assert not cap_first(add).get("error"), add
+    get_node = mcp.call_capability(
+        "manage_asset_blueprint",
+        assetPath=path,
+        operations=[{
+            "action": "add_node",
+            "graphName": "EventGraph",
+            "nodeClass": "K2Node_VariableGet",
+            "variableName": "OrphanProbe",
+            "posX": 800, "posY": 400,
+        }],
+    )
+    assert cap_first(get_node).get("nodeId"), get_node
+    rm = mcp.call_capability(
+        "manage_asset_blueprint",
+        assetPath=path,
+        operations=[{"action": "remove_variable", "variableName": "OrphanProbe"}],
+        compile=True,
+    )
+    assert not cap_first(rm).get("error"), rm
+    got = mcp.call_capability(
+        "get_asset_blueprint", assetPath=path, sections=["orphaned"],
+    )
+    payload = cap_first(got)
+    pins = payload.get("orphanedPins")
+    assert isinstance(pins, list), payload
+    if pins:
+        assert pins[0].get("nodeId") and pins[0].get("pinName"), pins[0]
+
+
+def test_bp_exec_paths(test_ns, mcp):
+    path = f"{test_ns}/BP_ExecPaths"
+    mcp.call_capability("create_asset_blueprint", assetPath=path, parentClass="Actor")
+    ensure = mcp.call_capability(
+        "manage_asset_blueprint",
+        assetPath=path,
+        operations=[{
+            "action": "add_node",
+            "graphName": "EventGraph",
+            "nodeClass": "K2Node_Event",
+            "functionName": "ReceiveBeginPlay",
+            "posX": 0, "posY": 0,
+        }],
+    )
+    begin_id = cap_first(ensure).get("nodeId")
+    assert begin_id, ensure
+    add = mcp.call_capability(
+        "manage_asset_blueprint",
+        assetPath=path,
+        operations=[{
+            "action": "add_node",
+            "graphName": "EventGraph",
+            "nodeClass": "K2Node_CallFunction",
+            "functionName": "PrintString",
+            "posX": 420, "posY": 80,
+        }],
+    )
+    print_id = cap_first(add).get("nodeId")
+    assert print_id, add
+    graph = mcp.call_capability(
+        "get_asset_blueprint",
+        assetPath=path,
+        sections=["graph"],
+        graphName="EventGraph",
+    )
+    nodes = cap_first(graph).get("nodes") or []
+    begin_node = next((n for n in nodes if n.get("nodeId") == begin_id), None)
+    print_node = next((n for n in nodes if n.get("nodeId") == print_id), None)
+    assert begin_node and print_node, graph
+    begin_then = next(
+        (p.get("pinName") for p in (begin_node.get("pins") or [])
+         if p.get("direction") == "output" and p.get("pinCategory") == "exec"),
+        None,
+    )
+    print_exec = next(
+        (p.get("pinName") for p in (print_node.get("pins") or [])
+         if p.get("direction") == "input" and p.get("pinCategory") == "exec"),
+        None,
+    )
+    assert begin_then and print_exec, (begin_node, print_node)
+    wire = mcp.call_capability(
+        "manage_asset_blueprint",
+        assetPath=path,
+        operations=[{
+            "action": "connect",
+            "graphName": "EventGraph",
+            "sourceNodeId": begin_id,
+            "sourcePinName": begin_then,
+            "targetNodeId": print_id,
+            "targetPinName": print_exec,
+        }],
+    )
+    assert not cap_first(wire).get("error"), wire
+    paths = mcp.call_capability(
+        "get_asset_blueprint",
+        assetPath=path,
+        sections=["execPaths"],
+        graphName="EventGraph",
+    )
+    payload = cap_first(paths)
+    chain = payload.get("execPaths") or []
+    assert chain, payload
+    assert any(len(p.get("nodes") or []) >= 2 for p in chain if isinstance(p, dict)), payload
+
+
+def test_bp_exec_paths_all_needs_graph_name(test_ns, mcp):
+    path = f"{test_ns}/BP_ExecAllNote"
+    mcp.call_capability("create_asset_blueprint", assetPath=path, parentClass="Actor")
+    r = mcp.call_capability("get_asset_blueprint", assetPath=path, sections=["all"])
+    payload = cap_first(r)
+    assert payload.get("compileStatus"), payload
+    assert "graphName required" in str(payload.get("note") or ""), payload
+
+
+def test_calls_batch_memory_rollback(test_ns, mcp):
+    path = f"{test_ns}/BP_UndoBatch"
+    mcp.call_capability("create_asset_blueprint", assetPath=path, parentClass="Actor")
+    batch = mcp._tool_call_raw("call_capability", {
+        "calls": [
+            {
+                "capability": "manage_asset_blueprint",
+                "arguments": {
+                    "assetPath": path,
+                    "operations": [{
+                        "action": "add_variable",
+                        "variableName": "UndoMe",
+                        "variableType": "float",
+                    }],
+                },
+            },
+            {
+                "capability": "manage_asset_blueprint",
+                "arguments": {"assetPath": path},
+            },
+        ],
+    })
+    assert batch.get("failureCount", 0) > 0, batch
+    got = mcp.call_capability("get_asset_blueprint", assetPath=path, sections=["variable"])
+    names = [v.get("name") for v in (cap_first(got).get("variables") or [])]
+    assert "UndoMe" not in names, got

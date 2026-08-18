@@ -124,9 +124,9 @@ def main() -> int:
         )
 
     cap_only = names - META_TOOLS
-    if len(cap_only) != 226:
+    if len(cap_only) != 227:
         errors.append(
-            f"expected exactly 226 capability names under Capabilities/, found {len(cap_only)}"
+            f"expected exactly 227 capability names under Capabilities/, found {len(cap_only)}"
         )
 
     for w in warnings:
