@@ -120,13 +120,13 @@ def main() -> int:
     for path, line in _scan_nexuslink_sources_for_raw_at_least():
         rel = path.relative_to(NEXUS_UNREAL)
         errors.append(
-            f"{rel}:{line}: 禁止裸 NX_UE_AT_LEAST；仅在 NexusVersionCompat.h 定义，业务代码用 NX_UE_HAS_*（§1 / CapabilitySpec §7.5）"
+            f"{rel}:{line}: 禁止裸 NX_UE_AT_LEAST；仅在 NexusVersionCompat.h 定义，业务代码用 NX_UE_HAS_*（§1 / CapabilitySpec §8.5）"
         )
 
     cap_only = names - META_TOOLS
-    if len(cap_only) != 221:
+    if len(cap_only) != 226:
         errors.append(
-            f"expected exactly 221 capability names under Capabilities/, found {len(cap_only)}"
+            f"expected exactly 226 capability names under Capabilities/, found {len(cap_only)}"
         )
 
     for w in warnings:
