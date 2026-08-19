@@ -5,8 +5,8 @@
 build_test.py -- NexusLink cross-version build test
 
 Runs BuildPlugin against all installed UE versions:
-  Phase 1 — DevelopmentEditor (WITH_EDITOR=1; NexusLink.uplugin Type: Editor)
-  Phase 2 — UnrealGame Development (WITH_EDITOR=0, temp copy; Editor→Runtime rewrite for compile check)
+  Phase 1 — DevelopmentEditor (WITH_EDITOR=1; NexusLink.uplugin Type: UncookedOnly)
+  Phase 2 — UnrealGame Development (WITH_EDITOR=0, temp copy; UncookedOnly→Runtime rewrite for compile check)
 
 Writes error logs to Saved/Logs/Build.Log (+ Build.Game.Log for phase 2).
 
@@ -47,6 +47,7 @@ LOG_FILE_GAME = LOG_DIR / "Build.Game.Log"
 TEMP_BASE = Path(tempfile.gettempdir()) / "NexusBuildTest"
 _TEMP_GAME_BASE = TEMP_BASE / "GameTarget"
 _EDITOR_TYPE = '"Type": "Editor"'
+_UNCOOKED_TYPE = '"Type": "UncookedOnly"'
 _RUNTIME_TYPE = '"Type": "Runtime"'
 _GAME_TARGET_RE = re.compile(r"UnrealGame", re.IGNORECASE)
 
@@ -211,7 +212,7 @@ def _extract_warnings(lines: List[str]) -> List[str]:
 
 
 def _prepare_runtime_plugin_copy(ver: str) -> Tuple[str, str]:
-    """Copy NexusLink to temp；若仍为 Editor Type 则改写为 Runtime（兼容旧仓）。"""
+    """Copy NexusLink to temp；UncookedOnly/Editor 改写为 Runtime 以便 Game 目标编译。"""
     src_root = PLUGIN_PATH.parent
     work = _TEMP_GAME_BASE / ver
     plugin_copy = work / "PluginSrc" / "NexusLink"
@@ -224,12 +225,15 @@ def _prepare_runtime_plugin_copy(ver: str) -> Tuple[str, str]:
     shutil.copytree(src_root, plugin_copy)
     uplugin = plugin_copy / "NexusLink.uplugin"
     content = uplugin.read_text(encoding="utf-8")
-    if _EDITOR_TYPE in content:
+    if _UNCOOKED_TYPE in content:
+        content = content.replace(_UNCOOKED_TYPE, _RUNTIME_TYPE, 1)
+        uplugin.write_text(content, encoding="utf-8")
+    elif _EDITOR_TYPE in content:
         content = content.replace(_EDITOR_TYPE, _RUNTIME_TYPE, 1)
         uplugin.write_text(content, encoding="utf-8")
     elif _RUNTIME_TYPE not in content:
         raise RuntimeError(
-            f"NexusLink module Type 既非 Editor 也非 Runtime: {uplugin}"
+            f"NexusLink module Type 既非 UncookedOnly/Editor 也非 Runtime: {uplugin}"
         )
     return str(uplugin), str(package_out)
 
@@ -449,7 +453,7 @@ def run_build_test_game(engines: List[dict], max_workers: int = 2,
         "NexusLink Game-Target Build Report (WITH_EDITOR=0)",
         f"Time     : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         f"Target   : UnrealGame {target} Development",
-        f"Method   : temp copy + uplugin Type Editor→Runtime + BuildPlugin",
+        f"Method   : temp copy + uplugin Type UncookedOnly→Runtime + BuildPlugin",
         f"Plugin   : {PLUGIN_PATH}",
         f"Versions : {', '.join(e['version'] for e in engines)}",
     ]
@@ -526,7 +530,7 @@ def run_build_test(engines: List[dict], max_workers: int = 3,
         lines_out.extend([
             "",
             "=== Phase 2: UnrealGame Development (WITH_EDITOR=0) ===",
-            f"Method         : temp copy + uplugin Type Editor→Runtime + BuildPlugin",
+            f"Method         : temp copy + uplugin Type UncookedOnly→Runtime + BuildPlugin",
             "",
         ])
         for engine in engines:
@@ -550,7 +554,7 @@ def run_build_test(engines: List[dict], max_workers: int = 3,
             "NexusLink Game-Target Build Report (WITH_EDITOR=0)",
             f"Time     : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             f"Target   : UnrealGame {target} Development",
-            f"Method   : temp copy + uplugin Type Editor→Runtime + BuildPlugin",
+            f"Method   : temp copy + uplugin Type UncookedOnly→Runtime + BuildPlugin",
             f"Plugin   : {PLUGIN_PATH}",
             f"Versions : {', '.join(e['version'] for e in engines)}",
             "(extracted from build_test.py phase 2 — see also Build.Log)",

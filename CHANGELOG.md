@@ -16,7 +16,7 @@
 - chore(test): 新增 `_framework/test_cleanup.py`——测试前后清理 `Saved/Logs` 下 `UE-auto-launch*` / `TestReport.xml` / `Automation-*.stdout.log` 与 `Content/_McpTest/`；session 级 purge `/Game/_McpTest`（`--keep-artifacts` 时保留）
 - chore(test): pytest / `run_e2e.py` 自动拉起 UE **默认 headless**（`UnrealEditor-Cmd -unattended -nullrhi -NoSplash -NoSound`）；headless/命令行会话跳过 `l4_runtime`/`lua`/`requires_gui`；本地观察编辑器加 `--gui`；全量 `--gui`/`--full`
 - chore(test): `ue_launcher` 会话级 `-EnableNexusMcp` 开启 MCP；`Config/DefaultEditorPerProjectUserSettings.ini` 默认 `bEnableMcpServer=True`（不再写 Saved ini / `-ini:...` 双路径）
-- chore(test): `build_test` Game 阶段兼容 `NexusLink.uplugin` 已为 `Type: Runtime`
+- chore(test): `build_test` Game 阶段将 `UncookedOnly`/`Editor` 临时改写为 `Runtime` 做 `WITH_EDITOR=0` 编译探针
 - docs: 仓库改为公开（NexusLink 示例工程）；README 移除私有/NexusWork 表述；测试策略——新功能补测、默认 headless、命令行不可覆盖打标走 GUI
 
 ### Fixed
