@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""审计：代码 Capability 与 README / tool-reference / ZH_DESCRIPTIONS 对齐。"""
+"""审计：代码 Capability 与 README / tool-reference / 中文 overlay 对齐。"""
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-CAP_DIR = REPO / "nexus-unreal/Plugins/Developer/NexusLink/Source/NexusLink/Private/Capabilities"
+PLUGIN = REPO / "nexus-unreal/Plugins/Developer/NexusLink"
+CAP_DIR = PLUGIN / "Source/NexusLink/Private/Capabilities"
 README = REPO / "nexus-unreal/README.md"
-TOOL_REF = REPO / "docs/tool-reference.md"
-BUILD_SCRIPT = REPO / "nexus-unreal/Script/build_tool_reference.py"
+TOOL_REF = PLUGIN / "docs/tool-reference.md"
+TOOL_REF_ZH = PLUGIN / "docs/tool-reference.zh.md"
+ZH_JSON = PLUGIN / "scripts/tool_reference_zh.json"
 
 RE_NAME = re.compile(r'Out\.Name\s*=\s*TEXT\("([^"]+)"\)')
 RE_DESC = re.compile(r'Out\.Description\s*=\s*TEXT\("([^"]+)"\)')
@@ -21,8 +24,6 @@ RE_README_CAP = re.compile(
     r"call|submit|capture|control|exec)_[a-z0-9_]+)`"
 )
 RE_TOOL_HEAD = re.compile(r"^### `([^`]+)`", re.M)
-RE_ZH_KEY = re.compile(r'^\s+"([a-z][a-z0-9_]+)":', re.M)
-
 META = {"search_capabilities", "call_capability", "submit_feedback"}
 
 # README 行应提及的关键 action/能力（代码 schema 中存在）
@@ -58,10 +59,13 @@ def load_caps() -> dict[str, dict]:
 
 
 def load_zh_descriptions() -> set[str]:
-    text = BUILD_SCRIPT.read_text(encoding="utf-8")
-    start = text.index("ZH_DESCRIPTIONS: dict[str, str] = {")
-    end = text.index("\nZH_WHEN_TO_USE:", start)
-    return set(RE_ZH_KEY.findall(text[start:end]))
+    data = json.loads(ZH_JSON.read_text(encoding="utf-8"))
+    return set(data.get("descriptions") or {})
+
+
+def load_zh_when() -> set[str]:
+    data = json.loads(ZH_JSON.read_text(encoding="utf-8"))
+    return set(data.get("when_to_use") or {})
 
 
 def load_readme_caps() -> dict[str, str]:
@@ -117,20 +121,24 @@ def main() -> int:
     readme = set(readme_lines)
     tool_ref = load_tool_ref()
     zh = load_zh_descriptions()
+    zh_when = load_zh_when()
+    tool_ref_zh = set(RE_TOOL_HEAD.findall(TOOL_REF_ZH.read_text(encoding="utf-8"))) if TOOL_REF_ZH.is_file() else set()
     tool_ref_caps = tool_ref - META
 
     print(f"代码 Capability: {len(code_names)}")
     print(f"README 功能点: {len(readme)}")
     print(f"tool-reference: {len(tool_ref)} (cap {len(tool_ref_caps)} + meta {len(tool_ref & META)})")
-    print(f"ZH_DESCRIPTIONS: {len(zh)}")
+    print(f"tool-reference.zh: {len(tool_ref_zh)}")
+    print(f"ZH descriptions: {len(zh)}")
     print()
 
     section("代码有、README 无", sorted(code_names - readme), caps)
     section("README 有、代码无", sorted(readme - code_names))
     section("代码有、tool-reference 无", sorted(code_names - tool_ref_caps), caps)
     section("tool-reference 有、代码无", sorted(tool_ref_caps - code_names))
-    section("代码有、ZH_DESCRIPTIONS 无", sorted(code_names - zh), caps)
-    section("ZH_DESCRIPTIONS 无对应代码", sorted(zh - code_names - META))
+    section("代码有、中文 Description 无", sorted(code_names - zh), caps)
+    section("中文 Description 无对应代码", sorted(zh - code_names - META))
+    section("英文/中文 tool-reference 标题不一致", sorted(tool_ref.symmetric_difference(tool_ref_zh)))
     section("README 功能描述缺项", find_readme_stale(readme_lines, caps))
 
     # GAS caps conditional
@@ -150,12 +158,7 @@ def main() -> int:
     print(f"  SUM {sum(len(v) for v in by_dir.values())}")
     print()
 
-    # ZH_WHEN_TO_USE 覆盖
-    text = BUILD_SCRIPT.read_text(encoding="utf-8")
-    start = text.index("ZH_WHEN_TO_USE: dict[str, str] = {")
-    end = text.index("\n\n# ── Regex", start)
-    when = set(RE_ZH_KEY.findall(text[start:end]))
-    section("代码有、ZH_WHEN_TO_USE 无", sorted(code_names - when), caps)
+    section("代码有、中文 WhenToUse 无（可空，仅统计）", sorted(code_names - zh_when), caps)
 
     return 0
 
