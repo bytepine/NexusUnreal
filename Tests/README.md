@@ -1,6 +1,6 @@
 # NexusUnreal — pytest E2E 测试
 
-本目录为 **NexusUnreal 私有工程**内的 NexusLink L2 回归测试实现。
+本目录为 **NexusUnreal 示例工程**内的 NexusLink L2 回归测试实现。
 
 通用说明（工具模型、过滤）见 [NexusLink docs/testing.md](https://github.com/bytepine/NexusLink/blob/master/docs/testing.md)。
 
@@ -27,6 +27,8 @@
 **参数契约（与 NexusLink Breaking 对齐）**：Capability 单目标（`assetPath`/`actorName`/`widgetName`）；跨目标用多次调用或 `call_capability.calls[]`；manage 用 `operations[]`；get 用 `propertyPaths[]`；spawn 用 `assetPath`（非 `blueprintPath`）；duplicate/rename 用 `destAssetPath`（非 `newPath`）。旧键不兼容。
 
 **`exec_command` 勿用 `help *`**：UE 会在系统浏览器打开 `ConsoleHelp.html`（GUI/headless 均可能）。
+
+E2E 连 MCP 须带 Bearer（`NEXUS_MCP_TOKEN` 或 `{Temp}/NexusLink/{PID}.json`）。自动拉起会加 `-EnableNexusMcp` 与 `-NexusEnableDangerousCaps`（会话级打开 `exec_command` / Lua eval/dofile）。手动 `--ue-url` 时需已开 MCP，危险 cap 需在设置里打开或带同样 CLI。
 
 ## 快速开始
 

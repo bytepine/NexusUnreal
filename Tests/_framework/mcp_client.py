@@ -14,7 +14,12 @@ from __future__ import annotations
 import itertools
 import json
 import logging
+import os
+import tempfile
+import time
+from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
+from urllib.parse import urlparse
 
 import httpx
 
@@ -24,6 +29,35 @@ log = logging.getLogger(__name__)
 
 PROTOCOL_VERSION = "2025-06-18"
 _SESSION_HEADER = "Mcp-Session-Id"
+
+
+def read_nexus_auth_token(mcp_port: int) -> Optional[str]:
+    """在 GET /status 探活后按端口读 {Temp}/NexusLink/{PID}.json 的 authToken。"""
+    env = os.environ.get("NEXUS_MCP_TOKEN")
+    if env:
+        return env
+    d = Path(tempfile.gettempdir()) / "NexusLink"
+    if not d.is_dir():
+        return None
+    for f in d.glob("*.json"):
+        if not f.stem.isdigit():
+            continue
+        try:
+            obj = json.loads(f.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            continue
+        if int(obj.get("mcpPort") or 0) == mcp_port:
+            token = obj.get("authToken")
+            if isinstance(token, str) and token:
+                return token
+    return None
+
+
+def _port_from_url(url: str) -> int:
+    parsed = urlparse(url)
+    if parsed.port:
+        return parsed.port
+    return 443 if parsed.scheme == "https" else 80
 
 
 class MCPError(RuntimeError):
@@ -47,7 +81,22 @@ class MCPClient:
         self.url = url
         self._session_id: Optional[str] = None
         self._ids = itertools.count(1)
-        self._http = httpx.Client(timeout=timeout)
+        token = os.environ.get("NEXUS_MCP_TOKEN")
+        if not token:
+            port = _port_from_url(url)
+            for _ in range(50):
+                token = read_nexus_auth_token(port)
+                if token:
+                    break
+                time.sleep(0.1)
+        if not token:
+            raise MCPError(
+                "missing MCP auth token; set NEXUS_MCP_TOKEN or ensure {Temp}/NexusLink/{PID}.json exists"
+            )
+        self._http = httpx.Client(
+            timeout=timeout,
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
     # ---- connection lifecycle ----
 

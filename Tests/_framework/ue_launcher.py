@@ -164,6 +164,8 @@ class UELauncher:
         args.append("-skipcompile")
         # 会话级强制开 MCP（不依赖 Preferences / Config 目录）
         args.append("-EnableNexusMcp")
+        # 会话级打开危险 Capability，供 exec_command / Lua eval/dofile 用例；不写盘
+        args.append("-NexusEnableDangerousCaps")
         if self.extra_args:
             args.extend(self.extra_args)
         # Persist stdout/stderr so we can surface real reasons for early-exit
