@@ -42,8 +42,8 @@ LEGACY_CAP_NAMES: Dict[str, str] = {
     "diff_actors":             "diff_runtime_actors",
     "get_actor_animation":     "get_runtime_actor_animation",
     "get_actor_behavior_tree": "get_runtime_actor_behavior_tree",
+    "get_behavior_tree":       "get_asset_behavior_tree",
     "spawn_widget":            "spawn_runtime_widget",
-    "list_runtime_widgets":    "list_runtime_widgets",  # 已是新名，无需改动但保留以防旧拼写
     "get_asset_slate_widget":  "get_runtime_slate_widget",
     "interact_widget":         "interact_runtime_widget",
 
