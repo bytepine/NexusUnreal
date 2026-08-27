@@ -30,6 +30,18 @@ def test_string_table_roundtrip(test_ns, mcp):
     keys = got.get("keys") or []
     assert any(isinstance(k, dict) and k.get("key") == "Hello" for k in keys), got
 
+    extra = mcp.call_capability(
+        "manage_asset_string_table",
+        assetPath=path,
+        operations=[
+            {"action": "set_source", "key": "Hello", "source": "World2"},
+            {"action": "remove_key", "key": "Hello"},
+        ],
+    )
+    for e in (extra.get("results") or [cap_first(extra)]):
+        if isinstance(e, dict):
+            assert not e.get("error"), extra
+
     try:
         bad = cap_first(
             mcp.call_capability(

@@ -130,3 +130,38 @@ def test_create_asset_level(test_ns, mcp):
     assert not entry.get("error"), r
     got = cap_first(mcp.call_capability("get_asset_level", assetPath=path, sections=["settings"]))
     assert not got.get("error"), got
+
+
+def test_manage_level_properties(mcp, scratch_level):
+    r = mcp.call_capability(
+        "manage_asset_level",
+        assetPath=scratch_level,
+        operations=[{"action": "set_property", "propertyPath": "WorldSettings.KillZ", "value": "-10000"}],
+    )
+    entry = cap_first(r)
+    if entry.get("error"):
+        pytest.skip(f"level set_property 跳过: {entry}")
+    listing = mcp.call_capability(
+        "get_asset_level", assetPath=scratch_level, sections=["actors"], limit=5
+    )
+    actors = cap_first(listing).get("actors") or []
+    name = None
+    for a in actors:
+        if isinstance(a, dict):
+            name = a.get("actorName") or a.get("name") or a.get("label")
+            if name:
+                break
+    if not name:
+        pytest.skip("关卡无 Actor 可 set_actor_property")
+    ap = mcp.call_capability(
+        "manage_asset_level",
+        assetPath=scratch_level,
+        operations=[{
+            "action": "set_actor_property",
+            "actorName": name,
+            "propertyPath": "RelativeLocation.Z",
+            "value": "0",
+        }],
+    )
+    if cap_first(ap).get("error"):
+        pytest.skip(f"set_actor_property 跳过: {cap_first(ap)}")

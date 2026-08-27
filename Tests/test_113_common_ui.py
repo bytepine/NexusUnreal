@@ -33,3 +33,20 @@ def test_common_ui_styles(test_ns, mcp):
         pytest.fail(f"create_asset_common_text_style 失败: {e2}")
     got2 = cap_first(mcp.call_capability("get_asset_common_text_style", assetPath=txt))
     assert not got2.get("error"), got2
+
+    btn_man = mcp.call_capability(
+        "manage_asset_common_button_style",
+        assetPath=btn,
+        operations=[{"action": "set_property", "propertyPath": "DisabledOpacity", "value": "0.5"}],
+    )
+    btn_e = cap_first(btn_man)
+    if btn_e.get("error"):
+        pytest.skip(f"manage_asset_common_button_style set_property 跳过: {btn_e}")
+    txt_man = mcp.call_capability(
+        "manage_asset_common_text_style",
+        assetPath=txt,
+        operations=[{"action": "set_property", "propertyPath": "FontSize", "value": "16"}],
+    )
+    txt_e = cap_first(txt_man)
+    if txt_e.get("error"):
+        pytest.skip(f"manage_asset_common_text_style set_property 跳过: {txt_e}")

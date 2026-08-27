@@ -32,6 +32,14 @@ def st_path(test_ns, mcp):
     return assets[0].get("path") or assets[0].get("assetPath")
 
 
+def test_get_asset_state_tree(st_path, mcp):
+    if not is_capability_available(mcp, "get_asset_state_tree"):
+        pytest.skip("get_asset_state_tree 未编入")
+    r = mcp.call_capability("get_asset_state_tree", assetPath=st_path)
+    entry = cap_first(r)
+    assert not entry.get("error"), r
+
+
 def test_manage_state_tree_add_state(st_path, mcp):
     r = mcp.call_capability(
         "manage_asset_state_tree",
@@ -101,6 +109,59 @@ def test_manage_state_tree_remove_state(st_path, mcp):
     )
     entry = cap_first(r)
     assert not entry.get("error") and entry.get("success") is not False, r
+
+
+def test_manage_state_tree_task_condition_remove_transition(st_path, mcp):
+    mcp.call_capability(
+        "manage_asset_state_tree",
+        assetPath=st_path,
+        operations=[{"action": "add_state", "stateName": "NxCondSrc"}],
+    )
+    mcp.call_capability(
+        "manage_asset_state_tree",
+        assetPath=st_path,
+        operations=[{"action": "add_state", "stateName": "NxCondDst"}],
+    )
+    mcp.call_capability(
+        "manage_asset_state_tree",
+        assetPath=st_path,
+        operations=[{
+            "action": "add_task",
+            "stateName": "NxCondSrc",
+            "nodeType": "StateTreeTask_Delay",
+        }],
+    )
+    cond = mcp.call_capability(
+        "manage_asset_state_tree",
+        assetPath=st_path,
+        operations=[{
+            "action": "add_enter_condition",
+            "stateName": "NxCondSrc",
+            "nodeType": "StateTreeCondition_CompareInt",
+        }],
+    )
+    assert isinstance(cap_first(cond), dict), cond
+    mcp.call_capability(
+        "manage_asset_state_tree",
+        assetPath=st_path,
+        operations=[{
+            "action": "add_transition",
+            "stateName": "NxCondSrc",
+            "targetState": "NxCondDst",
+        }],
+    )
+    rm = mcp.call_capability(
+        "manage_asset_state_tree",
+        assetPath=st_path,
+        operations=[
+            {"action": "remove_task", "stateName": "NxCondSrc", "index": 0},
+            {"action": "remove_enter_condition", "stateName": "NxCondSrc", "index": 0},
+            {"action": "remove_transition", "stateName": "NxCondSrc", "index": 0},
+        ],
+    )
+    for e in (rm.get("results") or [cap_first(rm)]):
+        if isinstance(e, dict) and e.get("error"):
+            pytest.skip(f"state_tree remove_* 跳过: {e}")
 
 
 def test_manage_state_tree_recompile(st_path, mcp):

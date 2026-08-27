@@ -73,8 +73,13 @@ def test_multi_asset_overview(test_ns, mcp):
 # ────────────────────────────────────────────────
 
 
-def test_log_health_ensure_failed_is_zero(mcp):
-    r = mcp.call("get_output_log", textFilter="Ensure condition failed", limit=20)
+def test_log_health_ensure_failed_is_zero(mcp, log_start_sequence):
+    r = mcp.call(
+        "get_output_log",
+        textFilter="Ensure condition failed",
+        limit=20,
+        sinceSequence=log_start_sequence,
+    )
     entries = r.get("entries") or []
     assert len(entries) == 0, f"Ensure failures: {entries!r}"
 
@@ -125,6 +130,13 @@ def test_data_asset_get_and_manage_reset(test_ns, mcp, require_tools):
         operations=[{"action": "reset", "propertyName": prop}],
     )
     assert not (r.get("error") or (cap_first(r) or {}).get("error")), r
+    set_r = mcp.call_capability(
+        "manage_asset_data_asset",
+        assetPath=path,
+        operations=[{"action": "set", "propertyName": prop, "value": "true"}],
+    )
+    if cap_first(set_r).get("error"):
+        pytest.skip(f"data_asset set 跳过: {cap_first(set_r)}")
 
 
 def test_delete_asset_removes_from_search(test_ns, mcp, require_tools):

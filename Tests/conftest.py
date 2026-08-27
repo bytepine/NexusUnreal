@@ -202,6 +202,16 @@ def mcp(_ue_url: str) -> Generator[MCPClient, None, None]:
         client.close()
 
 
+@pytest.fixture(scope="session", autouse=True)
+def log_start_sequence(mcp: MCPClient) -> int:
+    """会话开始时的日志游标；log_health 只看本轮增量，避免复用 Editor 吃到旧 Ensure。"""
+    try:
+        r = mcp.call("get_output_log", limit=1)
+        return int(r.get("latestSequence") or 0)
+    except Exception:
+        return 0
+
+
 @pytest.fixture(scope="session")
 def tool_names(mcp: MCPClient) -> List[str]:
     return [t["name"] for t in mcp.list_tools()]

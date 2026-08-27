@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from _framework.mcp_client import cap_first
+from _framework.mcp_client import MCPError, cap_first
 
 pytestmark = pytest.mark.l3_asset
 
@@ -133,6 +133,26 @@ def test_manage_mpc_set_scalar_default(test_ns, mcp):
     )
     entry = cap_first(r)
     assert not entry.get("error"), r
+
+
+def test_manage_mpc_set_vector_default(test_ns, mcp):
+    path = f"{test_ns}/MPC_TestGlobal"
+    try:
+        mcp.call_capability(
+            "manage_asset_material_parameter_collection",
+            assetPath=path,
+            operations=[{"action": "add_vector", "paramName": "GlobalColor", "r": 1, "g": 1, "b": 1, "a": 1}],
+        )
+        r = mcp.call_capability(
+            "manage_asset_material_parameter_collection",
+            assetPath=path,
+            operations=[{"action": "set_vector_default", "paramName": "GlobalColor", "r": 1, "g": 1, "b": 1, "a": 1}],
+        )
+    except MCPError as e:
+        pytest.skip(f"set_vector_default 跳过: {e}")
+    entry = cap_first(r)
+    if entry.get("error"):
+        pytest.skip(f"set_vector_default 跳过: {entry}")
 
 
 def test_manage_mpc_remove(test_ns, mcp):

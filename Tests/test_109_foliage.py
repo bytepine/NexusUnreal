@@ -40,6 +40,15 @@ def test_foliage_type_roundtrip(test_ns, mcp):
         )
     )
     assert not dens.get("error"), dens
+    prop = cap_first(
+        mcp.call_capability(
+            "manage_asset_foliage_type",
+            assetPath=path,
+            operations=[{"action": "set_property", "propertyPath": "Radius", "value": "100"}],
+        )
+    )
+    if prop.get("error"):
+        pytest.skip(f"foliage set_property 跳过: {prop}")
 
     got = cap_first(mcp.call_capability("get_asset_foliage_type", assetPath=path))
     assert not got.get("error"), got

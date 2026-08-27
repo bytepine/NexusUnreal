@@ -92,3 +92,38 @@ def test_manage_static_mesh_collision_and_socket(mcp, require_tools):
         operations=[{"action": "remove_socket", "socketName": sock}],
     )
     assert not cap_first(rm).get("error"), rm
+
+
+def test_manage_static_mesh_remaining_actions(mcp, require_tools):
+    require_tools("manage_asset_static_mesh")
+    path = first_asset_path(mcp, "StaticMesh")
+    assert path, "无法定位 StaticMesh 样本"
+    sock = "NxSmSetSock"
+    ops = [
+        {"action": "add_sphere_collision", "radius": 10},
+        {"action": "add_socket", "socketName": sock, "locX": 0, "locY": 0, "locZ": 0},
+        {"action": "set_socket", "socketName": sock, "locX": 2, "locY": 3, "locZ": 4},
+        {"action": "remove_socket", "socketName": sock},
+        {"action": "set_property", "propertyPath": "LightMapResolution", "value": "64"},
+    ]
+    mat = first_asset_path(mcp, "Material")
+    if mat:
+        ops.insert(0, {"action": "set_material_slot", "slotIndex": 0, "materialPath": mat})
+    r = mcp.call_capability("manage_asset_static_mesh", assetPath=path, operations=ops)
+    for e in (r.get("results") or [cap_first(r)]):
+        if isinstance(e, dict) and e.get("error"):
+            pytest.skip(f"manage_asset_static_mesh 剩余 action 跳过: {e}")
+
+
+def test_manage_asset_texture_set_property(mcp, require_tools):
+    require_tools("manage_asset_texture")
+    path = first_asset_path(mcp, "Texture2D")
+    assert path, "无法定位 Texture2D 样本"
+    r = mcp.call_capability(
+        "manage_asset_texture",
+        assetPath=path,
+        operations=[{"action": "set_property", "propertyPath": "sRGB", "value": "true"}],
+    )
+    entry = cap_first(r)
+    if entry.get("error"):
+        pytest.skip(f"manage_asset_texture 跳过: {entry}")

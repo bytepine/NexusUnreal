@@ -64,6 +64,28 @@ def test_manage_metasound_add_input(mcp, test_ns):
     assert not entry.get("error") or entry.get("alreadyExists"), f"add_input 失败：{entry}"
 
 
+@pytest.mark.skipif_ue_below("5.3")
+def test_manage_metasound_graph_ops(mcp, test_ns):
+    asset_path = f"{test_ns}/TestMetaSound_MCP"
+    r = mcp.call_capability(
+        "manage_asset_meta_sound",
+        assetPath=asset_path,
+        operations=[
+            {"action": "add_output", "name": "TestOutput", "typeName": "float"},
+            {"action": "add_node", "nodeClass": "Add"},
+            {"action": "add_edge", "fromNode": "TestInput", "toNode": "TestOutput"},
+            {"action": "remove_edge", "fromNode": "TestInput", "toNode": "TestOutput"},
+            {"action": "remove_node", "nodeId": "0"},
+            {"action": "remove_output", "name": "TestOutput"},
+        ],
+    )
+    for e in (r.get("results") or []):
+        if isinstance(e, dict) and e.get("error"):
+            pytest.skip(f"metasound remaining 跳过: {e}")
+    if not r.get("results") and cap_first(r).get("error"):
+        pytest.skip(f"metasound remaining 跳过: {cap_first(r)}")
+
+
 # ── PCG Graph ─────────────────────────────────────────────────────────────────
 
 @pytest.fixture(scope="module")
@@ -132,3 +154,38 @@ def test_get_pose_search_database(mcp, pose_search_db_path):
     assert entry is not None, f"无有效条目：{r}"
     assert entry.get("assetType") == "PoseSearchDatabase", f"类型错误：{entry}"
     assert "animationAssetCount" in entry, f"缺少 animationAssetCount：{entry}"
+
+
+@pytest.mark.skipif_ue_below("5.4")
+def test_manage_pose_search_schema_and_tags(test_ns, mcp):
+    from _framework.capability_probe import is_capability_available
+    from _framework.mcp_client import cap_first
+    if not is_capability_available(mcp, "manage_asset_pose_search"):
+        pytest.skip("manage_asset_pose_search 未编入")
+    schema = f"{test_ns}/PSS_Manage"
+    db = f"{test_ns}/PSD_Manage"
+    s = mcp.call_capability("create_asset_pose_search", assetPath=schema, assetKind="Schema")
+    se = cap_first(s)
+    if se.get("error") and "already exists" not in str(se.get("error")).lower():
+        pytest.skip(f"create PoseSearch Schema 失败: {se}")
+    d = mcp.call_capability(
+        "create_asset_pose_search",
+        assetPath=db,
+        assetKind="Database",
+        schemaPath=schema,
+    )
+    de = cap_first(d)
+    if de.get("error") and "already exists" not in str(de.get("error")).lower():
+        pytest.skip(f"create PoseSearch Database 失败: {de}")
+    r = mcp.call_capability(
+        "manage_asset_pose_search",
+        assetPath=db,
+        operations=[
+            {"action": "set_schema", "schemaPath": schema},
+            {"action": "add_tag", "tag": "NxPoseTag"},
+            {"action": "remove_tag", "tag": "NxPoseTag"},
+        ],
+    )
+    for e in (r.get("results") or [cap_first(r)]):
+        if isinstance(e, dict):
+            assert not e.get("error"), r

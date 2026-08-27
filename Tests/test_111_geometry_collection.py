@@ -33,3 +33,12 @@ def test_geometry_collection_create_get(test_ns, mcp):
         )
     )
     assert isinstance(man, dict), man
+    extra = cap_first(
+        mcp.call_capability(
+            "manage_asset_geometry_collection",
+            assetPath=path,
+            operations=[{"action": "set_property", "propertyPath": "EnableClustering", "value": "true"}],
+        )
+    )
+    if extra.get("error"):
+        pytest.skip(f"geometry_collection set_property 跳过: {extra}")

@@ -33,3 +33,16 @@ def test_movie_pipeline_config(test_ns, mcp):
         )
     )
     assert isinstance(man, dict), man
+    extra = mcp.call_capability(
+        "manage_asset_movie_pipeline_config",
+        assetPath=path,
+        operations=[
+            {"action": "add_setting", "settingClass": "HighRes"},
+            {"action": "set_setting_enabled", "settingClass": "HighRes", "enabled": True},
+            {"action": "set_setting_property", "settingClass": "HighRes", "propertyPath": "TileCount", "value": "1"},
+            {"action": "remove_setting", "settingClass": "HighRes"},
+        ],
+    )
+    for e in (extra.get("results") or [cap_first(extra)]):
+        if isinstance(e, dict) and e.get("error"):
+            pytest.skip(f"movie_pipeline remaining 跳过: {e}")

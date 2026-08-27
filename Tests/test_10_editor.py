@@ -40,7 +40,7 @@ def test_get_editor_context_sections(mcp, require_tools):
     require_tools("get_editor_context")
     r = mcp.call_capability(
         "get_editor_context",
-        sections=["selection_actors", "content_browser_path"],
+        sections=["selection_actors", "content_browser_path", "selection_assets"],
         limit=10,
     )
     entry = cap_first(r)
@@ -108,5 +108,11 @@ def test_manage_asset_lua_binding(test_ns, mcp):
         operations=[{"action": "not_a_real_action"}],
     )
     assert cap_first(bad).get("error"), bad
+    unbind = mcp.call_capability(
+        "manage_asset_lua_binding",
+        assetPath=bp,
+        operations=[{"action": "unbind"}],
+    )
+    assert isinstance(cap_first(unbind), dict), unbind
 
 

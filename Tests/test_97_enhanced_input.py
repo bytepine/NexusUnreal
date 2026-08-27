@@ -60,6 +60,23 @@ def test_manage_input_action_add_trigger(test_ns, mcp):
     assert "error" not in entry or "未找到" in entry["error"], r
 
 
+def test_manage_input_action_remaining(test_ns, mcp):
+    path = f"{test_ns}/IA_TestJump"
+    r = mcp.call_capability(
+        "manage_asset_input_action",
+        assetPath=path,
+        operations=[
+            {"action": "add_modifier", "className": "InputModifierNegate"},
+            {"action": "set_flags", "bConsumeInput": True},
+            {"action": "remove_trigger", "index": 0},
+            {"action": "remove_modifier", "index": 0},
+        ],
+    )
+    for e in (r.get("results") or [cap_first(r)]):
+        if isinstance(e, dict) and e.get("error"):
+            pytest.skip(f"input_action remaining 跳过: {e}")
+
+
 # ── InputMappingContext ───────────────────────────────────────────────────────
 
 def test_create_input_mapping_context(test_ns, mcp):
@@ -100,3 +117,9 @@ def test_manage_imc_add_remove_mapping(test_ns, mcp):
     remove_results = remove.get("results") or []
     assert len(remove_results) == 1, remove
     assert remove_results[0].get("removedCount", 0) >= 1, remove
+    clr = mcp.call_capability(
+        "manage_asset_input_mapping_context",
+        assetPath=imc_path,
+        operations=[{"action": "clear_mappings"}],
+    )
+    assert not cap_first(clr).get("error"), clr

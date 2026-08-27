@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 
 from _framework.assertions import assert_success_count
-from _framework.mcp_client import cap_first
+from _framework.mcp_client import MCPError, cap_first
 
 pytestmark = pytest.mark.l3_asset
 
@@ -195,3 +195,27 @@ def test_wbp_event_graph_via_blueprint(mcp, wbp_path):
     )
     pn_id = cap_first(add).get("nodeId")
     assert pn_id, f"WBP EventGraph add_node: {add!r}"
+
+
+def test_widget_set_slot_and_property(mcp, wbp_path):
+    try:
+        r = mcp.call_capability(
+            "manage_asset_user_widget",
+            assetPath=wbp_path,
+            operations=[
+                {
+                    "action": "set_slot",
+                    "widgetName": "TitleText",
+                    "anchorMinX": 0.5,
+                    "anchorMinY": 0.5,
+                    "anchorMaxX": 0.5,
+                    "anchorMaxY": 0.5,
+                },
+                {"action": "set_property", "widgetName": "TitleText", "propertyPath": "Visibility", "value": "Visible"},
+            ],
+        )
+    except MCPError as e:
+        pytest.skip(f"widget set_slot/set_property 跳过: {e}")
+    for e in (r.get("results") or [cap_first(r)]):
+        if isinstance(e, dict) and e.get("error"):
+            pytest.skip(f"widget set_slot/set_property 跳过: {e}")

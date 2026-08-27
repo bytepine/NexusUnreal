@@ -6,6 +6,8 @@ from __future__ import annotations
 import pytest
 
 from _framework.mcp_client import cap_first
+from _framework.asset_helpers import first_asset_path
+from _framework.capability_probe import is_capability_available
 
 pytestmark = pytest.mark.l3_asset
 
@@ -175,3 +177,86 @@ class TestSoundSubmix:
         payload = r if isinstance(r, dict) else {}
         assets = payload.get("assets") or payload.get("results") or []
         assert isinstance(assets, list), f"search_asset SoundSubmix 格式错误: {r}"
+
+    def test_manage_set(self, mcp, test_ns):
+        path = f"{test_ns}/SS_Manage"
+        if is_capability_available(mcp, "create_asset_sound_submix"):
+            cr = mcp.call_capability("create_asset_sound_submix", assetPath=path)
+            e = cap_first(cr)
+            if e.get("error") and "already exists" not in str(e.get("error")).lower():
+                path = self._sm_path
+        else:
+            path = self._sm_path
+        r = mcp.call_capability(
+            "manage_asset_sound_submix",
+            assetPath=path,
+            operations=[{"action": "set", "outputVolume": 0.8, "wetLevel": 0.2, "dryLevel": 0.9}],
+        )
+        first = cap_first(r)
+        if first.get("error"):
+            r = mcp.call_capability(
+                "manage_asset_sound_submix",
+                assetPath=path,
+                operations=[{"action": "set", "outputVolumeDB": -6.0, "wetLevelDB": -12.0, "dryLevelDB": 0.0}],
+            )
+            first = cap_first(r)
+        assert not first.get("error"), first
+
+
+class TestSoundCueManage:
+    def test_manage_nodes_and_property(self, mcp, test_ns):
+        path = f"{test_ns}/SC_Manage"
+        cr = mcp.call_capability("create_asset_sound_cue", assetPath=path)
+        e = cap_first(cr)
+        if e.get("error") and "already exists" not in str(e.get("error")).lower():
+            pytest.skip(f"create_asset_sound_cue 失败: {e}")
+        wave = first_asset_path(mcp, "SoundWave")
+        add_op = {"action": "add_node", "nodeClass": "SoundNodeWavePlayer"}
+        if wave:
+            add_op["soundWavePath"] = wave
+        r = mcp.call_capability(
+            "manage_asset_sound_cue",
+            assetPath=path,
+            operations=[
+                {"action": "set_property", "propertyPath": "VolumeMultiplier", "value": "0.8"},
+                add_op,
+            ],
+        )
+        for ent in (r.get("results") or [cap_first(r)]):
+            if isinstance(ent, dict) and ent.get("error"):
+                pytest.skip(f"manage_asset_sound_cue 跳过: {ent}")
+        got = cap_first(mcp.call_capability("get_asset_sound_cue", assetPath=path))
+        nodes = got.get("nodes") or []
+        if len(nodes) >= 2:
+            conn = mcp.call_capability(
+                "manage_asset_sound_cue",
+                assetPath=path,
+                operations=[{
+                    "action": "connect_nodes",
+                    "parentNodeIndex": 0,
+                    "childSlot": 0,
+                    "childIndex": 1,
+                }],
+            )
+            assert isinstance(cap_first(conn), dict), conn
+        rm = mcp.call_capability(
+            "manage_asset_sound_cue",
+            assetPath=path,
+            operations=[{"action": "remove_node", "nodeIndex": 0}],
+        )
+        assert isinstance(cap_first(rm), dict), rm
+
+
+class TestSoundWaveManage:
+    def test_set_property(self, mcp):
+        path = first_asset_path(mcp, "SoundWave")
+        if not path:
+            pytest.skip("无 SoundWave 样本")
+        r = mcp.call_capability(
+            "manage_asset_sound_wave",
+            assetPath=path,
+            operations=[{"action": "set_property", "propertyPath": "Volume", "value": "0.9"}],
+        )
+        first = cap_first(r)
+        if first.get("error"):
+            pytest.skip(f"manage_asset_sound_wave 跳过: {first}")

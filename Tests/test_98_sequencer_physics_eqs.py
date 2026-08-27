@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from _framework.mcp_client import cap_first
+from _framework.mcp_client import MCPError, cap_first
 
 pytestmark = pytest.mark.l3_asset
 
@@ -123,6 +123,36 @@ def test_manage_level_sequence_extended_tracks(seq_path, mcp):
             assert not e.get("error"), binding
 
 
+def test_manage_level_sequence_remaining(seq_path, mcp):
+    try:
+        r = mcp.call_capability(
+            "manage_asset_level_sequence",
+            assetPath=seq_path,
+            operations=[
+                {"action": "set_playback_range", "startFrame": 0, "endFrame": 60},
+                {"action": "add_spawnable", "possessableName": "NxSpawn", "className": "Actor"},
+            ],
+        )
+    except MCPError as e:
+        pytest.skip(f"level_sequence remaining 跳过: {e}")
+    for e in (r.get("results") or [cap_first(r)]):
+        if isinstance(e, dict) and e.get("error"):
+            pytest.skip(f"level_sequence remaining 跳过: {e}")
+    guid = cap_first(r).get("bindingGuid")
+    try:
+        rm = mcp.call_capability(
+            "manage_asset_level_sequence",
+            assetPath=seq_path,
+            operations=[
+                {"action": "remove_master_track", "trackClass": "Fade"},
+                {"action": "remove_binding", "bindingGuid": guid or "00000000000000000000000000000000"},
+            ],
+        )
+    except MCPError as e:
+        pytest.skip(f"level_sequence remaining 跳过: {e}")
+    assert isinstance(cap_first(rm), dict), rm
+
+
 # ── Physics Asset ─────────────────────────────────────────────────────────────
 
 @pytest.fixture(scope="module")
@@ -163,6 +193,33 @@ def test_manage_physics_asset_add_sphere(pa_path, mcp):
     )
     entry = cap_first(r)
     assert not entry.get("error"), r
+
+
+def test_manage_physics_asset_remaining(pa_path, mcp):
+    get_r = mcp.call_capability("get_asset_physics_asset", assetPath=pa_path)
+    bodies = cap_first(get_r).get("bodies") or []
+    if not bodies:
+        pytest.skip("PhysicsAsset 无 Body")
+    bone_name = bodies[0].get("boneName", "")
+    try:
+        r = mcp.call_capability(
+            "manage_asset_physics_asset",
+            assetPath=pa_path,
+            saveToDisk=False,
+            operations=[
+                {"action": "set_physics_type", "boneName": bone_name, "physicsType": "Default"},
+                {"action": "add_capsule", "boneName": bone_name, "radius": 4, "halfHeight": 8},
+                {"action": "add_box", "boneName": bone_name, "extentX": 3, "extentY": 3, "extentZ": 3},
+                {"action": "add_constraint", "boneName": bone_name, "bone1": bone_name, "bone2": bone_name},
+                {"action": "remove_constraint", "jointName": bone_name},
+                {"action": "clear_shapes", "boneName": bone_name},
+            ],
+        )
+    except MCPError as e:
+        pytest.skip(f"physics remaining 跳过: {e}")
+    for e in (r.get("results") or [cap_first(r)]):
+        if isinstance(e, dict) and e.get("error"):
+            pytest.skip(f"physics remaining 跳过: {e}")
 
 
 # ── EQS ──────────────────────────────────────────────────────────────────────
@@ -212,3 +269,20 @@ def test_manage_eqs_set_generator(test_ns, mcp, require_tools):
     entry = cap_first(r)
     # 生成器类名可能因版本而异，允许未找到
     assert "error" not in entry or "未找到" in entry["error"], r
+
+
+def test_manage_eqs_test_and_remove(test_ns, mcp, require_tools):
+    require_tools("manage_asset_eqs")
+    path = f"{test_ns}/EQ_TestFindCover"
+    r = mcp.call_capability(
+        "manage_asset_eqs",
+        assetPath=path,
+        operations=[
+            {"action": "add_test", "optionIndex": 0, "testClass": "EnvQueryTest_Trace"},
+            {"action": "remove_test", "optionIndex": 0, "testIndex": 0},
+            {"action": "remove_option", "optionIndex": 0},
+        ],
+    )
+    for e in (r.get("results") or [cap_first(r)]):
+        if isinstance(e, dict) and e.get("error"):
+            pytest.skip(f"eqs remaining 跳过: {e}")

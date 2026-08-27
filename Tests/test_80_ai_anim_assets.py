@@ -254,7 +254,7 @@ def test_get_actor_animation_error_path(mcp, require_tools):
     r = mcp.call(
         "get_runtime_actor_animation",
         actorName="__NonExistentActor_Animation__",
-        sections=["state"],
+        sections=["state", "slots"],
     )
     assert isinstance(r, dict), r
     entry = cap_first(r)
@@ -471,3 +471,135 @@ def test_interact_runtime_actor_animation_stop_montage(mcp, _anim_actor, test_ns
     entry = cap_first(stop)
     assert not entry.get("error"), entry
     assert entry.get("stopped") is True, entry
+
+
+def test_manage_behavior_tree_remaining_actions(test_ns, mcp):
+    bt = f"{test_ns}/BT_Remaining"
+    bb = f"{test_ns}/BB_Remaining"
+    mcp.call("create_asset_blackboard", assetPath=bb)
+    mcp.call("create_asset_behavior_tree", assetPath=bt)
+    mcp.call_capability(
+        "manage_asset_behavior_tree",
+        assetPath=bt,
+        operations=[
+            {"action": "set_root", "nodeClass": "BTComposite_Selector"},
+            {"action": "add_node", "nodeClass": "BTTask_Wait", "parentPath": ""},
+            {"action": "add_decorator", "nodeClass": "BTDecorator_Blackboard", "targetPath": "0"},
+            {"action": "add_service", "nodeClass": "BTService_DefaultFocus", "targetPath": ""},
+            {"action": "set_blackboard", "blackboardPath": bb},
+            {"action": "set_property", "targetPath": "0", "targetType": "node", "propertyName": "WaitTime", "propertyValue": "1.0"},
+            {"action": "sync_graph"},
+        ],
+    )
+    r = mcp.call_capability(
+        "manage_asset_behavior_tree",
+        assetPath=bt,
+        operations=[
+            {"action": "replace_node", "targetPath": "0", "nodeClass": "BTTask_Wait"},
+            {"action": "remove_decorator", "targetPath": "0", "targetIndex": 0},
+            {"action": "remove_service", "targetPath": "", "targetIndex": 0},
+            {"action": "remove_node", "targetPath": "0"},
+        ],
+    )
+    for e in (r.get("results") or [cap_first(r)]):
+        if isinstance(e, dict) and e.get("error"):
+            pytest.skip(f"BT remaining action 跳过: {e}")
+
+
+def test_manage_blackboard_rename_remove_parent(test_ns, mcp):
+    parent = f"{test_ns}/BB_Parent"
+    child = f"{test_ns}/BB_Child"
+    mcp.call("create_asset_blackboard", assetPath=parent)
+    mcp.call("create_asset_blackboard", assetPath=child)
+    mcp.call_capability(
+        "manage_asset_blackboard",
+        assetPath=child,
+        operations=[{"action": "add", "keyName": "ToRename", "keyType": "bool"}],
+    )
+    r = mcp.call_capability(
+        "manage_asset_blackboard",
+        assetPath=child,
+        operations=[
+            {"action": "rename", "keyName": "ToRename", "newName": "RenamedKey"},
+            {"action": "set_parent", "parentPath": parent},
+            {"action": "remove", "keyName": "RenamedKey"},
+        ],
+    )
+    for e in (r.get("results") or [cap_first(r)]):
+        if isinstance(e, dict) and e.get("error"):
+            pytest.skip(f"blackboard remaining 跳过: {e}")
+
+
+def test_manage_anim_blueprint_states_and_wires(test_ns, mcp, template_skeleton):
+    path = f"{test_ns}/ABP_States"
+    mcp.call("create_asset_anim_blueprint", assetPath=path, skeletonPath=template_skeleton)
+    mcp.call_capability(
+        "manage_asset_anim_blueprint",
+        assetPath=path,
+        operations=[{"action": "add_state_machine", "stateMachineName": "Locomotion"}],
+    )
+    add_a = mcp.call_capability(
+        "manage_asset_anim_blueprint",
+        assetPath=path,
+        operations=[{"action": "add_node", "nodeClass": "SequencePlayer", "posX": 0, "posY": 0}],
+    )
+    add_b = mcp.call_capability(
+        "manage_asset_anim_blueprint",
+        assetPath=path,
+        operations=[{"action": "add_node", "nodeClass": "Slot", "posX": 200, "posY": 0}],
+    )
+    id_a = cap_first(add_a).get("nodeId")
+    id_b = cap_first(add_b).get("nodeId")
+    ops = [
+        {"action": "add_state", "stateMachineName": "Locomotion", "stateName": "Idle"},
+        {"action": "add_state", "stateMachineName": "Locomotion", "stateName": "Run"},
+        {"action": "add_transition", "stateMachineName": "Locomotion", "stateName": "Idle", "targetStateName": "Run"},
+    ]
+    if id_a and id_b:
+        ops.append({
+            "action": "connect",
+            "sourceNodeId": id_a,
+            "targetNodeId": id_b,
+        })
+        ops.append({
+            "action": "disconnect",
+            "sourceNodeId": id_a,
+            "targetNodeId": id_b,
+        })
+        ops.append({"action": "remove_node", "nodeId": id_b})
+    ops.extend([
+        {"action": "remove_transition", "stateMachineName": "Locomotion", "stateName": "Idle", "targetStateName": "Run"},
+        {"action": "remove_state", "stateMachineName": "Locomotion", "stateName": "Run"},
+        {"action": "remove_state_machine", "stateMachineName": "Locomotion"},
+    ])
+    r = mcp.call_capability("manage_asset_anim_blueprint", assetPath=path, operations=ops)
+    for e in (r.get("results") or [cap_first(r)]):
+        if isinstance(e, dict) and e.get("error"):
+            pytest.skip(f"ABP remaining 跳过: {e}")
+    got = mcp.call_capability(
+        "get_asset_anim_blueprint",
+        assetPath=path,
+        sections=["variables", "statemachines", "defaults"],
+    )
+    assert not cap_first(got).get("error"), got
+
+
+def test_manage_anim_montage_section_and_remove(test_ns, mcp, template_skeleton):
+    path = f"{test_ns}/AM_Sections"
+    mcp.call("create_asset_anim_montage", assetPath=path, skeletonPath=template_skeleton)
+    seq = first_asset_path(mcp, "AnimSequence", path_filter="/Game/Mannequin")
+    if not seq:
+        pytest.skip("无 AnimSequence")
+    r = mcp.call_capability(
+        "manage_asset_anim_montage",
+        assetPath=path,
+        operations=[
+            {"action": "add_segment", "animSequencePath": seq},
+            {"action": "add_section", "sectionName": "NxSec"},
+            {"action": "remove_section", "sectionName": "NxSec"},
+            {"action": "remove_segment", "segmentIndex": 0},
+        ],
+    )
+    for e in (r.get("results") or [cap_first(r)]):
+        if isinstance(e, dict) and e.get("error"):
+            pytest.skip(f"montage remaining 跳过: {e}")

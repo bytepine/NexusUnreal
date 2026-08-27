@@ -23,3 +23,5 @@ def test_tags_asset_read(mcp, test_ns):
         pytest.skip("create_asset_blueprint unavailable")
     r = mcp.call("get_gameplay_tags", sections=["asset"], assetPath=path)
     assert isinstance(r, dict)
+    ref = mcp.call("get_gameplay_tags", sections=["referencers"], assetPath=path)
+    assert isinstance(ref, dict)

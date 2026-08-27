@@ -25,6 +25,15 @@ def test_media_source_roundtrip(test_ns, mcp):
         )
     )
     assert not man.get("error"), man
+    loop = cap_first(
+        mcp.call_capability(
+            "manage_asset_media_source",
+            assetPath=path,
+            operations=[{"action": "set_loop", "loop": True}],
+        )
+    )
+    if loop.get("error"):
+        pytest.skip(f"media set_loop 跳过: {loop}")
 
     got = cap_first(mcp.call_capability("get_asset_media_source", assetPath=path))
     assert not got.get("error"), got

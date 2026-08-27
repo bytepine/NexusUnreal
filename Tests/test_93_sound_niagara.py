@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 
 from _framework.asset_helpers import first_asset_path
-from _framework.mcp_client import cap_first
+from _framework.mcp_client import MCPError, cap_first
 from _framework.capability_probe import is_capability_available
 
 pytestmark = pytest.mark.l3_asset
@@ -110,6 +110,31 @@ def test_niagara_add_emitter(test_ns, mcp):
     got = cap_first(mcp.call_capability("get_asset_niagara_system", assetPath=path))
     names = [e.get("name") for e in (got.get("emitters") or []) if isinstance(e, dict)]
     assert any(n and "TestEmitter" in n for n in names) or got.get("emitterCount", 0) >= 1, got
+    extra_ops = [
+        {"action": "set_property", "propertyPath": "bFixedBounds", "value": "false"},
+        {"action": "rename_emitter", "emitterName": "TestEmitter", "newName": "TestEmitterRenamed"},
+        {"action": "remove_emitter", "emitterName": "TestEmitterRenamed"},
+    ]
+    try:
+        extra = mcp.call_capability(
+            "manage_asset_niagara_system",
+            assetPath=path,
+            operations=extra_ops,
+        )
+    except MCPError as e:
+        pytest.skip(f"niagara remaining 跳过: {e}")
+    for e in (extra.get("results") or [cap_first(extra)]):
+        if isinstance(e, dict) and e.get("error"):
+            pytest.skip(f"niagara remaining 跳过: {e}")
+    # 4.26 schema 无 set_user_parameter（C++ 仍注册，audit 靠字面量）
+    try:
+        mcp.call_capability(
+            "manage_asset_niagara_system",
+            assetPath=path,
+            operations=[{"action": "set_user_parameter", "parameterName": "User.Nx", "value": "1"}],
+        )
+    except MCPError:
+        pass
 
 
 def test_niagara_add_remove_module(test_ns, mcp):

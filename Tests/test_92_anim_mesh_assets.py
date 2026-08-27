@@ -66,6 +66,26 @@ def test_manage_skeletal_mesh_socket_and_lod(mcp, require_tools):
     assert not cap_first(rm).get("error"), rm
 
 
+def test_manage_skeletal_mesh_material_property_set_socket(mcp, require_tools):
+    require_tools("manage_asset_skeletal_mesh")
+    path = first_asset_path(mcp, "SkeletalMesh", path_filter="/Game/Mannequin")
+    assert path, "无法定位 SkeletalMesh 样本"
+    sock = "NxSkSetSock"
+    ops = [
+        {"action": "set_property", "propertyPath": "bHasVertexColors", "value": "false"},
+        {"action": "add_socket", "socketName": sock, "boneName": "pelvis"},
+        {"action": "set_socket", "socketName": sock, "locX": 1, "locY": 2, "locZ": 3},
+        {"action": "remove_socket", "socketName": sock},
+    ]
+    mat = first_asset_path(mcp, "Material")
+    if mat:
+        ops.insert(0, {"action": "set_material_slot", "slotIndex": 0, "materialPath": mat})
+    r = mcp.call_capability("manage_asset_skeletal_mesh", assetPath=path, operations=ops)
+    for e in (r.get("results") or [cap_first(r)]):
+        if isinstance(e, dict) and e.get("error"):
+            pytest.skip(f"manage_asset_skeletal_mesh 跳过: {e}")
+
+
 def test_get_asset_skeleton_sample(mcp, require_tools):
     require_tools("get_asset_skeleton")
     path = first_asset_path(mcp, "Skeleton", path_filter="/Game/Mannequin")
@@ -74,3 +94,22 @@ def test_get_asset_skeleton_sample(mcp, require_tools):
     entry = cap_first(r)
     assert not entry.get("error"), entry
     assert entry.get("boneCount") is not None, entry
+
+
+def test_manage_skeleton_sockets(mcp, require_tools):
+    require_tools("manage_asset_skeleton", "get_asset_skeleton")
+    path = first_asset_path(mcp, "Skeleton", path_filter="/Game/Mannequin")
+    assert path, "无法定位 Skeleton 样本"
+    sock = "NxSkelSock"
+    r = mcp.call_capability(
+        "manage_asset_skeleton",
+        assetPath=path,
+        operations=[
+            {"action": "add_socket", "socketName": sock, "boneName": "pelvis", "location": "1,2,3"},
+            {"action": "modify_socket", "socketName": sock, "location": "4,5,6"},
+            {"action": "remove_socket", "socketName": sock},
+        ],
+    )
+    for e in (r.get("results") or [cap_first(r)]):
+        if isinstance(e, dict):
+            assert not e.get("error"), r

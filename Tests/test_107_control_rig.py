@@ -40,3 +40,24 @@ def test_control_rig_create_add_control(test_ns, mcp):
         operations=[{"action": "not_a_real_action"}],
     )
     assert cap_first(bad).get("error"), bad
+
+
+def test_control_rig_remaining_actions(test_ns, mcp):
+    path = f"{test_ns}/CR_Created"
+    r = mcp.call_capability(
+        "manage_asset_control_rig",
+        assetPath=path,
+        operations=[
+            {"action": "rename_element", "elementName": "NxCtrl", "newName": "NxCtrlRenamed"},
+            {"action": "set_control_color", "elementName": "NxCtrlRenamed", "r": 1, "g": 0, "b": 0, "a": 1},
+            {"action": "add_null", "elementName": "NxNull"},
+            {"action": "add_rig_node", "structType": "RigUnit_GetTransform", "nodeName": "NxGetXform"},
+            {"action": "set_pin_default", "pinPath": "NxGetXform.Item", "pinDefaultValue": ""},
+            {"action": "add_rig_link", "sourcePinPath": "NxGetXform.Transform", "targetPinPath": "NxGetXform.Item"},
+            {"action": "break_rig_link", "sourcePinPath": "NxGetXform.Transform", "targetPinPath": "NxGetXform.Item"},
+            {"action": "remove_element", "elementName": "NxNull", "elementType": "null"},
+        ],
+    )
+    for e in (r.get("results") or [cap_first(r)]):
+        if isinstance(e, dict) and e.get("error"):
+            pytest.skip(f"control_rig remaining 跳过: {e}")

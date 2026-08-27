@@ -59,3 +59,10 @@ def test_pcg_create_add_remove_edge(test_ns, mcp):
         operations=[{"action": "not_a_real_action"}],
     )
     assert cap_first(bad).get("error"), bad
+    rm_node = mcp.call_capability(
+        "manage_asset_pcg_graph",
+        assetPath=path,
+        operations=[{"action": "remove_node", "nodeId": id_b}],
+    )
+    if cap_first(rm_node).get("error"):
+        pytest.skip(f"pcg remove_node 跳过: {cap_first(rm_node)}")

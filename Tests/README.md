@@ -8,10 +8,12 @@
 
 | 场景 | 做法 |
 |------|------|
-| **新功能 / 新 Capability** | 在对应 `test_*.py` 至少补 **1 条 happy-path**；写入走 `test_ns`（`/Game/_McpTest/<ts>/`） |
+| **新功能 / 新 Capability** | 在对应 `test_*.py` 覆盖该 cap 的 **每个 manage `operations[].action`** 与 MultiSection get 的 **每个 named section**；写入走 `test_ns`（`/Game/_McpTest/<ts>/`） |
+| **覆盖门禁** | `py Script/audit_e2e_coverage.py`（对照 C++ `RegisterActions` / `GetSectionNames`，缺项 exit 1，不启动 UE） |
 | **日常 / CI / 开发自测** | **默认命令行 headless**：`py Script/run_e2e.py`（`UEEditor-Cmd -nullrhi`，快、无窗口） |
 | **命令行无法覆盖** | 用例打标 `l4_runtime` / `lua` / `requires_gui`；headless 自动 skip，须在 **GUI** 下验证 |
-| **全量回归** | **必须 GUI**：`py Script/run_e2e.py --gui` 或 `--full`（含 PIE、UnLua、视口/RHI 等） |
+| **全量回归 / 全覆盖验证** | **必须 GUI**：`py Script/run_e2e.py --gui` 或 `--full`（含 PIE、UnLua、视口/RHI 等） |
+| **发版验证（NexusLink）** | **按本次变更选**（不改日常默认）：仅编辑器资产 / manage-get / schema → headless；含 PIE / UnLua / 视口 / `l4_runtime`/`lua`/`requires_gui` / `interact_runtime_*` → `--gui`；混合或不清 → `--gui` |
 
 ### Marker 选用
 
@@ -71,6 +73,7 @@ pytest Tests --ue-url http://127.0.0.1:45000/stream
 
 | 命令 | 用途 |
 |------|------|
+| `py Script/audit_e2e_coverage.py` | 对照 C++ 注册表，缺 action/section 则失败（不启动 UE） |
 | `pytest Tests -m "not l4_runtime"` | 手动跳过 PIE（headless 已自动跳过） |
 | `pytest Tests -m "not lua"` | 跳过 UnLua |
 | `pytest Tests --headless` | 显式命令行模式（跳过 `l4_runtime` / `lua` / `requires_gui`） |

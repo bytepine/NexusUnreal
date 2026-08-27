@@ -23,7 +23,7 @@ def spawn_runtime_actors(mcp: MCPClient, specs: List[Dict[str, Any]]) -> List[st
     """逐条 spawn_runtime_actor；每条 spec 含 assetPath/className 与可选位置/旋转。"""
     names: List[str] = []
     for spec in specs:
-        r = mcp.call("spawn_actor", **spec)
+        r = mcp.call("spawn_runtime_actor", **spec)
         entry = cap_first(r)
         if entry.get("error"):
             continue
@@ -36,6 +36,6 @@ def spawn_runtime_actors(mcp: MCPClient, specs: List[Dict[str, Any]]) -> List[st
 def destroy_runtime_actors(mcp: MCPClient, names: List[str]) -> None:
     for name in names:
         try:
-            mcp.call("destroy_actor", actorName=name)
+            mcp.call("destroy_runtime_actor", actorName=name)
         except Exception:
             pass
