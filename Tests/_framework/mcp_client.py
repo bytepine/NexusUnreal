@@ -15,6 +15,7 @@ import itertools
 import json
 import logging
 import os
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -31,26 +32,40 @@ PROTOCOL_VERSION = "2025-06-18"
 _SESSION_HEADER = "Mcp-Session-Id"
 
 
+def _machine_auth_token_path() -> Path:
+    if os.name == "nt":
+        base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+    elif sys.platform == "darwin":
+        base = str(Path.home() / "Library" / "Application Support")
+    else:
+        base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+    return Path(base) / "NexusLink" / "mcp-auth-token"
+
+
 def read_nexus_auth_token(mcp_port: int) -> Optional[str]:
-    """在 GET /status 探活后按端口读 {Temp}/NexusLink/{PID}.json 的 authToken。"""
+    """NEXUS_MCP_TOKEN → {Temp}/NexusLink/{PID}.json → 本机共享 mcp-auth-token。"""
     env = os.environ.get("NEXUS_MCP_TOKEN")
     if env:
         return env
     d = Path(tempfile.gettempdir()) / "NexusLink"
-    if not d.is_dir():
+    if d.is_dir():
+        for f in d.glob("*.json"):
+            if not f.stem.isdigit():
+                continue
+            try:
+                obj = json.loads(f.read_text(encoding="utf-8"))
+            except Exception:  # noqa: BLE001
+                continue
+            if int(obj.get("mcpPort") or 0) == mcp_port:
+                token = obj.get("authToken")
+                if isinstance(token, str) and token:
+                    return token
+    machine = _machine_auth_token_path()
+    try:
+        raw = machine.read_text(encoding="utf-8").strip()
+    except OSError:
         return None
-    for f in d.glob("*.json"):
-        if not f.stem.isdigit():
-            continue
-        try:
-            obj = json.loads(f.read_text(encoding="utf-8"))
-        except Exception:  # noqa: BLE001
-            continue
-        if int(obj.get("mcpPort") or 0) == mcp_port:
-            token = obj.get("authToken")
-            if isinstance(token, str) and token:
-                return token
-    return None
+    return raw or None
 
 
 def _port_from_url(url: str) -> int:

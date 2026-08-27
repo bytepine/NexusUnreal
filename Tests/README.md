@@ -28,7 +28,7 @@
 
 **`exec_command` 勿用 `help *`**：UE 会在系统浏览器打开 `ConsoleHelp.html`（GUI/headless 均可能）。
 
-E2E 连 MCP 须带 Bearer（`NEXUS_MCP_TOKEN` 或 `{Temp}/NexusLink/{PID}.json`）。自动拉起会加 `-EnableNexusMcp` 与 `-NexusEnableDangerousCaps`（会话级打开 `exec_command` / Lua eval/dofile）。手动 `--ue-url` 时需已开 MCP，危险 cap 需在设置里打开或带同样 CLI。
+E2E 连 MCP 须带 Bearer（`NEXUS_MCP_TOKEN`、`{Temp}/NexusLink/{PID}.json`，或本机共享 `%LOCALAPPDATA%/NexusLink/mcp-auth-token`）。自动拉起会加 `-EnableNexusMcp` 与 `-NexusEnableDangerousCaps`（会话级打开 `exec_command` / Lua eval/dofile）。手动 `--ue-url` 时需已开 MCP，危险 cap 需在设置里打开或带同样 CLI。
 
 ## 快速开始
 
