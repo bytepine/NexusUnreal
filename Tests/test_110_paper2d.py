@@ -48,7 +48,7 @@ def test_paper_sprite_flipbook(test_ns, mcp):
         mcp.call_capability(
             "manage_asset_paper_flipbook",
             assetPath=fb,
-            operations=[{"action": "remove_key", "index": 0}],
+            operations=[{"action": "remove_key", "keyIndex": 0}],
         )
     )
     assert not rm_key.get("error"), rm_key
@@ -109,11 +109,15 @@ def test_paper_tile_map_create_get_manage(test_ns, mcp):
         {"action": "set_tile_size", "tileWidth": 16, "tileHeight": 16},
         {"action": "add_layer", "layerName": "NxLayer"},
         {"action": "set_layer_name", "layerIndex": 0, "layerName": "NxBase"},
-        {"action": "set_cell", "layerIndex": 0, "x": 0, "y": 0, "tileIndex": 0},
-        {"action": "clear_cell", "layerIndex": 0, "x": 0, "y": 0},
     ]
     if tile_set:
         ops.insert(2, {"action": "set_tileset", "tileSetPath": tile_set})
+        ops.extend(
+            [
+                {"action": "set_cell", "layerIndex": 0, "x": 0, "y": 0, "tileIndex": 0},
+                {"action": "clear_cell", "layerIndex": 0, "x": 0, "y": 0},
+            ]
+        )
     r = mcp.call_capability("manage_asset_paper_tile_map", assetPath=path, operations=ops)
     for e in (r.get("results") or [cap_first(r)]):
         if isinstance(e, dict):
