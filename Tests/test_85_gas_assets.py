@@ -76,6 +76,48 @@ def test_ga_policy_readback(test_ns, mcp):
     )
 
 
+def test_ga_manage_blueprint_set_defaults_non_actor(test_ns, mcp):
+    """回归：此前 set_defaults 与 add_component 绑在同一 Actor 门后，GameplayAbility
+    （非 Actor 子类）CDO 完全无法写自定义属性；修复后应可写任意 Blueprint 的 CDO。
+    add_variable 单独一次调用且 compile=true——同批 operations 内部处于事务中会跳过全量
+    Compile（见 NexusManageAssetBlueprintCapability.cpp:206），新变量不会立即出现在 CDO 上；
+    compile=true 走事务外的 ApplyIfRequested，确保下一步 set_defaults 能解析到该属性。"""
+    path = f"{test_ns}/GA_TestAbility"
+    r_var = mcp.call_capability(
+        "manage_asset_blueprint",
+        assetPath=path,
+        compile=True,
+        operations=[{"action": "add_variable", "variableName": "TestCdoFlag",
+                     "variableType": "bool", "defaultValue": "true"}],
+    )
+    assert not cap_first(r_var).get("error"), f"add_variable on GA: {r_var!r}"
+
+    r_set = mcp.call_capability(
+        "manage_asset_blueprint",
+        assetPath=path,
+        operations=[{"action": "set_defaults", "propertyPath": "TestCdoFlag", "value": "false"}],
+    )
+    entry = cap_first(r_set)
+    assert not entry.get("error"), f"set_defaults on non-Actor (GA) BP should now succeed: {entry!r}"
+
+    r_get = mcp.call_capability("get_asset_blueprint", assetPath=path, sections=["defaults"])
+    assert isinstance(cap_first(r_get).get("defaults"), list), f"defaults read-back failed: {r_get!r}"
+
+
+def test_ga_manage_blueprint_add_component_still_actor_only(test_ns, mcp):
+    """回归：GameplayAbility 仍不是 Actor 子类，add_component 应继续被拒绝（Actor 门未被误删）。"""
+    path = f"{test_ns}/GA_TestAbility"
+    r = mcp.call_capability(
+        "manage_asset_blueprint",
+        assetPath=path,
+        operations=[{"action": "add_component", "componentClass": "SceneComponent",
+                     "componentName": "ShouldFail"}],
+    )
+    entry = cap_first(r)
+    assert entry.get("error"), f"add_component on GA (non-Actor) BP should still fail: {entry!r}"
+    assert "Actor" in entry.get("error", ""), entry
+
+
 # ── GameplayEffect ───────────────────────────────────────────────────────────
 
 

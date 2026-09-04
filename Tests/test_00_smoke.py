@@ -40,6 +40,24 @@ def test_search_capabilities_nested_widget_action_enum(mcp):
     assert action.get("type") == "string (enum)" or action.get("enum"), action
 
 
+def test_search_capabilities_array_sections_enum(mcp):
+    """MultiSection get 的 sections[] 须带 enum，且 type 仍是 array（不得被误判为标量枚举）。"""
+    r = mcp.call("search_capabilities", capabilityName="get_asset_blueprint")
+    cap = r.get("capability") or r
+    params = cap.get("parameters") or []
+    by_name = {p.get("name"): p for p in params if isinstance(p, dict)}
+    sections = by_name.get("sections")
+    assert sections is not None, f"sections missing in parameters: {by_name.keys()!r}"
+    assert sections.get("type") == "array", f"sections type changed unexpectedly: {sections!r}"
+    enum_vals = sections.get("enum") or []
+    assert "variable" in enum_vals and "component" in enum_vals, (
+        f"expected singular section names in enum: {enum_vals!r}"
+    )
+    assert "variables" not in enum_vals and "components" not in enum_vals, (
+        f"sections enum should not contain plural aliases: {enum_vals!r}"
+    )
+
+
 def test_call_capability_create_blackboard_not_unknown(mcp):
     """规范名 create_asset_blackboard 应可路由，不得 errorKind=unknown。"""
     try:

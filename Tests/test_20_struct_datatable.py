@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from _framework.mcp_client import cap_first
+from _framework.mcp_client import MCPError, cap_first
 
 from _framework.assertions import assert_batch_success, assert_success_count
 
@@ -90,6 +90,24 @@ def test_datatable_row_get_batch(mcp, datatable_path):
                  mode="rows",
                  rowNames=["Row_001", "Row_002"])
     assert_batch_success(r, expected_count=2, context="datatable get batch")
+
+
+def test_datatable_row_get_by_name_filter(mcp, datatable_path):
+    """mode=rows + nameFilter（不带 rowNames）应按过滤条件解出行名并导出字段——
+    此前 nameFilter 只在 schema 分支生效，rows 分支强制要求 rowNames。"""
+    r = mcp.call("get_asset_data_table",
+                 assetPath=datatable_path,
+                 mode="rows",
+                 nameFilter="Row_00")
+    assert_batch_success(r, expected_count=2, context="datatable rows by nameFilter")
+
+
+def test_datatable_row_mode_requires_rownames_or_namefilter(mcp, datatable_path):
+    """mode=rows 且 rowNames/nameFilter 均空——应报 arg_invalid 级错误，而不是此前的
+    仅接受 rowNames 的强校验。"""
+    with pytest.raises(MCPError) as exc_info:
+        mcp.call_capability("get_asset_data_table", assetPath=datatable_path, mode="rows")
+    assert "rowNames or nameFilter" in str(exc_info.value), exc_info.value
 
 
 def test_datatable_set_row_error_path(mcp, datatable_path, require_tools):
