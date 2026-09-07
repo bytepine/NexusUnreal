@@ -27,6 +27,22 @@ def test_exec_command_output_in_get_output_log(mcp, require_tools):
     assert isinstance(log_r.get("entries"), list), log_r
 
 
+def test_exec_python_eval(mcp, require_tools):
+    """exec_python 需 Python Editor Script Plugin；未启用时 require_tools 自动 skip。"""
+    require_tools("exec_python")
+    r = cap_first(mcp.call("exec_python", code="1 + 1", mode="eval"))
+    assert r.get("executed") is True, f"exec_python did not execute: {r!r}"
+    assert r.get("result") == "2", r
+
+
+def test_exec_python_traceback(mcp, require_tools):
+    """语法错误须落到 error 字段（entry 计为失败），而不是静默成功。"""
+    require_tools("exec_python")
+    r = cap_first(mcp.call("exec_python", code="raise RuntimeError('nexus mcp probe')"))
+    assert r.get("executed") is False, r
+    assert "nexus mcp probe" in (r.get("error") or ""), r
+
+
 def test_capture_viewport_deferred(mcp):
     """按 NexusMCP 调用规范第 7 条：截图消耗 token，不自动跑。
     SearchMode 下 capture_viewport 不在 tools/list，改用 search_capabilities 确认 capability 注册。
