@@ -177,6 +177,13 @@ class UELauncher:
         self._stdout_log_fh = open(self._stdout_log_path, "w", encoding="utf-8",
                                    errors="replace", buffering=1)
 
+        # 启动前记下已被占用的 MCP 端口，避免本机已有 Editor（例如 LetsGo GUI）
+        # 占着 45000 时，把刚拉起的 headless 实例误判为就绪。
+        occupied = self._listening_mcp_ports()
+        if occupied:
+            log.info("MCP ports already in use (will wait for a new one): %s",
+                     sorted(occupied))
+
         log.info("launching UE: %s", " ".join(args))
         log.info("UE stdout -> %s", self._stdout_log_path)
         self._proc = subprocess.Popen(
@@ -186,7 +193,7 @@ class UELauncher:
             cwd=str(self.uproject.parent),
         )
         try:
-            self._wait_until_ready()
+            self._wait_until_ready(skip_ports=occupied)
         except RuntimeError:
             self._flush_stdout_log()
             raise
@@ -368,7 +375,21 @@ class UELauncher:
         tail = lines[-max_lines:] if len(lines) > max_lines else lines
         return "".join(tail).rstrip()
 
-    def _wait_until_ready(self) -> None:
+    def _listening_mcp_ports(self) -> set:
+        """探测启动前已在听的 NexusLink HTTP 端口。"""
+        found: set = set()
+        with httpx.Client(timeout=1.0) as client:
+            for port in self.port_range:
+                try:
+                    r = client.get(f"http://127.0.0.1:{port}{_STATUS_ENDPOINT}")
+                    if r.status_code == 200 and "wsPort" in r.text:
+                        found.add(port)
+                except Exception:  # noqa: BLE001
+                    continue
+        return found
+
+    def _wait_until_ready(self, skip_ports: Optional[set] = None) -> None:
+        skip = skip_ports or set()
         deadline = time.monotonic() + self.ready_timeout
         last_err: Optional[BaseException] = None
         with httpx.Client(timeout=2.0) as client:
@@ -382,6 +403,8 @@ class UELauncher:
                         f"--- tail ---\n{tail}\n--- end tail ---"
                     )
                 for port in self.port_range:
+                    if port in skip:
+                        continue
                     try:
                         r = client.get(f"http://127.0.0.1:{port}{_STATUS_ENDPOINT}")
                         if r.status_code == 200 and "wsPort" in r.text:

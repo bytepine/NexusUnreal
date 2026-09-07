@@ -28,3 +28,4 @@
 
 - fix(test): 全量 e2e 对齐——`skipif_ue_below` 移入 `pytest_runtest_setup`；用例统一 `cap_first` / `operations[]`；EQS 缺 cap 时 skip；`audit_capability_naming` 补 `unload`、期望数 176；GUI/PIE 对齐 `spawn_runtime_actor` 单条、`control_pie` results[]、`set_runtime_widget_property` 的 `updates[]`；补覆盖用例参数对齐真实 Schema（`rootMotion`/`anchorMin*`/`attribute`/`startFrame`/`halfHeight`/`updates[].actorName`），schema 校验失败 skip 而非 fail
 - fix(test): `test_bp_graph_connect_exec` 缺 BeginPlay 时经 `manage_asset_blueprint` 补 `K2Node_Event`；`test_anim_montage_create` 创建后 `add_segment`（Mannequin Idle）并 save；`exec_command` 改用 `stat fps`（避免 `help stat` 弹 `ConsoleHelp.html`）
+- fix(test): `ue_launcher` 自动拉起时跳过启动前已在听的 MCP 端口，避免本机已有 Editor 占着 `:45000` 时把 headless 新实例误接到旧进程

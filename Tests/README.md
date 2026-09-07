@@ -43,6 +43,7 @@ pip install -r Tests/requirements.txt
 ```bash
 py Script/run_e2e.py
 # 等价：自动探测或拉起 UEEditor-Cmd，跳过 l4_runtime / lua / requires_gui
+# 自动拉起时跳过启动前已在听的 MCP 端口（本机已有 Editor 占 :45000 时连新实例）
 ```
 
 ### 全量：GUI Editor
