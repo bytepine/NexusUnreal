@@ -43,6 +43,16 @@ def test_exec_python_traceback(mcp, require_tools):
     assert "nexus mcp probe" in (r.get("error") or ""), r
 
 
+def test_get_python_api_log(mcp, require_tools):
+    """get_python_api 需 Python Editor Script Plugin；未启用时 require_tools 自动 skip。"""
+    require_tools("get_python_api")
+    r = cap_first(mcp.call("get_python_api", target="unreal", query="log"))
+    assert r.get("engineVersion"), r
+    entries = r.get("entries") or []
+    assert entries, r
+    assert any("log" in (e.get("name") or "").lower() for e in entries), r
+
+
 def test_capture_viewport_deferred(mcp):
     """按 NexusMCP 调用规范第 7 条：截图消耗 token，不自动跑。
     SearchMode 下 capture_viewport 不在 tools/list，改用 search_capabilities 确认 capability 注册。

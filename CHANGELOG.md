@@ -10,7 +10,7 @@
 
 - test(e2e): 新领域与写路径——`test_108` StringTable/Font、`test_109` FoliageType、`test_110` Paper2D、`test_111` GeometryCollection、`test_112` Media、`test_113` CommonUI、`test_114` MoviePipeline；GAS 扩 CueNotify；钉写 MF 写图、ABP Slot/Blend/IK/AimOffset、Niagara 空白 `add_emitter`+模块栈、WBP 动画绑定/`remove_key`、`test_98` Sequencer 绑定级 key；缺口 `test_90` DataAsset、`test_94` manage_asset_level spawn/remove、`test_96` GAS runtime、`test_95` widget/Lua、`test_10` get_asset_lua_binding；**manage 每个 action + get 每个 named section** 均有 happy-path；`Script/audit_e2e_coverage.py` 对照 C++ 注册表门禁
 - feat(test): `capability_probe` + `asset_helpers`——SearchMode 下用 `search_capabilities` 替代 `tools/list` 门禁；资产搜索统一 `cap_first`，缺失时在 `test_ns` 内创建；`ue_launcher` 强制 `WITH_GAS=1`/`WITH_NIAGARA=1`；`Nexus.uproject` 启用 Niagara
-- test(e2e): `test_10` 补 `exec_python` eval 与 traceback 用例；`Nexus.uproject` 启用 PythonScriptPlugin（未启用时用例按 `require_tools` 自动 skip）
+- test(e2e): `test_10` 补 `exec_python` eval/traceback 与 `get_python_api` 内省用例；`Nexus.uproject` 启用 PythonScriptPlugin（未启用时用例按 `require_tools` 自动 skip）
 
 ### Changed
 
