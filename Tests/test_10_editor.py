@@ -7,7 +7,7 @@ import pytest
 
 from _framework.asset_helpers import first_asset_path
 from _framework.capability_probe import is_capability_available
-from _framework.mcp_client import cap_first
+from _framework.mcp_client import MCPError, cap_first
 
 pytestmark = pytest.mark.l2_write
 
@@ -43,6 +43,20 @@ def test_exec_python_traceback(mcp, require_tools):
     assert "nexus mcp probe" in (r.get("error") or ""), r
 
 
+def test_exec_python_file_mode_rejects_escape(mcp, require_tools):
+    """file 模式必须挡住 Content/Python/ 之外的路径。"""
+    require_tools("exec_python")
+    with pytest.raises(MCPError):
+        mcp.call("exec_python", mode="file", scriptPath="../../Nexus.uproject")
+
+
+def test_exec_python_file_mode_requires_py_extension(mcp, require_tools):
+    """非 .py 会被 UE 当字面代码执行并报无关的 NameError，须提前拦。"""
+    require_tools("exec_python")
+    with pytest.raises(MCPError):
+        mcp.call("exec_python", mode="file", scriptPath="probe.txt")
+
+
 def test_get_python_api_log(mcp, require_tools):
     """get_python_api 需 Python Editor Script Plugin；未启用时 require_tools 自动 skip。"""
     require_tools("get_python_api")
@@ -51,6 +65,56 @@ def test_get_python_api_log(mcp, require_tools):
     entries = r.get("entries") or []
     assert entries, r
     assert any("log" in (e.get("name") or "").lower() for e in entries), r
+
+
+@pytest.mark.parametrize("bad_target", [
+    "os",                    # 非 unreal 顶层模块
+    "unrealx.Foo",           # 前缀相同但不是 unreal
+    "unreal..log",           # 连续点
+    "unreal'; import os; '", # 注入字符
+])
+def test_get_python_api_rejects_unsafe_target(mcp, require_tools, bad_target):
+    """target 白名单是这个 cap 敢默认开启的唯一依据，须逐条挡住。"""
+    require_tools("get_python_api")
+    with pytest.raises(MCPError):
+        mcp.call("get_python_api", target=bad_target)
+
+
+def test_get_python_api_rejects_unsafe_query(mcp, require_tools):
+    """query 只允许标识符字符，带引号/括号一律拒绝。"""
+    require_tools("get_python_api")
+    with pytest.raises(MCPError):
+        mcp.call("get_python_api", query="log'); import os; ('")
+
+
+def test_get_python_api_missing_attr_reports_version(mcp, require_tools):
+    """探测不存在的 API 时同样要带版本 —— AI 正是靠它判断该换哪套 API。"""
+    require_tools("get_python_api")
+    r = cap_first(mcp.call("get_python_api", target="unreal.NexusNoSuchApi"))
+    assert r.get("error"), r
+    assert r.get("engineVersion"), r
+    assert r.get("pythonVersion"), r
+
+
+def test_get_python_api_offset_pagination(mcp, require_tools):
+    """offset 分页：两页不得重叠，且回显 offset。"""
+    require_tools("get_python_api")
+    page1 = cap_first(mcp.call("get_python_api", target="unreal", limit=5))
+    page2 = cap_first(mcp.call("get_python_api", target="unreal", offset=5, limit=5))
+    assert len(page1.get("entries") or []) == 5, page1
+    assert page2.get("offset") == 5, page2
+    names1 = {e.get("name") for e in page1["entries"]}
+    names2 = {e.get("name") for e in page2["entries"]}
+    assert not (names1 & names2), (names1, names2)
+
+
+def test_get_python_api_search_doc(mcp, require_tools):
+    """searchDoc=True 时名字没命中但 docstring 命中的成员也应返回。"""
+    require_tools("get_python_api")
+    by_name = cap_first(mcp.call("get_python_api", target="unreal", query="asset", limit=100))
+    by_doc = cap_first(mcp.call("get_python_api", target="unreal", query="asset",
+                                searchDoc=True, limit=100))
+    assert by_doc.get("totalMatched", 0) >= by_name.get("totalMatched", 0), (by_name, by_doc)
 
 
 def test_capture_viewport_deferred(mcp):

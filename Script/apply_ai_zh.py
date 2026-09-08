@@ -16,6 +16,8 @@ CAP_DESC_ZH: dict[str, str] = {
     "capture_viewport": "截图编辑器/PIE/Actor/Widget。target=editor|pie|actor|widget。",
     "control_pie": "启动/停止/查询 PIE。action=start|stop|status。",
     "exec_command": "执行 UE 控制台命令并捕获输出。silent=true 可跳过捕获。",
+    "exec_python": "在编辑器执行 Python。exec/file/eval；回传 stdout 与 traceback。先用 get_python_api 探测。",
+    "get_python_api": "内省 unreal 模块成员。按本引擎实时返回 dir/签名。调 exec_python 前先探测。",
     "get_editor_info": "返回 UE 版本、项目名、平台与构建配置。无参数。",
     "get_gameplay_tags": "检查 GAS 标签树或 Actor/资产标签。sections=hierarchy|actor|asset。",
     "get_output_log": "读取 UE 控制台缓冲。preset=diagnose 或 order=newest+includeSummary；sinceSequence 增量；按 category/verbosity/text 过滤分页。",
