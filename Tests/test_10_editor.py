@@ -57,6 +57,31 @@ def test_exec_python_file_mode_requires_py_extension(mcp, require_tools):
         mcp.call("exec_python", mode="file", scriptPath="probe.txt")
 
 
+def test_exec_python_undo_not_recorded_for_pure_read(mcp, require_tools):
+    """不碰 UObject 的脚本不该产生可回滚记录，否则 undoRecorded 就是假阳性。"""
+    require_tools("exec_python")
+    r = cap_first(mcp.call("exec_python", code="1 + 1", mode="eval"))
+    assert r.get("undoRecorded") is False, r
+
+
+def test_exec_python_undo_recorded_matches_engine(mcp, require_tools):
+    """undoRecorded 须与引擎自己的答案一致：modify() 的返回值就是「是否入了事务缓冲」。
+
+    传 False 让它只入事务、不把包标脏，测完不留痕迹。
+    """
+    require_tools("exec_python")
+    code = (
+        "import unreal\n"
+        "o = unreal.load_asset('/Game/ThirdPersonBP/Blueprints/ThirdPersonCharacter')\n"
+        "print('NEXUS_MODIFY:' + str(o.modify(False)))\n"
+    )
+    r = cap_first(mcp.call("exec_python", code=code))
+    assert r.get("executed") is True, r
+    output = r.get("output") or ""
+    assert "NEXUS_MODIFY:True" in output, r
+    assert r.get("undoRecorded") is True, r
+
+
 def test_get_python_api_log(mcp, require_tools):
     """get_python_api 需 Python Editor Script Plugin；未启用时 require_tools 自动 skip。"""
     require_tools("get_python_api")
