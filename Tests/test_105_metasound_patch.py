@@ -5,9 +5,12 @@ test_105_metasound_patch.py
 import pytest
 from conftest import mcp, skipif_ue_below  # noqa: F401
 
-PATCH_PKG_PATH = "/Game/_NexusTest/Audio"
 PATCH_NAME = "NxTestPatch"
-PATCH_FULL = f"{PATCH_PKG_PATH}/{PATCH_NAME}"
+
+
+@pytest.fixture(scope="session")
+def patch_full(test_ns):
+    return f"{test_ns}/{PATCH_NAME}"
 
 
 @pytest.mark.l3_asset
@@ -15,9 +18,9 @@ class TestCreateMetaSoundPatch:
     """create_asset_meta_sound_patch（≥UE5.1）"""
 
     @skipif_ue_below(5, 1)
-    def test_create_patch(self, mcp):
+    def test_create_patch(self, mcp, patch_full):
         r = mcp.call_capability("create_asset_meta_sound_patch",
-                                assetPath=PATCH_FULL)
+                                assetPath=patch_full)
         payload = r if isinstance(r, dict) else {}
         entries = payload.get("entries") or payload.get("results") or []
         first = entries[0] if entries else payload
@@ -33,8 +36,8 @@ class TestGetMetaSoundPatch:
     """get_asset_meta_sound 可读取 MetaSoundPatch（≥UE5.1）"""
 
     @skipif_ue_below(5, 1)
-    def test_get_patch_basic(self, mcp):
-        r = mcp.call_capability("get_asset_meta_sound", assetPath=PATCH_FULL)
+    def test_get_patch_basic(self, mcp, patch_full):
+        r = mcp.call_capability("get_asset_meta_sound", assetPath=patch_full)
         payload = r if isinstance(r, dict) else {}
         entries = payload.get("entries") or payload.get("results") or []
         first = entries[0] if entries else payload
@@ -50,10 +53,10 @@ class TestManageMetaSoundPatch:
     """manage_asset_meta_sound 可修改 MetaSoundPatch 接口（≥UE5.3，WITH_METASOUND + FRONTEND_DOCUMENT）"""
 
     @skipif_ue_below(5, 3)
-    def test_add_remove_input(self, mcp):
+    def test_add_remove_input(self, mcp, patch_full):
         # 添加一个 float input
         r = mcp.call_capability("manage_asset_meta_sound",
-                                assetPath=PATCH_FULL,
+                                assetPath=patch_full,
                                 operations=[{"action": "add_input", "name": "TestFloat", "typeName": "float"}])
         payload = r if isinstance(r, dict) else {}
         entries = payload.get("entries") or payload.get("results") or []
@@ -62,7 +65,7 @@ class TestManageMetaSoundPatch:
 
         # 移除
         mcp.call_capability("manage_asset_meta_sound",
-                            assetPath=PATCH_FULL,
+                            assetPath=patch_full,
                             operations=[{"action": "remove_input", "name": "TestFloat"}])
 
 
@@ -81,11 +84,11 @@ class TestSearchMetaSoundPatch:
         assert "error" not in payload or payload.get("assets") is not None
 
     @skipif_ue_below(5, 1)
-    def test_search_metasound_all_finds_patch(self, mcp):
+    def test_search_metasound_all_finds_patch(self, mcp, test_ns):
         """bIsAll 时应同时搜到 MetaSoundPatch"""
         r = mcp.call_capability("search_asset",
                                 assetType="all",
-                                pathFilter=PATCH_PKG_PATH,
+                                pathFilter=test_ns,
                                 limit=20)
         payload = r if isinstance(r, dict) else {}
         assets = payload.get("assets") or payload.get("results") or []

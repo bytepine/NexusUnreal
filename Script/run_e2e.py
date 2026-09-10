@@ -187,7 +187,7 @@ def _resolve_connection(args: argparse.Namespace) -> Tuple[List[str], str]:
 
 
 def _purge_disk_artifacts(label: str, *, include_report: bool = True) -> None:
-    """删除上一轮 pytest/e2e 落在 Saved/Logs 与 Content/_McpTest 的临时文件。"""
+    """删除上一轮 pytest/e2e 落在 Saved/Logs、Content/_McpTest、Content/_NexusTest 的临时文件。"""
     sys.path.insert(0, str(TESTS_DIR))
     from _framework.test_cleanup import purge_disk_test_artifacts
 
@@ -240,7 +240,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--keep-artifacts", action="store_true",
-        help="Keep /Game/_McpTest/<ts>/ assets after the run.",
+        help="Keep /Game/_McpTest/<ts>/ and leftover /Game/_NexusTest assets after the run.",
     )
     parser.add_argument(
         "--gui", action="store_true",

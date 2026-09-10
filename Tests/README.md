@@ -8,7 +8,7 @@
 
 | 场景 | 做法 |
 |------|------|
-| **新功能 / 新 Capability** | 在对应 `test_*.py` 覆盖该 cap 的 **每个 manage `operations[].action`** 与 MultiSection get 的 **每个 named section**；写入走 `test_ns`（`/Game/_McpTest/<ts>/`） |
+| **新功能 / 新 Capability** | 在对应 `test_*.py` 覆盖该 cap 的 **每个 manage `operations[].action`** 与 MultiSection get 的 **每个 named section**；写入走 `test_ns`（`/Game/_McpTest/<ts>/`）；session 结束会 purge `_McpTest` 与历史 `_NexusTest` |
 | **覆盖门禁** | `py Script/audit_e2e_coverage.py`（对照 C++ `RegisterActions` / `GetSectionNames`，缺项 exit 1，不启动 UE） |
 | **日常 / CI / 开发自测** | **默认命令行 headless**：`py Script/run_e2e.py`（`UEEditor-Cmd -nullrhi`，快、无窗口） |
 | **命令行无法覆盖** | 用例打标 `l4_runtime` / `lua` / `requires_gui`；headless 自动 skip，须在 **GUI** 下验证 |
@@ -79,7 +79,7 @@ pytest Tests --ue-url http://127.0.0.1:45000/stream
 | `pytest Tests -m "not lua"` | 跳过 UnLua |
 | `pytest Tests --headless` | 显式命令行模式（跳过 `l4_runtime` / `lua` / `requires_gui`） |
 | `pytest Tests -k blueprint` | 关键字过滤 |
-| `pytest Tests --keep-artifacts` | 保留 `/Game/_McpTest/<ts>/` |
+| `pytest Tests --keep-artifacts` | 保留 `/Game/_McpTest/<ts>/` 与历史 `/Game/_NexusTest` |
 
 ## 用例文件映射
 

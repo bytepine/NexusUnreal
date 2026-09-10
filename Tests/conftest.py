@@ -60,7 +60,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--keep-artifacts",
         action="store_true",
         default=False,
-        help="Keep /Game/_McpTest/<ts>/ assets after the run for post-mortem.",
+        help="Keep /Game/_McpTest/<ts>/ and /Game/_NexusTest assets after the run for post-mortem.",
     )
     g.addoption(
         "--gui",
@@ -133,7 +133,7 @@ def _test_artifact_hygiene(
     mcp: MCPClient,
     pytestconfig: pytest.Config,
 ) -> Generator[None, None, None]:
-    """测试前后清理磁盘临时文件与 /Game/_McpTest 下全部 UE 资产。"""
+    """测试前后清理磁盘临时文件与 /Game/_McpTest、/Game/_NexusTest 下全部 UE 资产。"""
     keep = bool(pytestconfig.getoption("--keep-artifacts"))
     uproject = pytestconfig.getoption("--uproject")
     resolved = Path(uproject) if uproject else autodetect_uproject()

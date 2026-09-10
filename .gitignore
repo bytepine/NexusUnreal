@@ -104,6 +104,7 @@ venv/
 
 # pytest E2E 写入的 UE 资产（磁盘镜像；主副本在 /Game/_McpTest）
 Content/_McpTest/
+Content/_NexusTest/
 Content/__nexus_*__.uasset
 
 # OS 生成文件

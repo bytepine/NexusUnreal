@@ -14,7 +14,7 @@
 
 ### Changed
 
-- chore(test): 新增 `_framework/test_cleanup.py`——测试前后清理 `Saved/Logs` 下 `UE-auto-launch*` / `TestReport.xml` / `Automation-*.stdout.log` 与 `Content/_McpTest/`；session 级 purge `/Game/_McpTest`（`--keep-artifacts` 时保留）
+- chore(test): 新增 `_framework/test_cleanup.py`——测试前后清理 `Saved/Logs` 下 `UE-auto-launch*` / `TestReport.xml` / `Automation-*.stdout.log`、`Content/_McpTest/`、历史 `Content/_NexusTest/` 与 `Content/__nexus_*__.uasset`；session 级 purge `/Game/_McpTest` 与 `/Game/_NexusTest`（`--keep-artifacts` 时保留）；`test_103`/`104`/`105`/`106` 写入改走 `test_ns`；`.gitignore` 忽略 `Content/_NexusTest/`
 - chore(test): pytest / `run_e2e.py` 自动拉起 UE **默认 headless**（`UnrealEditor-Cmd -unattended -nullrhi -NoSplash -NoSound`）；headless/命令行会话跳过 `l4_runtime`/`lua`/`requires_gui`；本地观察编辑器加 `--gui`；全量 `--gui`/`--full`
 - chore(test): `ue_launcher` 会话级 `-EnableNexusMcp` 开启 MCP；示例 `bEnableMcpServer=False`，E2E 不依赖 ini
 - chore(test): `build_test` Game 阶段将 `UncookedOnly`/`Editor` 临时改写为 `Runtime` 做 `WITH_EDITOR=0` 编译探针

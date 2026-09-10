@@ -5,9 +5,12 @@ test_106_data_layer.py
 import pytest
 from conftest import mcp, skipif_ue_below  # noqa: F401
 
-DL_PKG_PATH = "/Game/_NexusTest/World"
 DL_NAME = "NxTestDataLayer"
-DL_FULL = f"{DL_PKG_PATH}/{DL_NAME}"
+
+
+@pytest.fixture(scope="session")
+def dl_full(test_ns):
+    return f"{test_ns}/{DL_NAME}"
 
 
 @pytest.mark.l3_asset
@@ -15,9 +18,9 @@ class TestCreateDataLayer:
     """create_asset_data_layer（≥UE5.1）"""
 
     @skipif_ue_below(5, 1)
-    def test_create_runtime_layer(self, mcp):
+    def test_create_runtime_layer(self, mcp, dl_full):
         r = mcp.call_capability("create_asset_data_layer",
-                                assetPath=DL_FULL,
+                                assetPath=dl_full,
                                 type="Runtime",
                                 debugColor="#FF4400")
         payload = r if isinstance(r, dict) else {}
@@ -28,10 +31,10 @@ class TestCreateDataLayer:
         assert first.get("assetType") in ("DataLayerAsset", None)
 
     @skipif_ue_below(5, 1)
-    def test_create_idempotent(self, mcp):
+    def test_create_idempotent(self, mcp, dl_full):
         """重复创建应返回 alreadyExists=true"""
         r = mcp.call_capability("create_asset_data_layer",
-                                assetPath=DL_FULL,
+                                assetPath=dl_full,
                                 type="Runtime")
         payload = r if isinstance(r, dict) else {}
         entries = payload.get("entries") or payload.get("results") or []
@@ -46,8 +49,8 @@ class TestGetDataLayer:
     """get_asset_data_layer（≥UE5.1）"""
 
     @skipif_ue_below(5, 1)
-    def test_get_type_and_color(self, mcp):
-        r = mcp.call_capability("get_asset_data_layer", assetPath=DL_FULL)
+    def test_get_type_and_color(self, mcp, dl_full):
+        r = mcp.call_capability("get_asset_data_layer", assetPath=dl_full)
         payload = r if isinstance(r, dict) else {}
         entries = payload.get("entries") or payload.get("results") or []
         first = entries[0] if entries else payload
@@ -62,9 +65,9 @@ class TestManageDataLayer:
     """manage_asset_data_layer（≥UE5.1 WITH_EDITOR）"""
 
     @skipif_ue_below(5, 1)
-    def test_set_type(self, mcp):
+    def test_set_type(self, mcp, dl_full):
         r = mcp.call_capability("manage_asset_data_layer",
-                                assetPath=DL_FULL,
+                                assetPath=dl_full,
                                 operations=[{"action": "set_type", "type": "Editor"}])
         payload = r if isinstance(r, dict) else {}
         entries = payload.get("entries") or payload.get("results") or []
@@ -72,9 +75,9 @@ class TestManageDataLayer:
         assert isinstance(first, dict), f"manage set_type 返回格式异常: {r}"
 
     @skipif_ue_below(5, 1)
-    def test_set_debug_color(self, mcp):
+    def test_set_debug_color(self, mcp, dl_full):
         r = mcp.call_capability("manage_asset_data_layer",
-                                assetPath=DL_FULL,
+                                assetPath=dl_full,
                                 operations=[{"action": "set_debug_color", "color": "#00AAFF"}])
         payload = r if isinstance(r, dict) else {}
         entries = payload.get("entries") or payload.get("results") or []
@@ -82,9 +85,9 @@ class TestManageDataLayer:
         assert isinstance(first, dict), f"manage set_debug_color 返回格式异常: {r}"
 
     @skipif_ue_below(5, 1)
-    def test_restore_runtime(self, mcp):
+    def test_restore_runtime(self, mcp, dl_full):
         mcp.call_capability("manage_asset_data_layer",
-                            assetPath=DL_FULL,
+                            assetPath=dl_full,
                             operations=[{"action": "set_type", "type": "Runtime"}])
 
 
@@ -102,11 +105,11 @@ class TestSearchDataLayer:
         assert "error" not in payload or payload.get("assets") is not None
 
     @skipif_ue_below(5, 1)
-    def test_search_all_includes_datalayer(self, mcp):
+    def test_search_all_includes_datalayer(self, mcp, test_ns):
         """bIsAll 时 DataLayerAsset 也应出现"""
         r = mcp.call_capability("search_asset",
                                 assetType="all",
-                                pathFilter=DL_PKG_PATH,
+                                pathFilter=test_ns,
                                 limit=20)
         payload = r if isinstance(r, dict) else {}
         assets = payload.get("assets") or payload.get("results") or []

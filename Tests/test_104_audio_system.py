@@ -11,19 +11,17 @@ from _framework.capability_probe import is_capability_available
 
 pytestmark = pytest.mark.l3_asset
 
-# ── 资产路径常量 ──────────────────────────────────────────────────────────────
-
-_SOUND_CLASS_PATH       = "/Game/_NexusTest/T4/TestSoundClass"
-_SOUND_ATTENUATION_PATH = "/Game/_NexusTest/T4/TestSoundAttenuation"
-_SOUND_CONCURRENCY_PATH = "/Game/_NexusTest/T4/TestSoundConcurrency"
-
-
 # ── SoundClass ────────────────────────────────────────────────────────────────
 
 class TestSoundClass:
+    @pytest.fixture(autouse=True)
+    def _paths(self, test_ns):
+        self.path = f"{test_ns}/TestSoundClass"
+        self.ns = test_ns
+
     def test_create(self, mcp):
         r = mcp.call_capability("create_asset_sound_class",
-                                assetPath=_SOUND_CLASS_PATH,
+                                assetPath=self.path,
                                 volume=0.8, pitch=1.0)
         first = cap_first(r)
         # 固定路径资产跨次运行可能已存在，视为可继续后续 get/manage
@@ -34,27 +32,27 @@ class TestSoundClass:
         )
 
     def test_get(self, mcp):
-        r = mcp.call_capability("get_asset_sound_class", assetPath=_SOUND_CLASS_PATH)
+        r = mcp.call_capability("get_asset_sound_class", assetPath=self.path)
         first = cap_first(r)
         assert "volume" in first and "pitch" in first, f"字段缺失: {first}"
         assert abs(first.get("volume", 0) - 0.8) < 0.01, f"volume 不符: {first}"
 
     def test_manage_volume(self, mcp):
         r = mcp.call_capability("manage_asset_sound_class",
-                                assetPath=_SOUND_CLASS_PATH,
+                                assetPath=self.path,
                                 operations=[{"action": "set", "volume": 0.5, "pitch": 1.2}])
         first = cap_first(r)
         assert not first.get("error") and first.get("success") is not False, f"manage 失败: {first}"
 
     def test_get_after_manage(self, mcp):
-        r = mcp.call_capability("get_asset_sound_class", assetPath=_SOUND_CLASS_PATH)
+        r = mcp.call_capability("get_asset_sound_class", assetPath=self.path)
         first = cap_first(r)
         assert abs(first.get("volume", 0) - 0.5) < 0.01, f"manage 后 volume 不符: {first}"
 
     def test_search_sound_class(self, mcp):
         r = mcp.call_capability("search_asset",
                                 assetType="SoundClass",
-                                pathFilter="/Game/_NexusTest/",
+                                pathFilter=self.ns,
                                 limit=5)
         payload = r if isinstance(r, dict) else {}
         assets = payload.get("assets") or payload.get("results") or []
@@ -64,9 +62,14 @@ class TestSoundClass:
 # ── SoundAttenuation ──────────────────────────────────────────────────────────
 
 class TestSoundAttenuation:
+    @pytest.fixture(autouse=True)
+    def _paths(self, test_ns):
+        self.path = f"{test_ns}/TestSoundAttenuation"
+        self.ns = test_ns
+
     def test_create(self, mcp):
         r = mcp.call_capability("create_asset_sound_attenuation",
-                                assetPath=_SOUND_ATTENUATION_PATH,
+                                assetPath=self.path,
                                 innerRadius=500.0, falloffDistance=4000.0)
         first = cap_first(r)
         if first.get("error") and "already exists" in str(first.get("error")):
@@ -76,14 +79,14 @@ class TestSoundAttenuation:
         )
 
     def test_get(self, mcp):
-        r = mcp.call_capability("get_asset_sound_attenuation", assetPath=_SOUND_ATTENUATION_PATH)
+        r = mcp.call_capability("get_asset_sound_attenuation", assetPath=self.path)
         first = cap_first(r)
         assert "innerRadius" in first and "falloffDistance" in first, f"字段缺失: {first}"
         assert abs(first.get("innerRadius", 0) - 500.0) < 1.0, f"innerRadius 不符: {first}"
 
     def test_manage(self, mcp):
         r = mcp.call_capability("manage_asset_sound_attenuation",
-                                assetPath=_SOUND_ATTENUATION_PATH,
+                                assetPath=self.path,
                                 operations=[{"action": "set", "innerRadius": 800.0, "falloffDistance": 5000.0}])
         first = cap_first(r)
         assert not first.get("error") and first.get("success") is not False, f"manage 失败: {first}"
@@ -91,7 +94,7 @@ class TestSoundAttenuation:
     def test_search_sound_attenuation(self, mcp):
         r = mcp.call_capability("search_asset",
                                 assetType="SoundAttenuation",
-                                pathFilter="/Game/_NexusTest/",
+                                pathFilter=self.ns,
                                 limit=5)
         payload = r if isinstance(r, dict) else {}
         assets = payload.get("assets") or payload.get("results") or []
@@ -101,9 +104,14 @@ class TestSoundAttenuation:
 # ── SoundConcurrency ──────────────────────────────────────────────────────────
 
 class TestSoundConcurrency:
+    @pytest.fixture(autouse=True)
+    def _paths(self, test_ns):
+        self.path = f"{test_ns}/TestSoundConcurrency"
+        self.ns = test_ns
+
     def test_create(self, mcp):
         r = mcp.call_capability("create_asset_sound_concurrency",
-                                assetPath=_SOUND_CONCURRENCY_PATH,
+                                assetPath=self.path,
                                 maxCount=8)
         first = cap_first(r)
         if first.get("error") and "already exists" in str(first.get("error")):
@@ -113,27 +121,27 @@ class TestSoundConcurrency:
         )
 
     def test_get(self, mcp):
-        r = mcp.call_capability("get_asset_sound_concurrency", assetPath=_SOUND_CONCURRENCY_PATH)
+        r = mcp.call_capability("get_asset_sound_concurrency", assetPath=self.path)
         first = cap_first(r)
         assert "maxCount" in first and "resolutionRule" in first, f"字段缺失: {first}"
         assert first.get("maxCount") == 8, f"maxCount 不符: {first}"
 
     def test_manage(self, mcp):
         r = mcp.call_capability("manage_asset_sound_concurrency",
-                                assetPath=_SOUND_CONCURRENCY_PATH,
+                                assetPath=self.path,
                                 operations=[{"action": "set", "maxCount": 4, "retriggerTime": 0.1}])
         first = cap_first(r)
         assert not first.get("error") and first.get("success") is not False, f"manage 失败: {first}"
 
     def test_get_after_manage(self, mcp):
-        r = mcp.call_capability("get_asset_sound_concurrency", assetPath=_SOUND_CONCURRENCY_PATH)
+        r = mcp.call_capability("get_asset_sound_concurrency", assetPath=self.path)
         first = cap_first(r)
         assert first.get("maxCount") == 4, f"manage 后 maxCount 不符: {first}"
 
     def test_search_sound_concurrency(self, mcp):
         r = mcp.call_capability("search_asset",
                                 assetType="SoundConcurrency",
-                                pathFilter="/Game/_NexusTest/",
+                                pathFilter=self.ns,
                                 limit=5)
         payload = r if isinstance(r, dict) else {}
         assets = payload.get("assets") or payload.get("results") or []

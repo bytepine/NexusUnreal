@@ -9,18 +9,17 @@ from _framework.mcp_client import cap_entries, cap_first
 
 pytestmark = pytest.mark.l3_asset
 
-# ── 资产路径常量 ────────────────────────────────────────────────────────────────
-
-_COMPOSITE_PATH   = "/Game/_NexusTest/T4/TestAnimComposite"
-_RENDER_TARGET    = "/Game/_NexusTest/T4/TestRenderTarget"
-
-
 # ── AnimComposite ──────────────────────────────────────────────────────────────
 
 class TestAnimComposite:
+    @pytest.fixture(autouse=True)
+    def _paths(self, test_ns):
+        self.path = f"{test_ns}/TestAnimComposite"
+        self.ns = test_ns
+
     def test_create(self, mcp):
         r = mcp.call_capability("create_asset_anim_composite",
-                                assetPath=_COMPOSITE_PATH)
+                                assetPath=self.path)
         results = cap_entries(r)
         assert results, f"create_asset_anim_composite 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
@@ -29,7 +28,7 @@ class TestAnimComposite:
         assert (not first.get("error") and first.get("success") is not False) or first.get("name"), f"创建失败: {first}"
 
     def test_get_empty(self, mcp):
-        r = mcp.call_capability("get_asset_anim_composite", assetPath=_COMPOSITE_PATH)
+        r = mcp.call_capability("get_asset_anim_composite", assetPath=self.path)
         results = cap_entries(r)
         assert results, f"get_asset_anim_composite 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
@@ -39,7 +38,7 @@ class TestAnimComposite:
     def test_manage_add_segment(self, mcp):
         """add_segment 无 animPath 时应能添加空占位片段。"""
         r = mcp.call_capability("manage_asset_anim_composite",
-                                assetPath=_COMPOSITE_PATH,
+                                assetPath=self.path,
                                 operations=[{
                                     "action": "add_segment",
                                     "animStartTime": 0.0,
@@ -51,7 +50,7 @@ class TestAnimComposite:
             f"add_segment 无成功: {r}"
 
     def test_get_after_add(self, mcp):
-        r = mcp.call_capability("get_asset_anim_composite", assetPath=_COMPOSITE_PATH)
+        r = mcp.call_capability("get_asset_anim_composite", assetPath=self.path)
         results = cap_entries(r)
         first = results[0] if results and isinstance(results[0], dict) else {}
         assert first.get("segmentCount", 0) >= 1, f"add_segment 后 segmentCount 应 ≥1: {first}"
@@ -62,7 +61,7 @@ class TestAnimComposite:
 
     def test_manage_remove_segment(self, mcp):
         r = mcp.call_capability("manage_asset_anim_composite",
-                                assetPath=_COMPOSITE_PATH,
+                                assetPath=self.path,
                                 operations=[{"action": "remove_segment", "segmentIndex": 0}])
         results = cap_entries(r)
         assert any(isinstance(e, dict) and not e.get("error") and e.get("success") is not False for e in results), \
@@ -71,7 +70,7 @@ class TestAnimComposite:
     def test_search_anim_composite(self, mcp):
         r = mcp.call_capability("search_asset",
                                 assetType="AnimComposite",
-                                pathFilter="/Game/_NexusTest/",
+                                pathFilter=self.ns,
                                 limit=5)
         payload = r if isinstance(r, dict) else {}
         assets = payload.get("assets") or payload.get("results") or []
@@ -153,9 +152,14 @@ class TestPhysicalMaterial:
 # ── TextureRenderTarget2D ──────────────────────────────────────────────────────
 
 class TestRenderTarget:
+    @pytest.fixture(autouse=True)
+    def _paths(self, test_ns):
+        self.path = f"{test_ns}/TestRenderTarget"
+        self.ns = test_ns
+
     def test_create(self, mcp):
         r = mcp.call_capability("create_asset_render_target",
-                                assetPath=_RENDER_TARGET,
+                                assetPath=self.path,
                                 sizeX=512, sizeY=256)
         results = cap_entries(r)
         assert results, f"create_asset_render_target 无结果: {r}"
@@ -165,7 +169,7 @@ class TestRenderTarget:
         assert (not first.get("error") and first.get("success") is not False) or first.get("name"), f"创建失败: {first}"
 
     def test_get(self, mcp):
-        r = mcp.call_capability("get_asset_render_target", assetPath=_RENDER_TARGET)
+        r = mcp.call_capability("get_asset_render_target", assetPath=self.path)
         results = cap_entries(r)
         assert results, f"get_asset_render_target 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
@@ -175,7 +179,7 @@ class TestRenderTarget:
 
     def test_manage_resize(self, mcp):
         r = mcp.call_capability("manage_asset_render_target",
-                                assetPath=_RENDER_TARGET,
+                                assetPath=self.path,
                                 operations=[{"action": "set", "sizeX": 1024, "sizeY": 1024}])
         results = cap_entries(r)
         assert results, f"manage_asset_render_target 无结果: {r}"
@@ -183,7 +187,7 @@ class TestRenderTarget:
         assert (not first.get("error") and first.get("success") is not False) or first.get("sizeX") == 1024, f"resize 失败: {first}"
 
     def test_get_after_resize(self, mcp):
-        r = mcp.call_capability("get_asset_render_target", assetPath=_RENDER_TARGET)
+        r = mcp.call_capability("get_asset_render_target", assetPath=self.path)
         results = cap_entries(r)
         first = results[0] if results and isinstance(results[0], dict) else {}
         assert first.get("sizeX") == 1024 and first.get("sizeY") == 1024, \
@@ -191,7 +195,7 @@ class TestRenderTarget:
 
     def test_manage_clear_color(self, mcp):
         r = mcp.call_capability("manage_asset_render_target",
-                                assetPath=_RENDER_TARGET,
+                                assetPath=self.path,
                                 operations=[{"action": "set",
                                              "clearColorR": 1.0, "clearColorG": 0.0,
                                              "clearColorB": 0.0, "clearColorA": 1.0}])
@@ -201,7 +205,7 @@ class TestRenderTarget:
     def test_search_render_target(self, mcp):
         r = mcp.call_capability("search_asset",
                                 assetType="TextureRenderTarget2D",
-                                pathFilter="/Game/_NexusTest/",
+                                pathFilter=self.ns,
                                 limit=5)
         payload = r if isinstance(r, dict) else {}
         assets = payload.get("assets") or payload.get("results") or []
