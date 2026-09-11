@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright byteyang. All Rights Reserved.
-# NexusLink 跨版本编译测试 — macOS / Linux 入口
+# NexusUnreal 跨版本工程编译 — macOS / Linux 入口
 # 用法: ./build_test.sh [--ue-root <路径>] [--versions UE_X.Y ...] [--vs 2019|2022] [--max-workers N]
 
 set -euo pipefail

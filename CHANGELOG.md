@@ -18,7 +18,7 @@
 - chore(test): 新增 `_framework/test_cleanup.py`——测试前后清理 `Saved/Logs` 下 `UE-auto-launch*` / `TestReport.xml` / `Automation-*.stdout.log`、`Content/_McpTest/`、历史 `Content/_NexusTest/` 与 `Content/__nexus_*__.uasset`；session 级 purge `/Game/_McpTest` 与 `/Game/_NexusTest`（`--keep-artifacts` 时保留）；`test_103`/`104`/`105`/`106` 写入改走 `test_ns`；`.gitignore` 忽略 `Content/_NexusTest/`
 - chore(test): pytest / `run_e2e.py` 自动拉起 UE **默认 headless**（`UnrealEditor-Cmd -unattended -nullrhi -NoSplash -NoSound`）；headless/命令行会话跳过 `l4_runtime`/`lua`/`requires_gui`；本地观察编辑器加 `--gui`；全量 `--gui`/`--full`
 - chore(test): `ue_launcher` 会话级 `-EnableNexusMcp` 开启 MCP；示例 `bEnableMcpServer=False`，E2E 不依赖 ini
-- chore(test): `build_test` Game 阶段将 `UncookedOnly`/`Editor` 临时改写为 `Runtime` 做 `WITH_EDITOR=0` 编译探针
+- chore(test): `build_test` 改为对本机已装的每套引擎编整个 `Nexus.uproject`（Editor=`NexusEditor`，Game=`Nexus` / WITH_EDITOR=0）；不再 `BuildPlugin` 只编 NexusLink，也不再临时改写 UncookedOnly→Runtime；每套引擎在系统临时目录隔离 Intermediate（junction Content/Source/Config，不改仓库工程），默认 `--max-workers 3` 并行
 - docs: 仓库改为公开（NexusLink 示例工程）；README 移除私有/NexusWork 表述；测试策略——新功能补 **manage 每 action / get 每 named section**、默认 headless、全覆盖验证走 `--gui`；NexusLink 发版按本次变更选 headless 或 `--gui`
 - chore(test): `legacy_map` 与插件 C++ 旧名表对齐（补 `get_behavior_tree`，去掉恒等 `list_runtime_widgets`）
 - chore(script): `apply_ai_zh.py` 的 `CAP_DESC_ZH` 补 `exec_python` / `get_python_api` 中文描述

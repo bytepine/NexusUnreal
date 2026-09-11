@@ -2,16 +2,18 @@
 # -*- coding: utf-8 -*-
 # Copyright byteyang. All Rights Reserved.
 """
-build_test.py -- NexusLink cross-version build test
+build_test.py -- NexusUnreal 工程跨版本编译
 
-Runs BuildPlugin against all installed UE versions:
-  Phase 1 — DevelopmentEditor (WITH_EDITOR=1; NexusLink.uplugin Type: UncookedOnly).
-            Optional-plugin caps (GAS/Niagara/ControlRig/…) compile when that
-            engine's Plugins tree has the corresponding .uplugin (same disk probe
-            as a real host). Game-target still skips them (editor APIs).
-  Phase 2 — UnrealGame Development (WITH_EDITOR=0, temp copy; UncookedOnly→Runtime rewrite for compile check)
+用本机已装的每套 UE 引擎编整个 `Nexus.uproject`（不只某个插件）：
+  Phase 1 — NexusEditor / Development（WITH_EDITOR=1；编进游戏模块 + NexusLink + UnLua 等工程插件）
+  Phase 2 — Nexus / Development（Game 目标，WITH_EDITOR=0）
 
-Writes error logs to Saved/Logs/Build.Log (+ Build.Game.Log for phase 2).
+不改仓库工程（不写 Intermediate/Binaries，不改 .uproject / .uplugin）。
+每套引擎在系统临时目录建隔离工程：junction Content/Source/Config，
+插件根建真实目录（Intermediate 落在临时树），然后对该副本调 UBT。
+多引擎可并行（默认 --max-workers 3）。
+
+日志：Saved/Logs/Build.Log（+ Build.Game.Log 对应 phase 2）。
 
 Usage:
     python build_test.py [--ue-root <engine_root>] [--editor-only | --game-only]
@@ -31,6 +33,7 @@ import platform
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -43,18 +46,21 @@ from typing import Dict, List, Optional, Tuple
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 NEXUS_UNREAL_DIR = SCRIPT_DIR.parent
-PLUGIN_PATH = NEXUS_UNREAL_DIR / "Plugins" / "Developer" / "NexusLink" / "NexusLink.uplugin"
+UPROJECT_PATH = NEXUS_UNREAL_DIR / "Nexus.uproject"
+EDITOR_TARGET = "NexusEditor"
+GAME_TARGET = "Nexus"
 LOG_DIR = NEXUS_UNREAL_DIR / "Saved" / "Logs"
 LOG_FILE = LOG_DIR / "Build.Log"
 LOG_FILE_GAME = LOG_DIR / "Build.Game.Log"
 TEMP_BASE = Path(tempfile.gettempdir()) / "NexusBuildTest"
-_TEMP_GAME_BASE = TEMP_BASE / "GameTarget"
-_EDITOR_TYPE = '"Type": "Editor"'
-_UNCOOKED_TYPE = '"Type": "UncookedOnly"'
-_RUNTIME_TYPE = '"Type": "Runtime"'
-_GAME_TARGET_RE = re.compile(r"UnrealGame", re.IGNORECASE)
 
 _SYSTEM = platform.system()  # "Windows" | "Darwin" | "Linux"
+
+# 插件树里这些目录会由 UBT 写入，不能 junction 回仓库。
+_SKIP_DIR_NAMES = frozenset({
+    "Intermediate", "Binaries", "Saved", "DerivedDataCache",
+    ".git", ".vs", ".idea", "__pycache__",
+})
 
 # UE 版本中 UBT 默认查找 VS2017 的版本集——这些版本在仅装 VS2019/VS2022 的
 # 机器上会报 `ERROR: Visual Studio 2017 must be installed`。未显式传 --vs 时
@@ -112,7 +118,58 @@ def _signal_handler(sig: int, frame) -> None:
     sys.exit(1)
 
 
+def _lexists(path: Path) -> bool:
+    try:
+        os.lstat(path)
+        return True
+    except OSError:
+        return False
+
+
+def _is_reparse_or_symlink(path: Path) -> bool:
+    """junction / symlink：清理时只删链接，绝不下钻到仓库目标。"""
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return False
+    if stat.S_ISLNK(st.st_mode):
+        return True
+    attrs = getattr(st, "st_file_attributes", 0)
+    reparse = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    return bool(attrs & reparse)
+
+
+def _rmtree_nofollow(path: Path) -> None:
+    """删除临时树；遇到 junction/symlink 只 unlink/rmdir，不跟随。"""
+    if not _lexists(path):
+        return
+    if _is_reparse_or_symlink(path):
+        try:
+            os.unlink(path)
+        except OSError:
+            os.rmdir(path)
+        return
+    if stat.S_ISREG(os.lstat(path).st_mode):
+        os.unlink(path)
+        return
+    try:
+        entries = list(os.scandir(path))
+    except OSError:
+        return
+    for entry in entries:
+        _rmtree_nofollow(Path(entry.path))
+    try:
+        os.rmdir(path)
+    except OSError:
+        pass
+
+
+def _cleanup_temp() -> None:
+    _rmtree_nofollow(TEMP_BASE)
+
+
 atexit.register(_cleanup_all)
+atexit.register(_cleanup_temp)
 signal.signal(signal.SIGINT, _signal_handler)
 if hasattr(signal, "SIGTERM"):
     signal.signal(signal.SIGTERM, _signal_handler)
@@ -142,40 +199,144 @@ def _decode_output(raw: bytes) -> str:
         return raw.decode("gbk", errors="replace")
 
 
-def _run_uat_build(engine_path: str, plugin_path: str, package_out: str,
-                   vs_version: Optional[str] = None) -> Tuple[int, List[str]]:
+def _ubt_build_script(engine_path: str) -> Optional[str]:
+    """该引擎的 UBT 入口（Build.bat / Build.sh）。找不到则返回 None。"""
+    batch = os.path.join(engine_path, "Engine", "Build", "BatchFiles")
+    if _SYSTEM == "Windows":
+        path = os.path.join(batch, "Build.bat")
+    elif _SYSTEM == "Darwin":
+        path = os.path.join(batch, "Mac", "Build.sh")
+    else:
+        path = os.path.join(batch, "Linux", "Build.sh")
+    return path if os.path.isfile(path) else None
+
+
+def _link_dir(src: Path, dst: Path) -> None:
+    """目录 junction（Windows）或 symlink（POSIX），不复制内容。"""
+    src = src.resolve()
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if _lexists(dst):
+        return
+    if _SYSTEM == "Windows":
+        result = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(dst), str(src)],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            err = (result.stderr or result.stdout or "").strip()
+            raise RuntimeError(f"mklink /J 失败: {dst} -> {src}: {err}")
+    else:
+        os.symlink(src, dst, target_is_directory=True)
+
+
+def _is_plugin_root(path: Path) -> bool:
+    try:
+        return any(path.glob("*.uplugin"))
+    except OSError:
+        return False
+
+
+def _mirror_plugins_tree(src: Path, dst: Path) -> None:
     """
-    Run RunUAT BuildPlugin for the given engine.
-
-    :param vs_version: optional MSVC toolchain selector, one of "2017"/"2019"/"2022";
-        appended as `-VS<ver>` to BuildPlugin. Needed by UE 4.26 / 4.27 on hosts
-        that only ship VS2019/VS2022 (both versions' UBT default查找 VS2017).
-    :return: (exit_code, output_lines); exit_code=-1 means RunUAT not found (SKIP).
+    复制插件树骨架：插件根为真实目录（UBT 的 Intermediate/Binaries 写在这里），
+    Source/Content 等数据目录 junction 回仓库，不改原工程。
     """
-    uat_name = "RunUAT.bat" if _SYSTEM == "Windows" else "RunUAT.sh"
-    uat_path = os.path.join(engine_path, "Engine", "Build", "BatchFiles", uat_name)
+    dst.mkdir(parents=True, exist_ok=True)
+    plugin = _is_plugin_root(src)
+    try:
+        children = list(src.iterdir())
+    except OSError:
+        return
+    for item in children:
+        if item.name in _SKIP_DIR_NAMES:
+            continue
+        dest = dst / item.name
+        if item.is_symlink() and not item.is_dir():
+            shutil.copy2(item, dest, follow_symlinks=True)
+            continue
+        if not item.is_dir():
+            shutil.copy2(item, dest)
+            continue
+        # 分组目录 / 嵌套 Plugins / 嵌套插件根：继续建真实目录往下走
+        if (not plugin) or item.name == "Plugins" or _is_plugin_root(item):
+            _mirror_plugins_tree(item, dest)
+        else:
+            _link_dir(item, dest)
 
-    if not os.path.isfile(uat_path):
-        return (-1, [f"RunUAT not found: {uat_path}"])
 
-    target = _PLATFORM_TARGET.get(_SYSTEM, "Linux")
-    uat_args = [
-        "BuildPlugin",
-        f"-Plugin={plugin_path}",
-        f"-Package={package_out}",
-        f"-TargetPlatforms={target}",
+_isolated_lock = Lock()
+_isolated_ready: Dict[str, Path] = {}
+
+
+def _reset_temp_workspace() -> None:
+    with _isolated_lock:
+        _isolated_ready.clear()
+        _rmtree_nofollow(TEMP_BASE)
+        TEMP_BASE.mkdir(parents=True, exist_ok=True)
+
+
+def _prepare_isolated_project(ver: str) -> Path:
+    dest = TEMP_BASE / ver / "Project"
+    uproject = dest / "Nexus.uproject"
+    dest.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(UPROJECT_PATH, uproject)
+    for name in ("Source", "Content", "Config"):
+        src = NEXUS_UNREAL_DIR / name
+        if src.is_dir():
+            _link_dir(src, dest / name)
+    plugins_src = NEXUS_UNREAL_DIR / "Plugins"
+    if plugins_src.is_dir():
+        _mirror_plugins_tree(plugins_src, dest / "Plugins")
+    return uproject
+
+
+def _isolated_uproject(ver: str) -> Path:
+    with _isolated_lock:
+        cached = _isolated_ready.get(ver)
+        if cached is not None and cached.is_file():
+            return cached
+    path = _prepare_isolated_project(ver)
+    with _isolated_lock:
+        _isolated_ready[ver] = path
+    return path
+
+
+def _run_project_build(engine_path: str, target: str,
+                       vs_version: Optional[str] = None,
+                       uproject: Optional[Path] = None) -> Tuple[int, List[str]]:
+    """
+    用指定引擎编某个 Target（默认编隔离副本，不写仓库 Intermediate）。
+
+    :param vs_version: optional MSVC toolchain selector, one of "2017"/"2019"/"2022"；
+        传给 UBT 的 `-VS<ver>`。UE 4.26 / 4.27 在仅装 VS2019/VS2022 的机器上需要。
+    :param uproject: 隔离副本的 .uproject；缺省则用仓库内文件（不推荐并行）。
+    :return: (exit_code, output_lines)；exit_code=-1 表示找不到 Build 脚本（SKIP）。
+    """
+    script = _ubt_build_script(engine_path)
+    if not script:
+        return (-1, [f"UBT Build script not found under: {engine_path}"])
+
+    platform_name = _PLATFORM_TARGET.get(_SYSTEM, "Linux")
+    project = str((uproject or UPROJECT_PATH).resolve())
+    ubt_args = [
+        target,
+        platform_name,
+        "Development",
+        f"-Project={project}",
+        "-NoMutex",
     ]
     if vs_version:
-        uat_args.append(f"-VS{vs_version}")
+        ubt_args.append(f"-VS{vs_version}")
 
     env = os.environ.copy()
     if _SYSTEM == "Windows":
         env["VSLANG"] = "1033"
-        cmd = ["cmd", "/c", uat_path] + uat_args
+        cmd = ["cmd", "/c", script] + ubt_args
         kwargs: dict = {"shell": False}
     else:
-        os.chmod(uat_path, 0o755)
-        cmd = ["bash", uat_path] + uat_args
+        os.chmod(script, 0o755)
+        cmd = ["bash", script] + ubt_args
         kwargs = {"shell": False, "start_new_session": True}
 
     proc = subprocess.Popen(
@@ -212,38 +373,6 @@ def _extract_warnings(lines: List[str]) -> List[str]:
         ln for ln in lines
         if _WARN_INCLUDE.search(ln) and not _WARN_EXCLUDE.search(ln)
     ]
-
-
-def _prepare_runtime_plugin_copy(ver: str) -> Tuple[str, str]:
-    """Copy NexusLink to temp；UncookedOnly/Editor 改写为 Runtime 以便 Game 目标编译。"""
-    src_root = PLUGIN_PATH.parent
-    work = _TEMP_GAME_BASE / ver
-    plugin_copy = work / "PluginSrc" / "NexusLink"
-    package_out = work / "Package"
-
-    if work.exists():
-        shutil.rmtree(work, ignore_errors=True)
-    work.mkdir(parents=True, exist_ok=True)
-
-    shutil.copytree(src_root, plugin_copy)
-    uplugin = plugin_copy / "NexusLink.uplugin"
-    content = uplugin.read_text(encoding="utf-8")
-    if _UNCOOKED_TYPE in content:
-        content = content.replace(_UNCOOKED_TYPE, _RUNTIME_TYPE, 1)
-        uplugin.write_text(content, encoding="utf-8")
-    elif _EDITOR_TYPE in content:
-        content = content.replace(_EDITOR_TYPE, _RUNTIME_TYPE, 1)
-        uplugin.write_text(content, encoding="utf-8")
-    elif _RUNTIME_TYPE not in content:
-        raise RuntimeError(
-            f"NexusLink module Type 既非 UncookedOnly/Editor 也非 Runtime: {uplugin}"
-        )
-    return str(uplugin), str(package_out)
-
-
-def _game_build_lines(lines: List[str]) -> List[str]:
-    game_lines = [ln for ln in lines if _GAME_TARGET_RE.search(ln)]
-    return game_lines if game_lines else lines
 
 
 def _format_result_block(r: Dict, lines_out: List[str], sep: str) -> Tuple[int, int, int]:
@@ -295,34 +424,43 @@ def _update_status_line(text: str, line_idx: int, total: int,
             print(text, flush=True)
 
 
-def _build_one(engine: dict, plugin_path: str, line_idx: int, total: int,
+def _build_one(engine: dict, target: str, line_idx: int, total: int,
                print_lock: Lock, is_tty: bool,
-               vs_version: Optional[str] = None) -> Dict:
+               vs_version: Optional[str] = None,
+               phase_label: str = "Editor") -> Dict:
     ver = engine["version"]
     eng_path = engine["path"]
-    package_out = str(TEMP_BASE / ver)
 
-    _update_status_line(f"[{ver}] Building...", line_idx, total, print_lock, is_tty)
+    _update_status_line(
+        f"[{ver}] {phase_label}: building {target}...", line_idx, total, print_lock, is_tty
+    )
 
-    if os.path.isdir(package_out):
-        shutil.rmtree(package_out, ignore_errors=True)
+    try:
+        uproject = _isolated_uproject(ver)
+    except Exception as exc:
+        msg = f"failed to prepare isolated project: {exc}"
+        _update_status_line(f"[{ver}] {phase_label}: FAIL ({msg})", line_idx, total, print_lock, is_tty)
+        return {
+            "ver": ver,
+            "eng_path": eng_path,
+            "exit_code": 1,
+            "output": [msg],
+            "error_lines": [msg],
+            "warn_lines": [],
+        }
 
-    # UE 4.26 / 4.27 的 UBT 默认查找 VS2017，没装时直接报 "Visual Studio 2017 must be installed"。
-    # 现代机器通常只有 VS2019/VS2022，两版官方均支持 VS2019，因此当用户未显式
-    # 传 --vs 时对这些版本自动回落到 VS2019；其它版本保持 UBT 默认逻辑不变。
     effective_vs = vs_version or ("2019" if ver in _VS2019_FALLBACK_VERSIONS else None)
-
-    exit_code, output = _run_uat_build(eng_path, plugin_path, package_out, effective_vs)
+    exit_code, output = _run_project_build(eng_path, target, effective_vs, uproject=uproject)
 
     error_lines = _extract_errors(output) if exit_code not in (-1, 0) else []
     warn_lines = _extract_warnings(output) if exit_code != -1 else []
 
     if exit_code == -1:
-        status = f"[{ver}] SKIP"
+        status = f"[{ver}] {phase_label}: SKIP"
     elif exit_code == 0:
-        status = f"[{ver}] PASS{f' ({len(warn_lines)} warnings)' if warn_lines else ''}"
+        status = f"[{ver}] {phase_label}: PASS{f' ({len(warn_lines)} warnings)' if warn_lines else ''}"
     else:
-        status = f"[{ver}] FAIL (exit={exit_code})"
+        status = f"[{ver}] {phase_label}: FAIL (exit={exit_code})"
 
     _update_status_line(status, line_idx, total, print_lock, is_tty)
 
@@ -336,60 +474,7 @@ def _build_one(engine: dict, plugin_path: str, line_idx: int, total: int,
     }
 
 
-def _build_one_game(engine: dict, line_idx: int, total: int,
-                    print_lock: Lock, is_tty: bool,
-                    vs_version: Optional[str] = None) -> Dict:
-    ver = engine["version"]
-    eng_path = engine["path"]
-
-    _update_status_line(f"[{ver}] Game: preparing Runtime copy...", line_idx, total, print_lock, is_tty)
-
-    try:
-        plugin_path, package_out = _prepare_runtime_plugin_copy(ver)
-    except Exception as exc:
-        _update_status_line(f"[{ver}] Game: FAIL (prep)", line_idx, total, print_lock, is_tty)
-        return {
-            "ver": ver,
-            "eng_path": eng_path,
-            "exit_code": 1,
-            "output": [str(exc)],
-            "error_lines": [str(exc)],
-            "warn_lines": [],
-        }
-
-    _update_status_line(f"[{ver}] Game: building UnrealGame...", line_idx, total, print_lock, is_tty)
-
-    effective_vs = vs_version or ("2019" if ver in _VS2019_FALLBACK_VERSIONS else None)
-    exit_code, output = _run_uat_build(eng_path, plugin_path, package_out, effective_vs)
-
-    scoped = _game_build_lines(output)
-    error_lines = _extract_errors(scoped) if exit_code not in (-1, 0) else []
-    if exit_code not in (-1, 0) and not error_lines:
-        error_lines = _extract_errors(output)
-    warn_lines = _extract_warnings(scoped) if exit_code != -1 else []
-    if exit_code != -1 and not warn_lines:
-        warn_lines = _extract_warnings(output)
-
-    if exit_code == -1:
-        status = f"[{ver}] Game: SKIP"
-    elif exit_code == 0:
-        status = f"[{ver}] Game: PASS{f' ({len(warn_lines)} warnings)' if warn_lines else ''}"
-    else:
-        status = f"[{ver}] Game: FAIL (exit={exit_code})"
-
-    _update_status_line(status, line_idx, total, print_lock, is_tty)
-
-    return {
-        "ver": ver,
-        "eng_path": eng_path,
-        "exit_code": exit_code,
-        "output": output,
-        "error_lines": error_lines,
-        "warn_lines": warn_lines,
-    }
-
-
-def _run_phase(engines: List[dict], build_fn, max_workers: int,
+def _run_phase(engines: List[dict], target: str, max_workers: int,
                vs_version: Optional[str], label: str) -> Tuple[Dict[str, Dict], int, int, int]:
     print_lock = Lock()
     is_tty = sys.stdout.isatty()
@@ -403,7 +488,8 @@ def _run_phase(engines: List[dict], build_fn, max_workers: int,
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {
             pool.submit(
-                build_fn, e, ver_index[e["version"]], total, print_lock, is_tty, vs_version
+                _build_one, e, target, ver_index[e["version"]], total,
+                print_lock, is_tty, vs_version, label,
             ): e["version"]
             for e in engines
         }
@@ -445,23 +531,24 @@ def _write_phase_log(path: Path, header: List[str], engines: List[dict],
         f.write("\n".join(lines_out) + "\n")
 
 
-def run_build_test_game(engines: List[dict], max_workers: int = 2,
+def run_build_test_game(engines: List[dict], max_workers: int = 3,
                         vs_version: Optional[str] = None) -> int:
     """Game-target only (WITH_EDITOR=0). See run_build_test(..., include_game=True)."""
     LOG_DIR.mkdir(parents=True, exist_ok=True)
-    _TEMP_GAME_BASE.mkdir(parents=True, exist_ok=True)
+    _reset_temp_workspace()
+    print(f"Isolated builds under: {TEMP_BASE}", flush=True)
 
-    target = _PLATFORM_TARGET.get(_SYSTEM, "Linux")
+    platform_name = _PLATFORM_TARGET.get(_SYSTEM, "Linux")
     header = [
-        "NexusLink Game-Target Build Report (WITH_EDITOR=0)",
+        "NexusUnreal Game-Target Build Report (WITH_EDITOR=0)",
         f"Time     : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        f"Target   : UnrealGame {target} Development",
-        f"Method   : temp copy + uplugin Type UncookedOnly→Runtime + BuildPlugin",
-        f"Plugin   : {PLUGIN_PATH}",
+        f"Target   : {GAME_TARGET} {platform_name} Development",
+        f"Method   : UBT Build.bat/sh -Project=<isolated temp> -NoMutex",
+        f"Project  : {UPROJECT_PATH} (read-only; build dir {TEMP_BASE})",
         f"Versions : {', '.join(e['version'] for e in engines)}",
     ]
     results, pass_count, fail_count, total_warnings = _run_phase(
-        engines, _build_one_game, max_workers, vs_version, "Game"
+        engines, GAME_TARGET, max_workers, vs_version, "Game"
     )
     _write_phase_log(
         LOG_FILE_GAME, header, engines, results,
@@ -475,50 +562,49 @@ def run_build_test_game(engines: List[dict], max_workers: int = 2,
 def run_build_test(engines: List[dict], max_workers: int = 3,
                    vs_version: Optional[str] = None,
                    include_game: bool = True,
-                   game_max_workers: int = 2) -> int:
+                   game_max_workers: int = 3) -> int:
     """
     Build all engine versions: Editor phase, then optional Game phase (WITH_EDITOR=0).
 
-    :param max_workers: Max concurrent Editor builds.
-    :param include_game: Run UnrealGame Development phase after Editor (default True).
-    :param game_max_workers: Max concurrent Game builds (default 2).
+    :param max_workers: concurrent Editor-phase engines (isolated temp per version).
+    :param include_game: Run Nexus Game target after Editor (default True).
+    :param game_max_workers: concurrent Game-phase engines.
     :return: Total failed version slots across phases.
     """
     LOG_DIR.mkdir(parents=True, exist_ok=True)
-    TEMP_BASE.mkdir(parents=True, exist_ok=True)
-    if include_game:
-        _TEMP_GAME_BASE.mkdir(parents=True, exist_ok=True)
+    _reset_temp_workspace()
+    print(f"Isolated builds under: {TEMP_BASE}", flush=True)
 
-    plugin_path = str(PLUGIN_PATH)
-    target = _PLATFORM_TARGET.get(_SYSTEM, "Linux")
+    platform_name = _PLATFORM_TARGET.get(_SYSTEM, "Linux")
+    project = str(UPROJECT_PATH)
 
-    print("=== Phase 1: DevelopmentEditor (WITH_EDITOR=1) ===", flush=True)
+    print("=== Phase 1: NexusEditor Development (WITH_EDITOR=1) ===", flush=True)
     editor_results, ed_pass, ed_fail, ed_warn = _run_phase(
-        engines,
-        lambda e, idx, tot, pl, tty, vs: _build_one(e, plugin_path, idx, tot, pl, tty, vs),
-        max_workers,
-        vs_version,
-        "Editor",
+        engines, EDITOR_TARGET, max_workers, vs_version, "Editor",
     )
 
     game_results: Dict[str, Dict] = {}
     gm_pass = gm_fail = gm_warn = 0
     if include_game:
-        print("\n=== Phase 2: UnrealGame Development (WITH_EDITOR=0) ===", flush=True)
+        print("\n=== Phase 2: Nexus Development (WITH_EDITOR=0) ===", flush=True)
         game_results, gm_pass, gm_fail, gm_warn = _run_phase(
-            engines, _build_one_game, game_max_workers, vs_version, "Game"
+            engines, GAME_TARGET, game_max_workers, vs_version, "Game"
         )
 
     sep = "=" * 64
     lines_out: List[str] = [
-        "NexusLink Cross-Version Build Report",
+        "NexusUnreal Cross-Version Build Report",
         f"Time     : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        f"Platform : {_SYSTEM}  (TargetPlatforms={target})",
-        f"Plugin   : {plugin_path}",
+        f"Platform : {_SYSTEM}  (UBT Platform={platform_name})",
+        f"Project  : {project} (read-only)",
+        f"BuildDir : {TEMP_BASE}",
+        f"Workers  : Editor={max_workers}"
+        + (f" Game={game_max_workers}" if include_game else ""),
+        f"Targets  : {EDITOR_TARGET} (Editor) / {GAME_TARGET} (Game)",
         f"Versions : {', '.join(e['version'] for e in engines)}",
         f"Phases   : Editor{' + Game (WITH_EDITOR=0)' if include_game else ''}",
         "",
-        "=== Phase 1: DevelopmentEditor (WITH_EDITOR=1) ===",
+        "=== Phase 1: NexusEditor Development (WITH_EDITOR=1) ===",
         "",
     ]
 
@@ -532,8 +618,8 @@ def run_build_test(engines: List[dict], max_workers: int = 3,
     if include_game:
         lines_out.extend([
             "",
-            "=== Phase 2: UnrealGame Development (WITH_EDITOR=0) ===",
-            f"Method         : temp copy + uplugin Type UncookedOnly→Runtime + BuildPlugin",
+            "=== Phase 2: Nexus Development (WITH_EDITOR=0) ===",
+            f"Method         : UBT {GAME_TARGET} Development -Project=<isolated temp> -NoMutex",
             "",
         ])
         for engine in engines:
@@ -554,11 +640,11 @@ def run_build_test(engines: List[dict], max_workers: int = 3,
 
     if include_game:
         game_header = [
-            "NexusLink Game-Target Build Report (WITH_EDITOR=0)",
+            "NexusUnreal Game-Target Build Report (WITH_EDITOR=0)",
             f"Time     : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            f"Target   : UnrealGame {target} Development",
-            f"Method   : temp copy + uplugin Type UncookedOnly→Runtime + BuildPlugin",
-            f"Plugin   : {PLUGIN_PATH}",
+            f"Target   : {GAME_TARGET} {platform_name} Development",
+            f"Method   : UBT Build.bat/sh -Project=<isolated temp> -NoMutex",
+            f"Project  : {UPROJECT_PATH} (read-only; build dir {TEMP_BASE})",
             f"Versions : {', '.join(e['version'] for e in engines)}",
             "(extracted from build_test.py phase 2 — see also Build.Log)",
         ]
@@ -577,9 +663,10 @@ def run_build_test(engines: List[dict], max_workers: int = 3,
     return total_fail
 
 
-
 def main() -> int:
-    parser = argparse.ArgumentParser(description="NexusLink cross-version build test")
+    parser = argparse.ArgumentParser(
+        description="NexusUnreal cross-version project build (all installed engines)"
+    )
     parser.add_argument(
         "--ue-root",
         default=None,
@@ -590,7 +677,7 @@ def main() -> int:
         type=int,
         default=3,
         metavar="N",
-        help="Max concurrent build workers (default 3); too many cause MSVC PCH OOM C3859",
+        help="Max concurrent Editor-phase builds (default 3). Each engine uses an isolated temp project.",
     )
     parser.add_argument(
         "--versions",
@@ -611,24 +698,24 @@ def main() -> int:
     phase.add_argument(
         "--editor-only",
         action="store_true",
-        help="Skip Game phase (WITH_EDITOR=0); only run DevelopmentEditor",
+        help="Skip Game phase (WITH_EDITOR=0); only build NexusEditor",
     )
     phase.add_argument(
         "--game-only",
         action="store_true",
-        help="Only run UnrealGame Development (WITH_EDITOR=0); writes Build.Game.Log",
+        help="Only build Nexus Game target (WITH_EDITOR=0); writes Build.Game.Log",
     )
     parser.add_argument(
         "--game-max-workers",
         type=int,
-        default=2,
+        default=None,
         metavar="N",
-        help="Max concurrent Game-phase workers (default 2)",
+        help="Max concurrent Game-phase workers (default: same as --max-workers)",
     )
     args = parser.parse_args()
 
-    if not PLUGIN_PATH.is_file():
-        print(f"[ERROR] Plugin file not found: {PLUGIN_PATH}", file=sys.stderr)
+    if not UPROJECT_PATH.is_file():
+        print(f"[ERROR] Project file not found: {UPROJECT_PATH}", file=sys.stderr)
         return 1
 
     try:
@@ -656,16 +743,30 @@ def main() -> int:
     print()
 
     if args.versions:
+        bad = [v for v in args.versions if not v.startswith("UE_")]
+        if bad:
+            print(
+                f"[ERROR] --versions must use UE_ prefix (got {bad}), e.g. UE_5.7",
+                file=sys.stderr,
+            )
+            return 1
         allowed = set(args.versions)
         engines = [e for e in engines if e["version"] in allowed]
         if not engines:
             print(f"[ERROR] Specified versions {args.versions} not found in discovered list", file=sys.stderr)
             return 1
 
+    if args.max_workers < 1:
+        print("[ERROR] --max-workers must be >= 1", file=sys.stderr)
+        return 1
+    game_workers = args.game_max_workers if args.game_max_workers is not None else args.max_workers
+    if game_workers < 1:
+        print("[ERROR] --game-max-workers must be >= 1", file=sys.stderr)
+        return 1
     if args.game_only:
         fail_count = run_build_test_game(
             engines,
-            max_workers=args.game_max_workers,
+            max_workers=game_workers,
             vs_version=args.vs,
         )
     else:
@@ -674,7 +775,7 @@ def main() -> int:
             max_workers=args.max_workers,
             vs_version=args.vs,
             include_game=not args.editor_only,
-            game_max_workers=args.game_max_workers,
+            game_max_workers=game_workers,
         )
     return 0 if fail_count == 0 else 1
 

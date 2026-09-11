@@ -1,6 +1,6 @@
 @echo off
 :: Copyright byteyang. All Rights Reserved.
-:: NexusLink Game-target build test (WITH_EDITOR=0) - Windows entry
+:: NexusUnreal Game 目标编译 (Nexus / WITH_EDITOR=0) - Windows 入口
 :: Usage: build_test_game.bat [--ue-root <path>] [--versions UE_X.Y ...] [--vs 2019|2022] [--max-workers N]
 
 setlocal

@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 # Copyright byteyang. All Rights Reserved.
 """
-build_test_game.py -- thin entry for Game-target only (WITH_EDITOR=0).
+build_test_game.py -- thin entry for Game-target only (Nexus / WITH_EDITOR=0).
 
-Delegates to build_test.py --game-only. Full build_test.py runs Editor + Game by default.
+Delegates to build_test.py --game-only. Full build_test.py 编整个 Nexus.uproject（Editor + Game）。
 
 Usage:
     python build_test_game.py [--versions UE_X.Y ...]

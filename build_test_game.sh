@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright byteyang. All Rights Reserved.
-# NexusLink Game-target build test (WITH_EDITOR=0)
+# NexusUnreal Game 目标编译 (Nexus / WITH_EDITOR=0)
 # 用法: ./build_test_game.sh [--ue-root <路径>] [--versions UE_X.Y ...] [--vs 2019|2022] [--max-workers N]
 
 set -euo pipefail
