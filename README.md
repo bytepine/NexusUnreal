@@ -1,6 +1,6 @@
 ﻿# NexusUnreal
 
-**公开** UE 4.26 **示例工程**：演示如何在 ThirdPerson 模板项目中集成 [NexusLink](https://github.com/bytepine/NexusLink) MCP 插件。含 UnLua 脚本、游戏 C++ 模块与 MCP 回归测试宿主。
+**公开** UE 5.7 **示例工程**：演示如何在 ThirdPerson 模板项目中集成 [NexusLink](https://github.com/bytepine/NexusLink) MCP 插件。含 UnLua 脚本、游戏 C++ 模块与 MCP 回归测试宿主。
 
 > 本仓**不包含** NexusLink 插件本体（以 git 子模块挂载）；Fab / 商店用户请单独安装插件，或克隆时 `--recurse-submodules`。
 >
@@ -22,7 +22,7 @@ git clone --recurse-submodules https://github.com/bytepine/NexusUnreal.git
 git submodule update --init --recursive
 ```
 
-引擎：`Nexus.uproject` → `EngineAssociation: 4.26`
+引擎：`Nexus.uproject` → `EngineAssociation: 5.7`
 
 ---
 
@@ -30,9 +30,9 @@ git submodule update --init --recursive
 
 | 用途 | 路径 |
 |------|------|
-| 默认关卡 | `/Game/ThirdPersonBP/Maps/ThirdPersonExampleMap` |
-| 蓝图 / GameMode | `/Game/ThirdPersonBP/` |
-| 角色动画 | `/Game/Mannequin/` |
+| 默认关卡 | `/Game/ThirdPerson/Lvl_ThirdPerson` |
+| 蓝图 / GameMode | `/Game/ThirdPerson/` |
+| 角色动画 | `/Game/Characters/Mannequins/` |
 | UnLua 脚本 | `Content/Script/` |
 | 游戏 C++ | `Source/Nexus/` |
 | **NexusLink 插件**（子模块） | `Plugins/Developer/NexusLink/` |
@@ -54,7 +54,7 @@ git submodule update --init --recursive
 
 | 任务 | 命令 |
 |------|------|
-| 游戏 C++ 编译 | `py Script/build_test_game.py --versions UE_4.26` |
+| 游戏 C++ 编译 | `py Script/build_test_game.py --versions UE_5.7` |
 | 跨版本插件编译 | `build_test.bat`（见 NexusLink 文档） |
 | L2 MCP 回归（日常，headless） | `py Script/run_e2e.py` |
 | L2 MCP 全量（GUI，含 PIE/Lua） | `py Script/run_e2e.py --gui` 或 `--full` |

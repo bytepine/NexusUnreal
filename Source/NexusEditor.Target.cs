@@ -5,10 +5,11 @@ using System.Collections.Generic;
 
 public class NexusEditorTarget : TargetRules
 {
-	public NexusEditorTarget( TargetInfo Target) : base(Target)
+	public NexusEditorTarget(TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Editor;
-		DefaultBuildSettings = BuildSettingsVersion.V2;
-		ExtraModuleNames.AddRange( new string[] { "Nexus" } );
+		DefaultBuildSettings = BuildSettingsVersion.V6;
+		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_7;
+		ExtraModuleNames.Add("Nexus");
 	}
 }

@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 
 from _framework.capability_probe import is_capability_available
-from _framework.mcp_client import cap_first
+from _framework.mcp_client import MCPError, cap_first
 
 pytestmark = [pytest.mark.l3_asset, pytest.mark.skipif_ue_below("5.0")]
 
@@ -34,12 +34,17 @@ def test_control_rig_create_add_control(test_ns, mcp):
     assert isinstance(cap_first(add), dict), add
     got = cap_first(mcp.call_capability("get_asset_control_rig", assetPath=path))
     assert not got.get("error"), got
-    bad = mcp.call_capability(
-        "manage_asset_control_rig",
-        assetPath=path,
-        operations=[{"action": "not_a_real_action"}],
-    )
-    assert cap_first(bad).get("error"), bad
+    try:
+        bad = cap_first(
+            mcp.call_capability(
+                "manage_asset_control_rig",
+                assetPath=path,
+                operations=[{"action": "not_a_real_action"}],
+            )
+        )
+    except MCPError as exc:
+        bad = {"error": str(exc)}
+    assert bad.get("error"), bad
 
 
 def test_control_rig_remaining_actions(test_ns, mcp):

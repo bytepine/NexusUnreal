@@ -5,7 +5,10 @@
 build_test.py -- NexusLink cross-version build test
 
 Runs BuildPlugin against all installed UE versions:
-  Phase 1 — DevelopmentEditor (WITH_EDITOR=1; NexusLink.uplugin Type: UncookedOnly)
+  Phase 1 — DevelopmentEditor (WITH_EDITOR=1; NexusLink.uplugin Type: UncookedOnly).
+            Optional-plugin caps (GAS/Niagara/ControlRig/…) compile when that
+            engine's Plugins tree has the corresponding .uplugin (same disk probe
+            as a real host). Game-target still skips them (editor APIs).
   Phase 2 — UnrealGame Development (WITH_EDITOR=0, temp copy; UncookedOnly→Runtime rewrite for compile check)
 
 Writes error logs to Saved/Logs/Build.Log (+ Build.Game.Log for phase 2).

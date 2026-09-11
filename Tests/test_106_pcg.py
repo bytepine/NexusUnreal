@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 
 from _framework.capability_probe import is_capability_available
-from _framework.mcp_client import cap_first
+from _framework.mcp_client import MCPError, cap_first
 
 pytestmark = [pytest.mark.l3_asset, pytest.mark.skipif_ue_below("5.4")]
 
@@ -53,12 +53,17 @@ def test_pcg_create_add_remove_edge(test_ns, mcp):
     assert not cap_first(rem).get("error"), rem
     got = cap_first(mcp.call_capability("get_asset_pcg_graph", assetPath=path))
     assert not got.get("error"), got
-    bad = mcp.call_capability(
-        "manage_asset_pcg_graph",
-        assetPath=path,
-        operations=[{"action": "not_a_real_action"}],
-    )
-    assert cap_first(bad).get("error"), bad
+    try:
+        bad = cap_first(
+            mcp.call_capability(
+                "manage_asset_pcg_graph",
+                assetPath=path,
+                operations=[{"action": "not_a_real_action"}],
+            )
+        )
+    except MCPError as exc:
+        bad = {"error": str(exc)}
+    assert bad.get("error"), bad
     rm_node = mcp.call_capability(
         "manage_asset_pcg_graph",
         assetPath=path,

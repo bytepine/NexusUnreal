@@ -21,6 +21,7 @@
 - docs: 仓库改为公开（NexusLink 示例工程）；README 移除私有/NexusWork 表述；测试策略——新功能补 **manage 每 action / get 每 named section**、默认 headless、全覆盖验证走 `--gui`；NexusLink 发版按本次变更选 headless 或 `--gui`
 - chore(test): `legacy_map` 与插件 C++ 旧名表对齐（补 `get_behavior_tree`，去掉恒等 `list_runtime_widgets`）
 - chore(script): `apply_ai_zh.py` 的 `CAP_DESC_ZH` 补 `exec_python` / `get_python_api` 中文描述
+- chore(unreal): 示例工程替换为 UE 5.7 第三人称模板（含 Combat/Platforming/SideScrolling 变体）；`EngineAssociation: 5.7`；默认关卡 `/Game/ThirdPerson/Lvl_ThirdPerson`；日常编译/E2E 跟 Association；`Nexus.uproject` 启用 ModelViewViewModel / PCG / PoseSearch / CommonUI / MoviePipeline——插件对这几个可选插件的 cap 已链接成功，不启用会让 DLL 缺 import 导致 NexusLink 加载失败
 
 ### Security
 
@@ -31,3 +32,5 @@
 - fix(test): 全量 e2e 对齐——`skipif_ue_below` 移入 `pytest_runtest_setup`；用例统一 `cap_first` / `operations[]`；EQS 缺 cap 时 skip；`audit_capability_naming` 补 `unload`、期望数 176；GUI/PIE 对齐 `spawn_runtime_actor` 单条、`control_pie` results[]、`set_runtime_widget_property` 的 `updates[]`；补覆盖用例参数对齐真实 Schema（`rootMotion`/`anchorMin*`/`attribute`/`startFrame`/`halfHeight`/`updates[].actorName`），schema 校验失败 skip 而非 fail
 - fix(test): `test_bp_graph_connect_exec` 缺 BeginPlay 时经 `manage_asset_blueprint` 补 `K2Node_Event`；`test_anim_montage_create` 创建后 `add_segment`（Mannequin Idle）并 save；`exec_command` 改用 `stat fps`（避免 `help stat` 弹 `ConsoleHelp.html`）
 - fix(test): `ue_launcher` 自动拉起时跳过启动前已在听的 MCP 端口，避免本机已有 Editor 占着 `:45000` 时把 headless 新实例误接到旧进程
+- fix(test): 用例与真实 Schema 对齐（此前这些 cap 因可选插件未启用而从未真跑过）——MetaSound 用 `classID`/`nodeID`/`fromNodeID`；MVVM `add_binding` 不吃参数、`remove_binding` 只认 `bindingIndex`；InputAction `remove_trigger`/`remove_modifier` 按 `className` 而非 `index`、`set_flags` 用 `consumesInput`；`not_a_real_action` 负例统一接受 schema 层 `MCPError`（IKRig / MVVM / PCG / ControlRig）
+- fix(test): `test_101` 的 `f"/Game/{test_ns}"` 把已带前缀的 ns 再拼一次，拼出 `/Game//Game/...`；`test_108` 的 StringTable 与 `test_97_statetree_manage` 撞同一个 `{test_ns}/ST_Created`，先跑的占位导致 StateTree 整组 not found，改名 `StrTable_Created`；IMC 单条结果响应被压平后 `results` 为空，改走 `or [cap_first(...)]`

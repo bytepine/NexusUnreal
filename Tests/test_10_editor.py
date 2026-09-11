@@ -72,7 +72,7 @@ def test_exec_python_undo_recorded_matches_engine(mcp, require_tools):
     require_tools("exec_python")
     code = (
         "import unreal\n"
-        "o = unreal.load_asset('/Game/ThirdPersonBP/Blueprints/ThirdPersonCharacter')\n"
+        "o = unreal.load_asset('/Game/ThirdPerson/Blueprints/BP_ThirdPersonCharacter')\n"
         "print('NEXUS_MODIFY:' + str(o.modify(False)))\n"
     )
     r = cap_first(mcp.call("exec_python", code=code))

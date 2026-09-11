@@ -39,7 +39,7 @@ def test_get_metasound_returns_inputs_outputs(mcp, metasound_path):
 @pytest.mark.skipif_ue_below("5.0")
 def test_create_metasound_asset(mcp, test_ns):
     """create_asset_meta_sound 应能创建 MetaSoundSource 资产。"""
-    pkg  = f"/Game/{test_ns}"
+    pkg  = test_ns
     name = "TestMetaSound_MCP"
     r = mcp.call_capability("create_asset_meta_sound", assetPath=f"{pkg}/{name}")
     entries = r if isinstance(r, list) else [r]
@@ -52,7 +52,7 @@ def test_create_metasound_asset(mcp, test_ns):
 @pytest.mark.skipif_ue_below("5.3")
 def test_manage_metasound_add_input(mcp, test_ns):
     """manage_asset_meta_sound add_input 应成功。"""
-    asset_path = f"/Game/{test_ns}/TestMetaSound_MCP"
+    asset_path = f"{test_ns}/TestMetaSound_MCP"
     r = mcp.call_capability(
         "manage_asset_meta_sound",
         assetPath=asset_path,
@@ -72,10 +72,10 @@ def test_manage_metasound_graph_ops(mcp, test_ns):
         assetPath=asset_path,
         operations=[
             {"action": "add_output", "name": "TestOutput", "typeName": "float"},
-            {"action": "add_node", "nodeClass": "Add"},
-            {"action": "add_edge", "fromNode": "TestInput", "toNode": "TestOutput"},
-            {"action": "remove_edge", "fromNode": "TestInput", "toNode": "TestOutput"},
-            {"action": "remove_node", "nodeId": "0"},
+            {"action": "add_node", "classID": "Add"},
+            {"action": "add_edge", "fromNodeID": "TestInput", "toNodeID": "TestOutput"},
+            {"action": "remove_edge", "fromNodeID": "TestInput", "toNodeID": "TestOutput"},
+            {"action": "remove_node", "nodeID": "0"},
             {"action": "remove_output", "name": "TestOutput"},
         ],
     )
@@ -117,7 +117,7 @@ def test_get_pcg_graph_nodes(mcp, pcg_path):
 @pytest.mark.skipif_ue_below("5.4")
 def test_create_pcg_graph(mcp, test_ns):
     """create_asset_pcg_graph 应能创建 PCGGraph 资产。"""
-    pkg  = f"/Game/{test_ns}"
+    pkg  = test_ns
     name = "TestPCGGraph_MCP"
     r = mcp.call_capability("create_asset_pcg_graph", assetPath=f"{pkg}/{name}")
     entries = r if isinstance(r, list) else [r]

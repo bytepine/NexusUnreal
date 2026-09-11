@@ -106,6 +106,7 @@ venv/
 Content/_McpTest/
 Content/_NexusTest/
 Content/__nexus_*__.uasset
+Content/Developers/
 
 # OS 生成文件
 .DS_Store

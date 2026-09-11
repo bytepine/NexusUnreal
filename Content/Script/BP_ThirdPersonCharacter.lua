@@ -6,7 +6,7 @@
 -- @DATE ${date} ${time}
 --
 
----@type ThirdPersonCharacter_C
+---@type BP_ThirdPersonCharacter_C
 local M = UnLua.Class()
 
 -- function M:Initialize(Initializer)

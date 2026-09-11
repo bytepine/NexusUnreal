@@ -29,7 +29,7 @@ def test_get_asset_texture_project_sample(mcp, require_tools):
     listing = mcp.call_capability(
         "search_asset",
         assetType="Texture2D",
-        pathFilter="/Game/Mannequin/Character/Textures",
+        pathFilter="/Game/Characters/Mannequins/Textures",
         limit=10,
     )
     payload = cap_first(listing)
@@ -44,7 +44,7 @@ def test_get_asset_texture_project_sample(mcp, require_tools):
             path = candidate
             break
     if not path:
-        path = "/Game/Mannequin/Character/Textures/T_Male_N"
+        path = "/Game/Characters/Mannequins/Textures/Quinn/T_Quinn_01_N"
     assert path, "无法定位有效 Texture2D 样本"
     r = mcp.call_capability("get_asset_texture", assetPath=path)
     entry = cap_first(r)

@@ -11,7 +11,8 @@ pytestmark = pytest.mark.l3_asset
 
 
 def test_string_table_roundtrip(test_ns, mcp):
-    path = f"{test_ns}/ST_Created"
+    # 不要叫 ST_Created：test_97_statetree_manage 用同名建 StateTree，会抢同一个包
+    path = f"{test_ns}/StrTable_Created"
     cr = mcp.call_capability("create_asset_string_table", assetPath=path, namespace="NxTest")
     entry = cap_first(cr)
     if entry.get("error") and "already exists" not in str(entry.get("error")).lower():

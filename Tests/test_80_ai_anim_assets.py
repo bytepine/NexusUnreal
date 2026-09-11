@@ -224,7 +224,7 @@ def test_anim_montage_create(test_ns, mcp, template_skeleton):
                  skeletonPath=template_skeleton)
     assert r, f"create_asset_anim_montage returned empty: {r!r}"
     # 空白 Montage 时长为 0；补一段 Idle 才能 play_montage
-    seq = first_asset_path(mcp, "AnimSequence", path_filter="/Game/Mannequin")
+    seq = first_asset_path(mcp, "AnimSequence", path_filter="/Game/Characters/Mannequins")
     assert seq, "无法定位 AnimSequence 样本以填充 Montage"
     add = mcp.call_capability(
         "manage_asset_anim_montage",
@@ -587,7 +587,7 @@ def test_manage_anim_blueprint_states_and_wires(test_ns, mcp, template_skeleton)
 def test_manage_anim_montage_section_and_remove(test_ns, mcp, template_skeleton):
     path = f"{test_ns}/AM_Sections"
     mcp.call("create_asset_anim_montage", assetPath=path, skeletonPath=template_skeleton)
-    seq = first_asset_path(mcp, "AnimSequence", path_filter="/Game/Mannequin")
+    seq = first_asset_path(mcp, "AnimSequence", path_filter="/Game/Characters/Mannequins")
     if not seq:
         pytest.skip("无 AnimSequence")
     r = mcp.call_capability(

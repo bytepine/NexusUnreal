@@ -45,7 +45,7 @@ def test_manage_input_action_set_value_type(test_ns, mcp):
 
     # 验证已更新
     check = mcp.call_capability("get_asset_input_action", assetPath=path)
-    assert check.get("results", [{}])[0].get("valueType") == "Axis1D"
+    assert cap_first(check).get("valueType") == "Axis1D", check
 
 
 def test_manage_input_action_add_trigger(test_ns, mcp):
@@ -67,9 +67,9 @@ def test_manage_input_action_remaining(test_ns, mcp):
         assetPath=path,
         operations=[
             {"action": "add_modifier", "className": "InputModifierNegate"},
-            {"action": "set_flags", "bConsumeInput": True},
-            {"action": "remove_trigger", "index": 0},
-            {"action": "remove_modifier", "index": 0},
+            {"action": "set_flags", "consumesInput": True},
+            {"action": "remove_trigger", "className": "InputTriggerPressed"},
+            {"action": "remove_modifier", "className": "InputModifierNegate"},
         ],
     )
     for e in (r.get("results") or [cap_first(r)]):
@@ -105,7 +105,7 @@ def test_manage_imc_add_remove_mapping(test_ns, mcp):
         assetPath=imc_path,
         operations=[{"action": "add_mapping", "actionPath": ia_path, "key": "SpaceBar"}],
     )
-    add_results = add.get("results") or []
+    add_results = add.get("results") or [cap_first(add)]
     assert len(add_results) == 1, add
     assert not add_results[0].get("error"), add
 
@@ -114,7 +114,7 @@ def test_manage_imc_add_remove_mapping(test_ns, mcp):
         assetPath=imc_path,
         operations=[{"action": "remove_mapping", "key": "SpaceBar"}],
     )
-    remove_results = remove.get("results") or []
+    remove_results = remove.get("results") or [cap_first(remove)]
     assert len(remove_results) == 1, remove
     assert remove_results[0].get("removedCount", 0) >= 1, remove
     clr = mcp.call_capability(

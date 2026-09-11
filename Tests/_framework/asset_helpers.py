@@ -8,19 +8,19 @@ from typing import Callable, Optional
 
 from _framework.mcp_client import MCPClient, MCPError, cap_first
 
-# ThirdPerson 模板工程内稳定存在的只读样本（search 失败时回退）
+# UE 5.7 ThirdPerson 模板内稳定存在的只读样本（search 失败时回退）
 _KNOWN_PATHS: dict[str, str] = {
-    "Skeleton": "/Game/Mannequin/Character/Mesh/UE4_Mannequin_Skeleton",
-    "SkeletalMesh": "/Game/Mannequin/Character/Mesh/SK_Mannequin",
-    "AnimSequence": "/Game/Mannequin/Animations/ThirdPersonIdle",
-    "StaticMesh": "/Game/Geometry/Meshes/1M_Cube",
-    "Texture2D": "/Game/Mannequin/Character/Textures/T_Male_N",
-    "Blueprint": "/Game/ThirdPersonBP/Blueprints/ThirdPersonCharacter",
-    "WidgetBlueprint": "/Game/ThirdPersonBP/Blueprints/WBP_Main",
-    "Material": "/Game/ThirdPerson/Meshes/RampMaterial",
-    "World": "/Game/ThirdPersonBP/Maps/ThirdPersonExampleMap",
-    "level": "/Game/ThirdPersonBP/Maps/ThirdPersonExampleMap",
-    "map": "/Game/ThirdPersonBP/Maps/ThirdPersonExampleMap",
+    "Skeleton": "/Game/Characters/Mannequins/Meshes/SK_Mannequin",
+    "SkeletalMesh": "/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple",
+    "AnimSequence": "/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle",
+    "StaticMesh": "/Game/LevelPrototyping/Meshes/SM_Cube",
+    "Texture2D": "/Game/Characters/Mannequins/Textures/Quinn/T_Quinn_01_N",
+    "Blueprint": "/Game/ThirdPerson/Blueprints/BP_ThirdPersonCharacter",
+    "WidgetBlueprint": "/Game/Input/Touch/UI_Thumbstick",
+    "Material": "/Game/LevelPrototyping/Materials/M_PrototypeGrid",
+    "World": "/Game/ThirdPerson/Lvl_ThirdPerson",
+    "level": "/Game/ThirdPerson/Lvl_ThirdPerson",
+    "map": "/Game/ThirdPerson/Lvl_ThirdPerson",
 }
 
 
@@ -147,11 +147,11 @@ def ensure_behavior_tree(mcp: MCPClient, test_ns: str) -> str:
 
 
 def resolve_skeleton(mcp: MCPClient) -> str:
-    """动画类测试依赖的 Skeleton：先搜 Mannequin，再回退已知路径。"""
+    """动画类测试依赖的 Skeleton：先搜 Mannequins，再回退已知路径。"""
     path = first_asset_path(
         mcp,
         "Skeleton",
-        path_filter="/Game/Mannequin",
+        path_filter="/Game/Characters/Mannequins",
         limit=5,
     )
     if not path:

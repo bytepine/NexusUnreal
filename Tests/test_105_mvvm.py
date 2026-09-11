@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 
 from _framework.capability_probe import is_capability_available
-from _framework.mcp_client import cap_first
+from _framework.mcp_client import MCPError, cap_first
 
 pytestmark = [pytest.mark.l3_asset, pytest.mark.skipif_ue_below("5.5")]
 
@@ -33,18 +33,23 @@ def test_manage_view_model_add_and_get(test_ns, mcp):
     assert isinstance(entry, dict), r
     got = cap_first(mcp.call_capability("get_asset_view_model", assetPath=wbp))
     assert not got.get("error"), got
-    bad = mcp.call_capability(
-        "manage_asset_view_model",
-        assetPath=wbp,
-        operations=[{"action": "not_a_real_action"}],
-    )
-    assert cap_first(bad).get("error"), bad
+    try:
+        bad = cap_first(
+            mcp.call_capability(
+                "manage_asset_view_model",
+                assetPath=wbp,
+                operations=[{"action": "not_a_real_action"}],
+            )
+        )
+    except MCPError as exc:
+        bad = {"error": str(exc)}
+    assert bad.get("error"), bad
     extra = mcp.call_capability(
         "manage_asset_view_model",
         assetPath=wbp,
         operations=[
-            {"action": "add_binding", "viewModelName": "NxVM", "widgetName": "Root", "propertyPath": "Text"},
-            {"action": "remove_binding", "viewModelName": "NxVM"},
+            {"action": "add_binding", "viewModelName": "NxVM"},
+            {"action": "remove_binding", "bindingIndex": 0},
             {"action": "remove_view_model", "viewModelName": "NxVM"},
         ],
     )

@@ -7,7 +7,7 @@ import pytest
 
 from _framework.asset_helpers import first_asset_path
 from _framework.capability_probe import is_capability_available
-from _framework.mcp_client import cap_first
+from _framework.mcp_client import MCPError, cap_first
 
 pytestmark = [pytest.mark.l3_asset, pytest.mark.skipif_ue_below("5.0")]
 
@@ -53,12 +53,17 @@ def test_create_ik_retargeter(test_ns, mcp):
         pytest.skip(f"create_asset_ik_retargeter 失败: {entry}")
     got = cap_first(mcp.call_capability("get_asset_ik_retargeter", assetPath=path))
     assert not got.get("error"), got
-    bad = mcp.call_capability(
-        "manage_asset_ik_rig",
-        assetPath=f"{test_ns}/IK_Created",
-        operations=[{"action": "not_a_real_action"}],
-    )
-    assert cap_first(bad).get("error"), bad
+    try:
+        bad = cap_first(
+            mcp.call_capability(
+                "manage_asset_ik_rig",
+                assetPath=f"{test_ns}/IK_Created",
+                operations=[{"action": "not_a_real_action"}],
+            )
+        )
+    except MCPError as exc:
+        bad = {"error": str(exc)}
+    assert bad.get("error"), bad
 
     src = f"{test_ns}/IK_Src"
     tgt = f"{test_ns}/IK_Tgt"

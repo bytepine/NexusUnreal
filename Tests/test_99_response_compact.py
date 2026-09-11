@@ -45,7 +45,7 @@ def test_search_asset_all_still_valid(mcp):
     """assetType='all' 下 assetType 值五花八门，多半不触发压缩；条目字段依然完整。"""
     try:
         r = mcp.call("search_asset", assetType="all",
-                     pathFilter="/Game/ThirdPersonBP", limit=50)
+                     pathFilter="/Game/ThirdPerson", limit=50)
     except MCPError as e:
         pytest.skip(f"search_asset all 被安全策略拒绝：{e}")
     assert_respecting_defaults(

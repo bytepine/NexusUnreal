@@ -13,7 +13,7 @@ pytestmark = pytest.mark.l3_asset
 
 def test_get_asset_anim_sequence_sample(mcp, require_tools):
     require_tools("get_asset_anim_sequence")
-    path = first_asset_path(mcp, "AnimSequence", path_filter="/Game/Mannequin")
+    path = first_asset_path(mcp, "AnimSequence", path_filter="/Game/Characters/Mannequins")
     assert path, "无法定位 AnimSequence 样本"
     r = mcp.call_capability("get_asset_anim_sequence", assetPath=path)
     entry = cap_first(r)
@@ -30,7 +30,7 @@ def test_get_asset_anim_sequence_sample(mcp, require_tools):
 
 def test_get_asset_skeletal_mesh_sample(mcp, require_tools):
     require_tools("get_asset_skeletal_mesh")
-    path = first_asset_path(mcp, "SkeletalMesh", path_filter="/Game/Mannequin")
+    path = first_asset_path(mcp, "SkeletalMesh", path_filter="/Game/Characters/Mannequins")
     assert path, "无法定位 SkeletalMesh 样本"
     r = mcp.call_capability("get_asset_skeletal_mesh", assetPath=path)
     entry = cap_first(r)
@@ -41,7 +41,7 @@ def test_get_asset_skeletal_mesh_sample(mcp, require_tools):
 def test_manage_skeletal_mesh_socket_and_lod(mcp, require_tools):
     """P1：SkeletalMesh mesh-only Socket + LOD ScreenSize。"""
     require_tools("manage_asset_skeletal_mesh", "get_asset_skeletal_mesh")
-    path = first_asset_path(mcp, "SkeletalMesh", path_filter="/Game/Mannequin")
+    path = first_asset_path(mcp, "SkeletalMesh", path_filter="/Game/Characters/Mannequins")
     assert path, "无法定位 SkeletalMesh 样本"
     sock = "NxSkSocket"
     add = mcp.call_capability(
@@ -68,7 +68,7 @@ def test_manage_skeletal_mesh_socket_and_lod(mcp, require_tools):
 
 def test_manage_skeletal_mesh_material_property_set_socket(mcp, require_tools):
     require_tools("manage_asset_skeletal_mesh")
-    path = first_asset_path(mcp, "SkeletalMesh", path_filter="/Game/Mannequin")
+    path = first_asset_path(mcp, "SkeletalMesh", path_filter="/Game/Characters/Mannequins")
     assert path, "无法定位 SkeletalMesh 样本"
     sock = "NxSkSetSock"
     ops = [
@@ -88,7 +88,7 @@ def test_manage_skeletal_mesh_material_property_set_socket(mcp, require_tools):
 
 def test_get_asset_skeleton_sample(mcp, require_tools):
     require_tools("get_asset_skeleton")
-    path = first_asset_path(mcp, "Skeleton", path_filter="/Game/Mannequin")
+    path = first_asset_path(mcp, "Skeleton", path_filter="/Game/Characters/Mannequins")
     assert path, "无法定位 Skeleton 样本"
     r = mcp.call_capability("get_asset_skeleton", assetPath=path, limit=20)
     entry = cap_first(r)
@@ -98,7 +98,7 @@ def test_get_asset_skeleton_sample(mcp, require_tools):
 
 def test_manage_skeleton_sockets(mcp, require_tools):
     require_tools("manage_asset_skeleton", "get_asset_skeleton")
-    path = first_asset_path(mcp, "Skeleton", path_filter="/Game/Mannequin")
+    path = first_asset_path(mcp, "Skeleton", path_filter="/Game/Characters/Mannequins")
     assert path, "无法定位 Skeleton 样本"
     sock = "NxSkelSock"
     r = mcp.call_capability(
