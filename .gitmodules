@@ -1,3 +1,6 @@
 [submodule "Plugins/Developer/NexusLink"]
 	path = Plugins/Developer/NexusLink
 	url = ../NexusLink
+[submodule "Plugins/UnLua"]
+	path = Plugins/UnLua
+	url = https://github.com/bytepine/UnLua.git
