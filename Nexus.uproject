@@ -77,6 +77,10 @@
 		{
 			"Name": "UnLua",
 			"Enabled": true
+		},
+		{
+			"Name": "UnLuaTestSuite",
+			"Enabled": true
 		}
 	]
 }
