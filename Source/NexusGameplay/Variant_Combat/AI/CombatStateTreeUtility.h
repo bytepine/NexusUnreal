@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "StateTreeTaskBase.h"
 #include "StateTreeConditionBase.h"
+#include "NexusGameplayVersionCompat.h"
 
 #include "CombatStateTreeUtility.generated.h"
 
@@ -28,7 +29,7 @@ struct FStateTreeCharacterGroundedConditionInstanceData
 	UPROPERTY(EditAnywhere, Category = "Condition")
 	bool bMustBeOnAir = false;
 };
-STATETREE_POD_INSTANCEDATA(FStateTreeCharacterGroundedConditionInstanceData);
+NG_STATETREE_POD_INSTANCEDATA(FStateTreeCharacterGroundedConditionInstanceData);
 
 /**
  *  StateTree condition to check if the character is grounded
@@ -48,7 +49,7 @@ struct FStateTreeCharacterGroundedCondition : public FStateTreeConditionCommonBa
 	/** Tests the StateTree condition */
 	virtual bool TestCondition(FStateTreeExecutionContext& Context) const override;
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 
 	/** Provides the description string */
 	virtual FText GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting = EStateTreeNodeFormatting::Text) const override;
@@ -82,7 +83,7 @@ struct FStateTreeIsInDangerConditionInstanceData
 	UPROPERTY(EditAnywhere, Category = "Parameters", meta = (Units = "degrees"))
 	float DangerSightConeAngle = 120.0f;
 };
-STATETREE_POD_INSTANCEDATA(FStateTreeIsInDangerConditionInstanceData);
+NG_STATETREE_POD_INSTANCEDATA(FStateTreeIsInDangerConditionInstanceData);
 
 /**
  *  StateTree condition to check if the character is about to be hit by an attack
@@ -102,7 +103,7 @@ struct FStateTreeIsInDangerCondition : public FStateTreeConditionCommonBase
 	/** Tests the StateTree condition */
 	virtual bool TestCondition(FStateTreeExecutionContext& Context) const override;
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 
 	/** Provides the description string */
 	virtual FText GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting = EStateTreeNodeFormatting::Text) const override;
@@ -143,7 +144,7 @@ struct FStateTreeComboAttackTask : public FStateTreeTaskCommonBase
 	/** Runs when the owning state is ended */
 	virtual void ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 	virtual FText GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting = EStateTreeNodeFormatting::Text) const override;
 #endif // WITH_EDITOR
 };
@@ -166,7 +167,7 @@ struct FStateTreeChargedAttackTask : public FStateTreeTaskCommonBase
 	/** Runs when the owning state is ended */
 	virtual void ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 	virtual FText GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting = EStateTreeNodeFormatting::Text) const override;
 #endif // WITH_EDITOR
 };
@@ -189,7 +190,7 @@ struct FStateTreeWaitForLandingTask : public FStateTreeTaskCommonBase
 	/** Runs when the owning state is ended */
 	virtual void ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 	virtual FText GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting = EStateTreeNodeFormatting::Text) const override;
 #endif // WITH_EDITOR
 };
@@ -231,7 +232,7 @@ struct FStateTreeFaceActorTask : public FStateTreeTaskCommonBase
 	/** Runs when the owning state is ended */
 	virtual void ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 	virtual FText GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting = EStateTreeNodeFormatting::Text) const override;
 #endif // WITH_EDITOR
 };
@@ -273,7 +274,7 @@ struct FStateTreeFaceLocationTask : public FStateTreeTaskCommonBase
 	/** Runs when the owning state is ended */
 	virtual void ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 	virtual FText GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting = EStateTreeNodeFormatting::Text) const override;
 #endif // WITH_EDITOR
 };
@@ -312,7 +313,7 @@ struct FStateTreeSetCharacterSpeedTask : public FStateTreeTaskCommonBase
 	/** Runs when the owning state is entered */
 	virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 	virtual FText GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting = EStateTreeNodeFormatting::Text) const override;
 #endif // WITH_EDITOR
 };
@@ -359,7 +360,7 @@ struct FStateTreeGetPlayerInfoTask : public FStateTreeTaskCommonBase
 	/** Runs while the owning state is active */
 	virtual EStateTreeRunStatus Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const override;
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 	virtual FText GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting = EStateTreeNodeFormatting::Text) const override;
 #endif // WITH_EDITOR
 };

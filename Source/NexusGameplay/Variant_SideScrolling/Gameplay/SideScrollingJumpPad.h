@@ -23,7 +23,7 @@ class ASideScrollingJumpPad : public AActor
 protected:
 
 	/** Vertical velocity to set the character to when they use the jump pad */
-	UPROPERTY(EditAnywhere, Category="Jump Pad", meta = (ClampMin=0, ClampMax=10000, Units="cm/s"))
+	UPROPERTY(EditAnywhere, Category="Jump Pad", meta = (ClampMin=0, ClampMax=10000))
 	float ZStrength = 1000.0f;
 
 public:	

@@ -11,7 +11,7 @@
  *  Returns the enemy character's last known danger location
  */
 UCLASS()
-class NEXUS_API UEnvQueryContext_Danger : public UEnvQueryContext
+class NEXUSGAMEPLAY_API UEnvQueryContext_Danger : public UEnvQueryContext
 {
 	GENERATED_BODY()
 	

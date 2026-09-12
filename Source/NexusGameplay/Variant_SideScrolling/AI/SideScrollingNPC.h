@@ -20,11 +20,11 @@ class ASideScrollingNPC : public ACharacter, public ISideScrollingInteractable
 protected:
 
 	/** Horizontal impulse to apply to the NPC when it's interacted with */
-	UPROPERTY(EditAnywhere, Category="NPC", meta = (ClampMin = 0, ClampMax = 10000, Units="cm/s"))
+	UPROPERTY(EditAnywhere, Category="NPC", meta = (ClampMin = 0, ClampMax = 10000))
 	float LaunchImpulse = 500.0f;
 
 	/** Vertical impulse to apply to the NPC when it's interacted with */
-	UPROPERTY(EditAnywhere, Category="NPC", meta = (ClampMin = 0, ClampMax = 10000, Units="cm/s"))
+	UPROPERTY(EditAnywhere, Category="NPC", meta = (ClampMin = 0, ClampMax = 10000))
 	float LaunchVerticalImpulse = 500.0f;
 
 	/** Time that the NPC remains deactivated after being interacted with */

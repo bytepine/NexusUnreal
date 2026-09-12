@@ -12,6 +12,8 @@ build_test.py -- NexusUnreal 工程跨版本编译
 每套引擎在系统临时目录建隔离工程：junction Content/Source/Config，
 插件根建真实目录（Intermediate 落在临时树），然后对该副本调 UBT。
 多引擎可并行（默认 --max-workers 3）。
+开跑前清残留 UBT / 调用 UBT 的 dotnet / 相关 MSBuild / VBCSCompiler，
+避免上次中断锁住 UnLuaDefaultParamCollectorUbtPlugin.dll 导致临时目录删不掉。
 
 日志：Saved/Logs/Build.Log（+ Build.Game.Log 对应 phase 2）。
 
@@ -28,6 +30,7 @@ Args:
 
 import argparse
 import atexit
+import json
 import os
 import platform
 import re
@@ -37,6 +40,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
@@ -52,20 +56,27 @@ GAME_TARGET = "Nexus"
 LOG_DIR = NEXUS_UNREAL_DIR / "Saved" / "Logs"
 LOG_FILE = LOG_DIR / "Build.Log"
 LOG_FILE_GAME = LOG_DIR / "Build.Game.Log"
-TEMP_BASE = Path(tempfile.gettempdir()) / "NexusBuildTest"
+TEMP_BASE = NEXUS_UNREAL_DIR / "Saved" / "NexusBuildTest"
 
 _SYSTEM = platform.system()  # "Windows" | "Darwin" | "Linux"
 
 # 插件树里这些目录会由 UBT 写入，不能 junction 回仓库。
 _SKIP_DIR_NAMES = frozenset({
     "Intermediate", "Binaries", "Saved", "DerivedDataCache",
-    ".git", ".vs", ".idea", "__pycache__",
+    ".git", ".vs", ".idea", "__pycache__", "obj",
 })
 
-# UE 版本中 UBT 默认查找 VS2017 的版本集——这些版本在仅装 VS2019/VS2022 的
-# 机器上会报 `ERROR: Visual Studio 2017 must be installed`。未显式传 --vs 时
-# 自动回落到 VS2019（4.26/4.27 官方均支持 VS2019）。
+# UE 4.26 / 4.27 在仅装 VS2019+ 的机器上需要 -VS2019。
 _VS2019_FALLBACK_VERSIONS = frozenset({"UE_4.26", "UE_4.27"})
+
+# 仅 VS2026 时：把 VS18 当成 VS2022，并按引擎 preferred 选侧载 MSVC（勿一律用 14.50+）。
+_MSVC_PREFERRED_PREFIXES = {
+    "UE_5.2": ("14.34",),
+    "UE_5.3": ("14.36", "14.35", "14.34"),
+    "UE_5.4": ("14.38", "14.37", "14.36", "14.35", "14.34"),
+    "UE_5.5": ("14.38",),
+    "UE_5.6": ("14.38",),
+}
 
 _PLATFORM_TARGET = {
     "Windows": "Win64",
@@ -116,6 +127,160 @@ def _cleanup_all() -> None:
 def _signal_handler(sig: int, frame) -> None:
     _cleanup_all()
     sys.exit(1)
+
+
+def _is_leftover_build_process(name: str, cmdline: str) -> bool:
+    """只认 UBT 相关残留，不误杀 Rider / 其它 dotnet。"""
+    n = (name or "").rsplit("\\", 1)[-1].rsplit("/", 1)[-1].lower()
+    c = (cmdline or "").lower()
+    if n in ("unrealbuildtool.exe", "unrealbuildtool", "vbcscompiler.exe", "vbcscompiler"):
+        return True
+    if n in ("msbuild.exe", "msbuild"):
+        return "unrealbuildtool" in c or "nexusbuildtest" in c
+    if n in ("dotnet.exe", "dotnet"):
+        return "unrealbuildtool" in c
+    return False
+
+
+def _list_leftover_build_processes() -> List[Tuple[int, str, str]]:
+    """(pid, name, cmdline_snippet)"""
+    found: List[Tuple[int, str, str]] = []
+    self_pid = os.getpid()
+    if _SYSTEM == "Windows":
+        ps = (
+            "$hits = Get-CimInstance Win32_Process | Where-Object { "
+            "$n = $_.Name; $c = [string]$_.CommandLine; "
+            "($n -match '^(UnrealBuildTool|VBCSCompiler)\\.exe$') -or "
+            "($n -eq 'MSBuild.exe' -and ($c -match 'UnrealBuildTool|NexusBuildTest')) -or "
+            "($n -eq 'dotnet.exe' -and $c -match 'UnrealBuildTool') "
+            "}; if ($hits) { $hits | Select-Object ProcessId, Name, CommandLine | ConvertTo-Json -Compress }"
+        )
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0 or not (result.stdout or "").strip():
+            return found
+        try:
+            data = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            return found
+        if isinstance(data, dict):
+            data = [data]
+        for item in data or []:
+            try:
+                pid = int(item.get("ProcessId") or 0)
+            except (TypeError, ValueError):
+                continue
+            if pid <= 0 or pid == self_pid:
+                continue
+            name = str(item.get("Name") or "")
+            cmdline = str(item.get("CommandLine") or "")
+            if _is_leftover_build_process(name, cmdline):
+                found.append((pid, name, cmdline[:180]))
+        return found
+
+    result = subprocess.run(
+        ["ps", "-ax", "-o", "pid=,comm=,args="],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return found
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split(None, 2)
+        if len(parts) < 2:
+            continue
+        try:
+            pid = int(parts[0])
+        except ValueError:
+            continue
+        if pid == self_pid:
+            continue
+        name = parts[1]
+        cmdline = parts[2] if len(parts) > 2 else ""
+        if _is_leftover_build_process(name, cmdline):
+            found.append((pid, name, cmdline[:180]))
+    return found
+
+
+def _kill_leftover_build_processes() -> None:
+    """开测前清残留编译进程，避免锁住隔离目录里的 UBT 插件 DLL。"""
+    leftovers = _list_leftover_build_processes()
+    if not leftovers:
+        print("No leftover UBT/MSBuild processes.", flush=True)
+        return
+    print(f"Killing {len(leftovers)} leftover build process(es):", flush=True)
+    for pid, name, cmdline in leftovers:
+        print(f"  pid={pid} {name} {cmdline}", flush=True)
+        try:
+            if _SYSTEM == "Windows":
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            else:
+                os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+    time.sleep(2)
+
+
+def _list_installed_msvc() -> List[str]:
+    vs_root = Path(r"C:\Program Files\Microsoft Visual Studio")
+    found: List[str] = []
+    if not vs_root.is_dir():
+        return found
+    for root in vs_root.glob("*/*/VC/Tools/MSVC"):
+        if not root.is_dir():
+            continue
+        for child in root.iterdir():
+            if child.is_dir() and (child / "bin" / "Hostx64" / "x64" / "cl.exe").is_file():
+                found.append(child.name)
+    found.sort(key=lambda v: tuple(int(x) for x in v.split(".") if x.isdigit()))
+    return found
+
+
+def _detect_msvc_for(ver: Optional[str]) -> Optional[str]:
+    """按引擎 preferred 前缀匹配 VS2026 侧载 toolset。"""
+    prefixes = _MSVC_PREFERRED_PREFIXES.get(ver or "")
+    if not prefixes:
+        return None
+    installed = _list_installed_msvc()
+    for prefix in prefixes:
+        matches = [v for v in installed if v.startswith(prefix + ".") or v == prefix]
+        if matches:
+            return matches[-1]
+    return None
+
+
+def _engine_dotnet_dir(engine_path: str) -> Optional[Path]:
+    """引擎自带 dotnet（5.1 InstalledBuild 会跳过 GetDotnetPath，必须由我们补 PATH）。"""
+    root = Path(engine_path) / "Engine" / "Binaries" / "ThirdParty" / "DotNet"
+    if not root.is_dir():
+        return None
+    exe_name = "dotnet.exe" if _SYSTEM == "Windows" else "dotnet"
+    for cand in root.rglob(exe_name):
+        if cand.is_file():
+            return cand.parent
+    return None
+
+
+def _copy_tree(src: Path, dst: Path) -> None:
+    """真实拷贝（不走 junction），给 UBT 编 .Build.cs / 加载 Rules DLL。"""
+    if _lexists(dst):
+        return
+    shutil.copytree(
+        src,
+        dst,
+        ignore=shutil.ignore_patterns("Intermediate", "Binaries", ".git", "obj"),
+        dirs_exist_ok=True,
+    )
 
 
 def _lexists(path: Path) -> bool:
@@ -237,10 +402,19 @@ def _is_plugin_root(path: Path) -> bool:
         return False
 
 
+def _has_csproj(path: Path) -> bool:
+    try:
+        return any(path.glob("*.csproj"))
+    except OSError:
+        return False
+
+
 def _mirror_plugins_tree(src: Path, dst: Path) -> None:
     """
     复制插件树骨架：插件根为真实目录（UBT 的 Intermediate/Binaries 写在这里），
     Source/Content 等数据目录 junction 回仓库，不改原工程。
+    含 .csproj 的 UHT 插件目录必须是真实拷贝，否则 obj 会经 junction 打进仓库，
+    多引擎并行会互相踩 project.assets.json。
     """
     dst.mkdir(parents=True, exist_ok=True)
     plugin = _is_plugin_root(src)
@@ -258,8 +432,16 @@ def _mirror_plugins_tree(src: Path, dst: Path) -> None:
         if not item.is_dir():
             shutil.copy2(item, dest)
             continue
-        # 分组目录 / 嵌套 Plugins / 嵌套插件根：继续建真实目录往下走
-        if (not plugin) or item.name == "Plugins" or _is_plugin_root(item):
+        recurse = (
+            item.name == "Plugins"
+            or _is_plugin_root(item)
+            or _has_csproj(item)
+            or any(c.is_dir() and _is_plugin_root(c) for c in item.iterdir())
+            or (plugin and any(c.is_dir() and _has_csproj(c) for c in item.iterdir()))
+        )
+        if item.name == "Source":
+            _copy_tree(item, dest)
+        elif recurse:
             _mirror_plugins_tree(item, dest)
         else:
             _link_dir(item, dest)
@@ -272,8 +454,22 @@ _isolated_ready: Dict[str, Path] = {}
 def _reset_temp_workspace() -> None:
     with _isolated_lock:
         _isolated_ready.clear()
-        _rmtree_nofollow(TEMP_BASE)
-        TEMP_BASE.mkdir(parents=True, exist_ok=True)
+        last_err: Optional[BaseException] = None
+        for attempt in range(2):
+            try:
+                _rmtree_nofollow(TEMP_BASE)
+                TEMP_BASE.mkdir(parents=True, exist_ok=True)
+                return
+            except OSError as e:
+                last_err = e
+                if attempt == 0:
+                    print(
+                        f"Temp workspace locked ({e}); killing leftover build processes and retrying...",
+                        flush=True,
+                    )
+                    _kill_leftover_build_processes()
+        if last_err is not None:
+            raise last_err
 
 
 def _prepare_isolated_project(ver: str) -> Path:
@@ -281,7 +477,10 @@ def _prepare_isolated_project(ver: str) -> Path:
     uproject = dest / "Nexus.uproject"
     dest.mkdir(parents=True, exist_ok=True)
     shutil.copy2(UPROJECT_PATH, uproject)
-    for name in ("Source", "Content", "Config"):
+    src_source = NEXUS_UNREAL_DIR / "Source"
+    if src_source.is_dir():
+        _copy_tree(src_source, dest / "Source")
+    for name in ("Content", "Config"):
         src = NEXUS_UNREAL_DIR / name
         if src.is_dir():
             _link_dir(src, dest / name)
@@ -304,13 +503,15 @@ def _isolated_uproject(ver: str) -> Path:
 
 def _run_project_build(engine_path: str, target: str,
                        vs_version: Optional[str] = None,
-                       uproject: Optional[Path] = None) -> Tuple[int, List[str]]:
+                       uproject: Optional[Path] = None,
+                       ver: Optional[str] = None) -> Tuple[int, List[str]]:
     """
     用指定引擎编某个 Target（默认编隔离副本，不写仓库 Intermediate）。
 
     :param vs_version: optional MSVC toolchain selector, one of "2017"/"2019"/"2022"；
         传给 UBT 的 `-VS<ver>`。UE 4.26 / 4.27 在仅装 VS2019/VS2022 的机器上需要。
     :param uproject: 隔离副本的 .uproject；缺省则用仓库内文件（不推荐并行）。
+    :param ver: 引擎目录名（如 UE_5.7）；并行时用来拆开 UBT `-log=`，避免抢同一份 Log.txt。
     :return: (exit_code, output_lines)；exit_code=-1 表示找不到 Build 脚本（SKIP）。
     """
     script = _ubt_build_script(engine_path)
@@ -328,8 +529,22 @@ def _run_project_build(engine_path: str, target: str,
     ]
     if vs_version:
         ubt_args.append(f"-VS{vs_version}")
+    if ver in _MSVC_PREFERRED_PREFIXES:
+        ubt_args.append("-2022")
+        msvc = _detect_msvc_for(ver)
+        if msvc:
+            ubt_args.append(f"-CompilerVersion={msvc}")
+    if ver:
+        log_dir = TEMP_BASE / ver
+        log_dir.mkdir(parents=True, exist_ok=True)
+        ubt_args.append(f"-log={log_dir / ('UBT-' + target + '.log')}")
 
     env = os.environ.copy()
+    dotnet_dir = _engine_dotnet_dir(engine_path)
+    if dotnet_dir is not None:
+        env["PATH"] = str(dotnet_dir) + os.pathsep + env.get("PATH", "")
+        env["DOTNET_ROOT"] = str(dotnet_dir)
+        env["DOTNET_MULTILEVEL_LOOKUP"] = "0"
     if _SYSTEM == "Windows":
         env["VSLANG"] = "1033"
         cmd = ["cmd", "/c", script] + ubt_args
@@ -450,7 +665,9 @@ def _build_one(engine: dict, target: str, line_idx: int, total: int,
         }
 
     effective_vs = vs_version or ("2019" if ver in _VS2019_FALLBACK_VERSIONS else None)
-    exit_code, output = _run_project_build(eng_path, target, effective_vs, uproject=uproject)
+    exit_code, output = _run_project_build(
+        eng_path, target, effective_vs, uproject=uproject, ver=ver
+    )
 
     error_lines = _extract_errors(output) if exit_code not in (-1, 0) else []
     warn_lines = _extract_warnings(output) if exit_code != -1 else []
@@ -535,6 +752,7 @@ def run_build_test_game(engines: List[dict], max_workers: int = 3,
                         vs_version: Optional[str] = None) -> int:
     """Game-target only (WITH_EDITOR=0). See run_build_test(..., include_game=True)."""
     LOG_DIR.mkdir(parents=True, exist_ok=True)
+    _kill_leftover_build_processes()
     _reset_temp_workspace()
     print(f"Isolated builds under: {TEMP_BASE}", flush=True)
 
@@ -572,6 +790,7 @@ def run_build_test(engines: List[dict], max_workers: int = 3,
     :return: Total failed version slots across phases.
     """
     LOG_DIR.mkdir(parents=True, exist_ok=True)
+    _kill_leftover_build_processes()
     _reset_temp_workspace()
     print(f"Isolated builds under: {TEMP_BASE}", flush=True)
 
@@ -740,6 +959,20 @@ def main() -> int:
     print(f"Found {len(engines)} UE engine version(s):")
     for e in engines:
         print(f"  {e['version']} -> {e['path']}")
+    installed_msvc = _list_installed_msvc()
+    if installed_msvc:
+        print("Installed MSVC: " + ", ".join(installed_msvc))
+    for e in engines:
+        picked = _detect_msvc_for(e["version"])
+        if picked:
+            print(f"  {e['version']} -> -2022 -CompilerVersion={picked}")
+        elif e["version"] in _MSVC_PREFERRED_PREFIXES:
+            want = "/".join(_MSVC_PREFERRED_PREFIXES[e["version"]])
+            print(
+                f"[WARN] {e['version']} needs MSVC {want} in VS 2026 Installer "
+                "(Individual Components). Do not install VS 2022.",
+                file=sys.stderr,
+            )
     print()
 
     if args.versions:

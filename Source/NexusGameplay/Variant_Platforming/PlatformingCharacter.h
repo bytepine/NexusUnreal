@@ -162,11 +162,11 @@ protected:
 	float WallJumpTraceRadius = 25.0f;
 
 	/** Impulse to apply away from the wall when wall jumping */
-	UPROPERTY(EditAnywhere, Category="Wall Jump", meta = (ClampMin = 0, ClampMax = 10000, Units = "cm/s"))
+	UPROPERTY(EditAnywhere, Category="Wall Jump", meta = (ClampMin = 0, ClampMax = 10000))
 	float WallJumpBounceImpulse = 800.0f;
 
 	/** Vertical impulse to apply when wall jumping */
-	UPROPERTY(EditAnywhere, Category="Wall Jump", meta = (ClampMin = 0, ClampMax = 10000, Units = "cm/s"))
+	UPROPERTY(EditAnywhere, Category="Wall Jump", meta = (ClampMin = 0, ClampMax = 10000))
 	float WallJumpVerticalImpulse = 900.0f;
 
 	/** Time to ignore jump inputs after a wall jump */

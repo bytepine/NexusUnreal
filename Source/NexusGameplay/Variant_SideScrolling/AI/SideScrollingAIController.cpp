@@ -2,12 +2,21 @@
 
 
 #include "SideScrollingAIController.h"
-#include "GameplayStateTreeModule/Public/Components/StateTreeAIComponent.h"
+#include "NexusGameplayVersionCompat.h"
+#if NG_UE_HAS_STATETREE_AI_COMPONENT
+#include "Components/StateTreeAIComponent.h"
+#else
+#include "Components/StateTreeComponent.h"
+#endif
 
 ASideScrollingAIController::ASideScrollingAIController()
 {
 	// create the StateTree AI Component
+#if NG_UE_HAS_STATETREE_AI_COMPONENT
 	StateTreeAI = CreateDefaultSubobject<UStateTreeAIComponent>(TEXT("StateTreeAI"));
+#else
+	StateTreeAI = CreateDefaultSubobject<UStateTreeComponent>(TEXT("StateTreeAI"));
+#endif
 	check(StateTreeAI);
 
 	// ensure we start the StateTree when we possess the pawn

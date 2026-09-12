@@ -6,7 +6,7 @@
 #include "AIController.h"
 #include "SideScrollingAIController.generated.h"
 
-class UStateTreeAIComponent;
+class UStateTreeComponent;
 
 /**
  *  A basic AI Controller capable of running StateTree
@@ -16,9 +16,9 @@ class ASideScrollingAIController : public AAIController
 {
 	GENERATED_BODY()
 	
-	/** StateTree Component */
+	/** StateTree Component（5.4+ 实际创建 UStateTreeAIComponent） */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI", meta = (AllowPrivateAccess = "true"))
-	UStateTreeAIComponent* StateTreeAI;
+	UStateTreeComponent* StateTreeAI;
 
 public:
 

@@ -24,7 +24,7 @@ EStateTreeRunStatus FStateTreeGetPlayerTask::Tick(FStateTreeExecutionContext& Co
 	return EStateTreeRunStatus::Running;
 }
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 FText FStateTreeGetPlayerTask::GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting /*= EStateTreeNodeFormatting::Text*/) const
 {
 	return FText::FromString("<b>Get Player</b>");

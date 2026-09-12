@@ -2,6 +2,7 @@
 
 
 #include "CombatEnemy.h"
+#include "NexusGameplayVersionCompat.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "CombatAIController.h"
@@ -296,7 +297,9 @@ float ACombatEnemy::TakeDamage(float Damage, struct FDamageEvent const& DamageEv
 
 		// enable partial ragdoll physics, but keep the pelvis vertical
 		GetMesh()->SetPhysicsBlendWeight(0.5f);
+#if NG_UE_HAS_SKELMESH_BODY_SIMULATE_PHYSICS
 		GetMesh()->SetBodySimulatePhysics(PelvisBoneName, false);
+#endif
 	}
 
 	// return the received damage amount

@@ -10,7 +10,9 @@
 #include "AIController.h"
 #include "CombatEnemy.h"
 #include "Kismet/GameplayStatics.h"
+#if NG_UE_HAS_STATETREE_WEAK_EXEC_CONTEXT
 #include "StateTreeAsyncExecutionContext.h"
+#endif
 
 bool FStateTreeCharacterGroundedCondition::TestCondition(FStateTreeExecutionContext& Context) const
 {
@@ -22,7 +24,7 @@ bool FStateTreeCharacterGroundedCondition::TestCondition(FStateTreeExecutionCont
 	return InstanceData.bMustBeOnAir ? !bCondition : bCondition;
 }
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 FText FStateTreeCharacterGroundedCondition::GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting /*= EStateTreeNodeFormatting::Text*/) const
 {
 	return FText::FromString("<b>Is Character Grounded</b>");
@@ -56,7 +58,7 @@ bool FStateTreeIsInDangerCondition::TestCondition(FStateTreeExecutionContext& Co
 	return false;
 }
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 FText FStateTreeIsInDangerCondition::GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting /*= EStateTreeNodeFormatting::Text*/) const
 {
 	return FText::FromString("<b>Is Character In Danger</b>");
@@ -74,13 +76,14 @@ EStateTreeRunStatus FStateTreeComboAttackTask::EnterState(FStateTreeExecutionCon
 		FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
 		// bind to the on attack completed delegate
+#if NG_UE_HAS_STATETREE_WEAK_EXEC_CONTEXT
 		InstanceData.Character->OnAttackCompleted.BindLambda(
 			[WeakContext = Context.MakeWeakExecutionContext()]()
 			{
 				WeakContext.FinishTask(EStateTreeFinishTaskType::Succeeded);
 			}
 		);
-
+#endif
 
 		// tell the character to do a combo attack
 		InstanceData.Character->DoAIComboAttack();
@@ -102,7 +105,7 @@ void FStateTreeComboAttackTask::ExitState(FStateTreeExecutionContext& Context, c
 	}
 }
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 FText FStateTreeComboAttackTask::GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting /*= EStateTreeNodeFormatting::Text*/) const
 {
 	return FText::FromString("<b>Do Combo Attack</b>");
@@ -120,12 +123,14 @@ EStateTreeRunStatus FStateTreeChargedAttackTask::EnterState(FStateTreeExecutionC
 		FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
 		// bind to the on attack completed delegate
+#if NG_UE_HAS_STATETREE_WEAK_EXEC_CONTEXT
 		InstanceData.Character->OnAttackCompleted.BindLambda(
 			[WeakContext = Context.MakeWeakExecutionContext()]()
 			{
 				WeakContext.FinishTask(EStateTreeFinishTaskType::Succeeded);
 			}
 		);
+#endif
 
 		// tell the character to do a charged attack
 		InstanceData.Character->DoAIChargedAttack();
@@ -147,7 +152,7 @@ void FStateTreeChargedAttackTask::ExitState(FStateTreeExecutionContext& Context,
 	}
 }
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 FText FStateTreeChargedAttackTask::GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting /*= EStateTreeNodeFormatting::Text*/) const
 {
 	return FText::FromString("<b>Do Charged Attack</b>");
@@ -165,12 +170,14 @@ EStateTreeRunStatus FStateTreeWaitForLandingTask::EnterState(FStateTreeExecution
 		FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
 		// bind to the on enemy landed delegate
+#if NG_UE_HAS_STATETREE_WEAK_EXEC_CONTEXT
 		InstanceData.Character->OnEnemyLanded.BindLambda(
 			[WeakContext = Context.MakeWeakExecutionContext()]()
 			{
 				WeakContext.FinishTask(EStateTreeFinishTaskType::Succeeded);
 			}
 		);
+#endif
 	}
 
 	return EStateTreeRunStatus::Running;
@@ -189,7 +196,7 @@ void FStateTreeWaitForLandingTask::ExitState(FStateTreeExecutionContext& Context
 	}
 }
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 FText FStateTreeWaitForLandingTask::GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting /*= EStateTreeNodeFormatting::Text*/) const
 {
 	return FText::FromString("<b>Wait for Landing</b>");
@@ -226,7 +233,7 @@ void FStateTreeFaceActorTask::ExitState(FStateTreeExecutionContext& Context, con
 	}
 }
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 FText FStateTreeFaceActorTask::GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting /*= EStateTreeNodeFormatting::Text*/) const
 {
 	return FText::FromString("<b>Face Towards Actor</b>");
@@ -263,7 +270,7 @@ void FStateTreeFaceLocationTask::ExitState(FStateTreeExecutionContext& Context, 
 	}
 }
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 FText FStateTreeFaceLocationTask::GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting /*= EStateTreeNodeFormatting::Text*/) const
 {
 	return FText::FromString("<b>Face Towards Location</b>");
@@ -287,7 +294,7 @@ EStateTreeRunStatus FStateTreeSetCharacterSpeedTask::EnterState(FStateTreeExecut
 	return EStateTreeRunStatus::Running;
 }
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 FText FStateTreeSetCharacterSpeedTask::GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting /*= EStateTreeNodeFormatting::Text*/) const
 {
 	return FText::FromString("<b>Set Character Speed</b>");
@@ -317,7 +324,7 @@ EStateTreeRunStatus FStateTreeGetPlayerInfoTask::Tick(FStateTreeExecutionContext
 	return EStateTreeRunStatus::Running;
 }
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 FText FStateTreeGetPlayerInfoTask::GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting /*= EStateTreeNodeFormatting::Text*/) const
 {
 	return FText::FromString("<b>Get Player Info</b>");

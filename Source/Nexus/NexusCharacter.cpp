@@ -7,8 +7,11 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/Controller.h"
+#include "Runtime/Launch/Resources/Version.h"
+#if ENGINE_MAJOR_VERSION >= 5
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#endif
 #include "InputActionValue.h"
 #include "Nexus.h"
 
@@ -31,9 +34,13 @@ ANexusCharacter::ANexusCharacter()
 	GetCharacterMovement()->JumpZVelocity = 500.f;
 	GetCharacterMovement()->AirControl = 0.35f;
 	GetCharacterMovement()->MaxWalkSpeed = 500.f;
+#if ENGINE_MAJOR_VERSION >= 5
 	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
+#else
+	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
+#endif
 
 	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
@@ -52,6 +59,7 @@ ANexusCharacter::ANexusCharacter()
 
 void ANexusCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
+#if ENGINE_MAJOR_VERSION >= 5
 	// Set up action bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
 		
@@ -70,6 +78,9 @@ void ANexusCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	{
 		UE_LOG(LogNexus, Error, TEXT("'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
 	}
+#else
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+#endif
 }
 
 void ANexusCharacter::Move(const FInputActionValue& Value)

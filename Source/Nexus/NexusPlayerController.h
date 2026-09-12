@@ -34,7 +34,7 @@ protected:
 
 	/** Pointer to the mobile controls widget */
 	UPROPERTY()
-	TObjectPtr<UUserWidget> MobileControlsWidget;
+	UUserWidget* MobileControlsWidget;
 
 	/** If true, the player will use UMG touch controls even if not playing on mobile platforms */
 	UPROPERTY(EditAnywhere, Config, Category = "Input|Touch Controls")

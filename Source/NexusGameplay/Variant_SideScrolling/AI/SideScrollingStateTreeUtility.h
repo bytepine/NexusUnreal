@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "StateTreeTaskBase.h"
+#include "NexusGameplayVersionCompat.h"
 
 #include "SideScrollingStateTreeUtility.generated.h"
 
@@ -53,7 +54,7 @@ struct FStateTreeGetPlayerTask : public FStateTreeTaskCommonBase
 	/** Runs while the owning state is active */
 	virtual EStateTreeRunStatus Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const override;
 
-#if WITH_EDITOR
+#if WITH_EDITOR && NG_UE_HAS_STATETREE_NODE_FORMATTING
 	virtual FText GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting = EStateTreeNodeFormatting::Text) const override;
 #endif // WITH_EDITOR
 };

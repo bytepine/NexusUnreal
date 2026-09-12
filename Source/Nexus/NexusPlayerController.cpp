@@ -2,7 +2,10 @@
 
 
 #include "NexusPlayerController.h"
+#include "Runtime/Launch/Resources/Version.h"
+#if ENGINE_MAJOR_VERSION >= 5
 #include "EnhancedInputSubsystems.h"
+#endif
 #include "Engine/LocalPlayer.h"
 #include "InputMappingContext.h"
 #include "Blueprint/UserWidget.h"
@@ -40,6 +43,7 @@ void ANexusPlayerController::SetupInputComponent()
 	// only add IMCs for local player controllers
 	if (IsLocalPlayerController())
 	{
+#if ENGINE_MAJOR_VERSION >= 5
 		// Add Input Mapping Contexts
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 		{
@@ -57,6 +61,7 @@ void ANexusPlayerController::SetupInputComponent()
 				}
 			}
 		}
+#endif
 	}
 }
 

@@ -5,4 +5,4 @@
 #include "CoreMinimal.h"
 
 /** Main log category used across the project */
-DECLARE_LOG_CATEGORY_EXTERN(LogNexus, Log, All);
+NEXUS_API DECLARE_LOG_CATEGORY_EXTERN(LogNexus, Log, All);

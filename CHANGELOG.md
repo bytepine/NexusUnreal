@@ -18,7 +18,7 @@
 - chore(test): 新增 `_framework/test_cleanup.py`——测试前后清理 `Saved/Logs` 下 `UE-auto-launch*` / `TestReport.xml` / `Automation-*.stdout.log`、`Content/_McpTest/`、历史 `Content/_NexusTest/` 与 `Content/__nexus_*__.uasset`；session 级 purge `/Game/_McpTest` 与 `/Game/_NexusTest`（`--keep-artifacts` 时保留）；`test_103`/`104`/`105`/`106` 写入改走 `test_ns`；`.gitignore` 忽略 `Content/_NexusTest/`
 - chore(test): pytest / `run_e2e.py` 自动拉起 UE **默认 headless**（`UnrealEditor-Cmd -unattended -nullrhi -NoSplash -NoSound`）；headless/命令行会话跳过 `l4_runtime`/`lua`/`requires_gui`；本地观察编辑器加 `--gui`；全量 `--gui`/`--full`
 - chore(test): `ue_launcher` 会话级 `-EnableNexusMcp` 开启 MCP；示例 `bEnableMcpServer=False`，E2E 不依赖 ini
-- chore(test): `build_test` 改为对本机已装的每套引擎编整个 `Nexus.uproject`（Editor=`NexusEditor`，Game=`Nexus` / WITH_EDITOR=0）；不再 `BuildPlugin` 只编 NexusLink，也不再临时改写 UncookedOnly→Runtime；每套引擎在系统临时目录隔离 Intermediate（junction Content/Source/Config，不改仓库工程），默认 `--max-workers 3` 并行
+- chore(test): `build_test` 改为对本机已装的每套引擎编整个 `Nexus.uproject`（Editor=`NexusEditor`，Game=`Nexus` / WITH_EDITOR=0）；不再 `BuildPlugin` 只编 NexusLink，也不再临时改写 UncookedOnly→Runtime；隔离目录改到工程 `Saved/NexusBuildTest`（避开 `%TEMP%` 下 Rules DLL 被应用控制策略拦截 0x800711C7）；`Source` 真实拷贝、Content/Config 仍 junction；开跑前清残留 UBT / 调用 UBT 的 `dotnet` / 相关 MSBuild / VBCSCompiler；5.1 补引擎自带 dotnet 到 PATH；仅 VS2026 时按引擎 preferred 传 `-2022 -CompilerVersion=`（5.2/5.3→14.34，5.4–5.6→14.38），不要求另装 VS2022
 - docs: 仓库改为公开（NexusLink 示例工程）；README 移除私有/NexusWork 表述；测试策略——新功能补 **manage 每 action / get 每 named section**、默认 headless、全覆盖验证走 `--gui`；NexusLink 发版按本次变更选 headless 或 `--gui`
 - chore(test): `legacy_map` 与插件 C++ 旧名表对齐（补 `get_behavior_tree`，去掉恒等 `list_runtime_widgets`）
 - chore(script): `apply_ai_zh.py` 的 `CAP_DESC_ZH` 补 `exec_python` / `get_python_api` 中文描述
@@ -30,6 +30,7 @@
 
 ### Fixed
 
+- fix(unreal): 跨版本 Target/模块——`V2`（UE4 / 5.0–5.2）/`V4`（5.3）/`V5`（5.4–5.6）/`V6`+`Unreal5_7`（5.7）/`V7`+`Unreal5_8`（5.8）；玩法变体 `NexusGameplay` ExtraModuleNames 5.6+（5.3+ 仍会因 uproject Modules 编进该模块）；AI 控制器 UPROPERTY 用基类 `UStateTreeComponent*`，5.5+ 才创建 `UStateTreeAIComponent`（5.4 无 MODULE_API 导出）；编辑器 `GetDescription` 仅 5.5+；`MakeWeakExecutionContext` 仅 5.6+；`SetBodySimulatePhysics` 仅 5.4+；冲动量去掉 `Units=cm/s`；`InputAction.h` 不再写 `EnhancedInput/Public/` 前缀；4.26 用 `NexusInputStubs`；uproject 将 StateTree/MVVM/PCG 等标为 Optional；`UEnvQueryContext_Danger` 改 `NEXUSGAMEPLAY_API`；`LogNexus` 导出 `NEXUS_API`；StateTree 实例数据宏走 `NexusGameplayVersionCompat.h`（`NG_UE_HAS_*`）
 - fix(test): 全量 e2e 对齐——`skipif_ue_below` 移入 `pytest_runtest_setup`；用例统一 `cap_first` / `operations[]`；EQS 缺 cap 时 skip；`audit_capability_naming` 补 `unload`、期望数 176；GUI/PIE 对齐 `spawn_runtime_actor` 单条、`control_pie` results[]、`set_runtime_widget_property` 的 `updates[]`；补覆盖用例参数对齐真实 Schema（`rootMotion`/`anchorMin*`/`attribute`/`startFrame`/`halfHeight`/`updates[].actorName`），schema 校验失败 skip 而非 fail
 - fix(test): `test_bp_graph_connect_exec` 缺 BeginPlay 时经 `manage_asset_blueprint` 补 `K2Node_Event`；`test_anim_montage_create` 创建后 `add_segment`（Mannequin Idle）并 save；`exec_command` 改用 `stat fps`（避免 `help stat` 弹 `ConsoleHelp.html`）
 - fix(test): `ue_launcher` 自动拉起时跳过启动前已在听的 MCP 端口，避免本机已有 Editor 占着 `:45000` 时把 headless 新实例误接到旧进程

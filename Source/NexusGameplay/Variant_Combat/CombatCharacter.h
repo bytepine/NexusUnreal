@@ -124,11 +124,11 @@ protected:
 	float MeleeDamage = 1.0f;
 
 	/** Amount of knockback impulse a melee attack will apply */
-	UPROPERTY(EditAnywhere, Category="Melee Attack|Damage", meta = (ClampMin = 0, ClampMax = 1000, Units = "cm/s"))
+	UPROPERTY(EditAnywhere, Category="Melee Attack|Damage", meta = (ClampMin = 0, ClampMax = 1000))
 	float MeleeKnockbackImpulse = 250.0f;
 
 	/** Amount of upwards impulse a melee attack will apply */
-	UPROPERTY(EditAnywhere, Category="Melee Attack|Damage", meta = (ClampMin = 0, ClampMax = 1000, Units = "cm/s"))
+	UPROPERTY(EditAnywhere, Category="Melee Attack|Damage", meta = (ClampMin = 0, ClampMax = 1000))
 	float MeleeLaunchImpulse = 300.0f;
 
 	/** AnimMontage that will play for combo attacks */
