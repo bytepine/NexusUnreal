@@ -350,6 +350,11 @@ _WARN_EXCLUDE = re.compile(
     r"(^\s*0\s+warning|warning\(s\)\s*=\s*0|warnings\s*:\s*0|^\s*Running\s)",
     re.IGNORECASE,
 )
+# 引擎树（Source/Plugins）C4996 与 UBT 工具链提示不计门禁
+_WARN_SKIP = re.compile(
+    r"[/\\]Engine[/\\]|compiler is not a preferred version",
+    re.IGNORECASE,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -586,7 +591,9 @@ def _extract_errors(lines: List[str]) -> List[str]:
 def _extract_warnings(lines: List[str]) -> List[str]:
     return [
         ln for ln in lines
-        if _WARN_INCLUDE.search(ln) and not _WARN_EXCLUDE.search(ln)
+        if _WARN_INCLUDE.search(ln)
+        and not _WARN_EXCLUDE.search(ln)
+        and not _WARN_SKIP.search(ln)
     ]
 
 
