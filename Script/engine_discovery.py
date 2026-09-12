@@ -24,6 +24,13 @@ _LINUX_COMMON_ROOTS: List[Path] = [
     Path("/usr/local/UnrealEngine"),
 ]
 
+# 启动器 dat 经常漏登拷贝/旧安装；Windows 再扫这些常见根和已发现引擎的兄弟目录。
+_WINDOWS_COMMON_ROOTS: List[Path] = [
+    Path(r"C:\Program Files\Epic Games"),
+    Path(r"D:\Epic Games"),
+    Path(r"E:\Epic Games"),
+]
+
 
 def _launcher_dat_path() -> Path:
     if _SYSTEM == "Windows":
@@ -72,15 +79,40 @@ def discover_engines_from_dat(dat_path: Path) -> List[dict]:
     return engines
 
 
+def _is_engine_install(path: Path) -> bool:
+    """目录名是 UE_X.Y 且带 UBT 入口，才当引擎安装。"""
+    batch = path / "Engine" / "Build" / "BatchFiles"
+    if _SYSTEM == "Windows":
+        return (batch / "Build.bat").is_file()
+    if _SYSTEM == "Darwin":
+        return (batch / "Mac" / "Build.sh").is_file() or (batch / "Build.sh").is_file()
+    return (batch / "Linux" / "Build.sh").is_file() or (batch / "Build.sh").is_file()
+
+
+def _scan_root_for_engines(root: Path, seen: set) -> List[dict]:
+    found: List[dict] = []
+    if not root.is_dir():
+        return found
+    try:
+        entries = list(root.iterdir())
+    except OSError:
+        return found
+    for entry in entries:
+        if not entry.is_dir() or not _VER_PATTERN.match(entry.name):
+            continue
+        p = str(entry)
+        if p in seen or not _is_engine_install(entry):
+            continue
+        found.append({"version": entry.name, "path": p})
+        seen.add(p)
+    return found
+
+
 def discover_engines_from_root(ue_root: str) -> List[dict]:
     root = Path(ue_root)
     if not root.is_dir():
         raise NotADirectoryError(f"Engine root directory not found: {ue_root}")
-    engines = [
-        {"version": entry.name, "path": str(entry)}
-        for entry in root.iterdir()
-        if entry.is_dir() and _VER_PATTERN.match(entry.name)
-    ]
+    engines = _scan_root_for_engines(root, set())
     engines.sort(key=lambda e: _version_key(e["version"]))
     return engines
 
@@ -95,16 +127,22 @@ def discover_engines_auto() -> List[dict]:
         except Exception:
             pass
 
+    seen = {e["path"] for e in engines}
+    extra_roots: List[Path] = []
     if _SYSTEM == "Linux":
-        seen = {e["path"] for e in engines}
-        for base in _LINUX_COMMON_ROOTS:
-            if not base.is_dir():
-                continue
-            for entry in base.iterdir():
-                p = str(entry)
-                if entry.is_dir() and _VER_PATTERN.match(entry.name) and p not in seen:
-                    engines.append({"version": entry.name, "path": p})
-                    seen.add(p)
+        extra_roots = list(_LINUX_COMMON_ROOTS)
+    elif _SYSTEM == "Windows":
+        extra_roots = list(_WINDOWS_COMMON_ROOTS)
+        extra_roots.extend(Path(e["path"]).parent for e in engines)
+    elif _SYSTEM == "Darwin":
+        extra_roots = [
+            Path("/Users/Shared/Epic Games"),
+            Path.home() / "Epic Games",
+        ]
+        extra_roots.extend(Path(e["path"]).parent for e in engines)
+
+    for base in extra_roots:
+        engines.extend(_scan_root_for_engines(base, seen))
 
     engines.sort(key=lambda e: _version_key(e["version"]))
     return engines
