@@ -75,6 +75,14 @@
 			"Enabled": true
 		},
 		{
+			"Name": "NexusLink",
+			"Enabled": true
+		},
+		{
+			"Name": "NexusLinkTestSuite",
+			"Enabled": true
+		},
+		{
 			"Name": "UnLua",
 			"Enabled": true
 		},

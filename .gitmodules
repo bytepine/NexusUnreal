@@ -1,5 +1,5 @@
-[submodule "Plugins/Developer/NexusLink"]
-	path = Plugins/Developer/NexusLink
+[submodule "Plugins/NexusLink"]
+	path = Plugins/NexusLink
 	url = ../NexusLink
 [submodule "Plugins/UnLua"]
 	path = Plugins/UnLua

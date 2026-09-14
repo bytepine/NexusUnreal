@@ -268,7 +268,7 @@ def main() -> int:
 
     params_audit = (
         NEXUS_UNREAL_DIR
-        / "Plugins/Developer/NexusLink/scripts/audit_capability_params.py"
+        / "Plugins/NexusLink/scripts/audit_capability_params.py"
     )
     if params_audit.is_file():
         print(f"[audit] {params_audit}", flush=True)

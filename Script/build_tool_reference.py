@@ -6,7 +6,7 @@ from pathlib import Path
 
 _TARGET = (
     Path(__file__).resolve().parent.parent
-    / "Plugins/Developer/NexusLink/scripts/build_tool_reference.py"
+    / "Plugins/NexusLink/scripts/build_tool_reference.py"
 )
 if not _TARGET.is_file():
     raise SystemExit(f"ERROR: {_TARGET} not found（请初始化 NexusLink 子模块）")

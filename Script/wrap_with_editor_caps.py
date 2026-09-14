@@ -3,7 +3,7 @@
 """One-shot: wrap listed capability .cpp files in #if WITH_EDITOR (skip if already wrapped)."""
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent / "Plugins/Developer/NexusLink/Source/NexusLink/Private"
+ROOT = Path(__file__).resolve().parent.parent / "Plugins/NexusLink/Source/NexusLink/Private"
 
 FILES = [
     "Capabilities/Editor/NexusControlPieCapability.cpp",

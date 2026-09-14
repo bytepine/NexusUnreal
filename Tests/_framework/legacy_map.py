@@ -16,8 +16,8 @@ _HERE = Path(__file__).resolve()
 
 
 def _legacy_json_path() -> Path:
-    # Tests/_framework → nexus-unreal/Plugins/Developer/NexusLink/Resources
-    p = _HERE.parents[2] / "Plugins" / "Developer" / "NexusLink" / "Resources" / "legacy_capability_names.json"
+    # Tests/_framework → nexus-unreal/Plugins/NexusLink/Resources
+    p = _HERE.parents[2] / "Plugins" / "NexusLink" / "Resources" / "legacy_capability_names.json"
     if p.is_file():
         return p
     raise FileNotFoundError(f"legacy_capability_names.json not found: {p}")

@@ -2,7 +2,7 @@
 
 > **�?v1.5.0 起本清单已不再人工勾�?*。全部测试用例迁移至两层自动化框架：
 >
-> - **L1 C++ Automation** (`Plugins/Developer/NexusLink/Source/NexusLinkTests/`)：工具函�?/ 插件加载 / 工具注册表冒烟，需手动 `UEEditor-Cmd <uproject> -ExecCmds="Automation RunTests NexusLink.; Quit" -unattended -nullrhi` 触发（已�?`build_test` 入口剥离）�?
+> - **L1 C++ Automation** (`Plugins/NexusLinkTestSuite/Source/NexusLinkTests/`)：工具函�?/ 插件加载 / 工具注册表冒烟，需手动 `UEEditor-Cmd <uproject> -ExecCmds="Automation RunTests NexusLink.; Quit" -unattended -nullrhi` 触发（已�?`build_test` 入口剥离）�?
 > - **L2 pytest E2E** (`nexus-unreal/Tests/`)：MCP 工具端到端，�?`python nexus-unreal/Script/run_e2e.py` �?`pytest nexus-unreal/Tests` 触发�?
 >
 > 本文件只维护 **"�?CHECKLIST 条目 �?自动�?TestId"** 的映射，便于回溯旧工�?/ PR 描述引用�?
@@ -204,5 +204,5 @@
 2. 若工�?happy-path 依赖外部产物（UI 交互拿地址、PIE 运行中的 Actor、模板骨骼等）不便稳定复现，追加**错误路径用例**（传不存在的 `actorName`/`functionName`/`rowName`/`fieldName`/非法 hex 地址等），断言契约�?
    - 批量工具必须返回 `{totalCount, failCount, results:[{error}]}` 三要素（不是 top-level `MCPError`）；参�?`test_datatable_set_row_error_path` / `test_get_actor_animation_error_path`�?
    - 非批量工具（�?`get_asset_slate_widget`）允�?`MCPError` �?payload �?`error`/`invalid`/`not found`/`null` 两种拒绝形态；参�?`test_get_slate_widget_error_path`�?
-3. 若该工具有非 MCP 依赖的纯 C++ 工具函数（类型解析、字符串匹配、数学等），同步�?`Source/NexusLinkTests/Private/Tests/` �?`IMPLEMENT_SIMPLE_AUTOMATION_TEST`�?
+3. 若该工具有非 MCP 依赖的纯 C++ 工具函数（类型解析、字符串匹配、数学等），同步�?`Plugins/NexusLinkTestSuite/Source/NexusLinkTests/Private/Tests/` �?`IMPLEMENT_SIMPLE_AUTOMATION_TEST`�?
 4. 工具调用参数变化或新�?section 时，更新本文件对应行�?TestId 注释，保持旧 PR 引用可追溯�?

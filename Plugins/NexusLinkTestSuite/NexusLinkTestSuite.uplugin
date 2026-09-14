@@ -1,0 +1,38 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0.0",
+	"FriendlyName": "NexusLinkTestSuite",
+	"Description": "NexusLink L1 Automation test suite. Lives in the example project, not the NexusLink plugin repo.",
+	"Category": "Testing",
+	"CreatedBy": "byteyang",
+	"CreatedByURL": "https://github.com/bytepine",
+	"DocsURL": "https://github.com/bytepine/NexusLink",
+	"MarketplaceURL": "",
+	"SupportURL": "https://github.com/bytepine/NexusLink/issues",
+	"CanContainContent": false,
+	"IsBetaVersion": false,
+	"Installed": false,
+	"EnabledByDefault": false,
+	"Plugins": [
+		{
+			"Name": "NexusLink",
+			"Enabled": true
+		}
+	],
+	"Modules": [
+		{
+			"Name": "NexusLinkTests",
+			"Type": "DeveloperTool",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [
+				"Win64",
+				"Mac"
+			],
+			"WhitelistPlatforms": [
+				"Win64",
+				"Mac"
+			]
+		}
+	]
+}

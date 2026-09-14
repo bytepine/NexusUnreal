@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-CAP = ROOT / "nexus-unreal/Plugins/Developer/NexusLink/Source/NexusLink/Private/Capabilities"
+CAP = ROOT / "nexus-unreal/Plugins/NexusLink/Source/NexusLink/Private/Capabilities"
 
 pat = re.compile(r'(?:SetStringField\(TEXT\("error"\)|OutError\s*=|MakeFatal\(|AddEntryError\()\s*(?:FString::Printf\()?TEXT\("([^"]+)"\)')
 

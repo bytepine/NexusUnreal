@@ -17,7 +17,7 @@ from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CAP_ROOT = ROOT / "Plugins" / "Developer" / "NexusLink" / "Source" / "NexusLink" / "Private" / "Capabilities"
+CAP_ROOT = ROOT / "Plugins" / "NexusLink" / "Source" / "NexusLink" / "Private" / "Capabilities"
 TESTS = ROOT / "Tests"
 
 NAME_RE = re.compile(r'Out\.Name\s*=\s*TEXT\(\s*"([^"]+)"\s*\)')

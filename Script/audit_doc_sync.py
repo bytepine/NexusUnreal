@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "nexus-unreal/Plugins/Developer/NexusLink"
+PLUGIN = REPO / "nexus-unreal/Plugins/NexusLink"
 CAP_DIR = PLUGIN / "Source/NexusLink/Private/Capabilities"
 README = REPO / "nexus-unreal/README.md"
 TOOL_REF = PLUGIN / "docs/tool-reference.md"
@@ -148,7 +148,7 @@ def main() -> int:
     # 域目录计数 vs AI_NAVIGATION
     by_dir: dict[str, list[str]] = {}
     for name, info in caps.items():
-        rel = Path(info["file"]).relative_to("nexus-unreal/Plugins/Developer/NexusLink/Source/NexusLink/Private/Capabilities")
+        rel = Path(info["file"]).relative_to("nexus-unreal/Plugins/NexusLink/Source/NexusLink/Private/Capabilities")
         parts = rel.parts
         key = parts[0] if len(parts) == 2 else f"{parts[0]}/{parts[1]}"
         by_dir.setdefault(key, []).append(name)

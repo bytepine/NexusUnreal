@@ -11,7 +11,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 NEXUS_UNREAL = SCRIPT_DIR.parent
-NEXUSLINK_PLUGIN_SOURCE = NEXUS_UNREAL / "Plugins/Developer/NexusLink/Source"
+NEXUSLINK_PLUGIN_SOURCE = NEXUS_UNREAL / "Plugins/NexusLink/Source"
 NEXUSLINK_SOURCE = NEXUSLINK_PLUGIN_SOURCE / "NexusLink"
 CAP_ROOT = NEXUSLINK_SOURCE / "Private/Capabilities"
 VERSION_COMPAT_FILE = NEXUSLINK_SOURCE / "Public/Utils/NexusVersionCompat.h"

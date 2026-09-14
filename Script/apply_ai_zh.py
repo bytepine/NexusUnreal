@@ -9,7 +9,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
-PLUGIN_SRC = REPO_ROOT / "nexus-unreal/Plugins/Developer/NexusLink/Source/NexusLink/Private"
+PLUGIN_SRC = REPO_ROOT / "nexus-unreal/Plugins/NexusLink/Source/NexusLink/Private"
 
 # Capability Out.Description（≤100 字符，供注册校验）
 CAP_DESC_ZH: dict[str, str] = {

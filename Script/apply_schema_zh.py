@@ -8,7 +8,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO = SCRIPT_DIR.parent.parent
-CAP_DIR = REPO / "nexus-unreal/Plugins/Developer/NexusLink/Source/NexusLink/Private"
+CAP_DIR = REPO / "nexus-unreal/Plugins/NexusLink/Source/NexusLink/Private"
 ZH_MAP: dict[str, str] = json.loads((SCRIPT_DIR / "schema_descs_zh.json").read_text(encoding="utf-8"))
 
 # 仅替换 FNexusSchema:: 调用内的 TEXT("...")

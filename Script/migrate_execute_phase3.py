@@ -11,7 +11,7 @@ import os
 import glob
 
 CAP_ROOT = os.path.join(os.path.dirname(__file__), os.pardir,
-    "Plugins", "Developer", "NexusLink", "Source", "NexusLink",
+    "Plugins", "NexusLink", "Source", "NexusLink",
     "Private", "Capabilities")
 CAP_ROOT = os.path.normpath(CAP_ROOT)
 

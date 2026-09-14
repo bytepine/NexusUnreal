@@ -17,7 +17,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 NEXUS_UNREAL = SCRIPT_DIR.parent
-CAP_ROOT = NEXUS_UNREAL / "Plugins" / "Developer" / "NexusLink" / "Source" / "NexusLink" / "Private" / "Capabilities"
+CAP_ROOT = NEXUS_UNREAL / "Plugins" / "NexusLink" / "Source" / "NexusLink" / "Private" / "Capabilities"
 
 # 目录名（含 Capabilities 下任意层级子目录）→ 默认功能分类（注：访问级别由 cap 名前缀决定）
 DIR_TO_CATEGORY = {

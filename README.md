@@ -35,16 +35,18 @@ git submodule update --init --recursive
 | 角色动画 | `/Game/Characters/Mannequins/` |
 | UnLua 脚本 | `Content/Script/` |
 | **UnLua 插件**（子模块） | `Plugins/UnLua/` |
+| **UnLuaTestSuite** | `Plugins/UnLuaTestSuite/` |
 | 游戏 C++ | `Source/Nexus/` |
-| **NexusLink 插件**（子模块） | `Plugins/Developer/NexusLink/` |
+| **NexusLink 插件**（子模块） | `Plugins/NexusLink/` |
+| **NexusLinkTestSuite** | `Plugins/NexusLinkTestSuite/` |
 
-插件版本：见 `Plugins/Developer/NexusLink/VERSION` 或 [NexusLink Releases](https://github.com/bytepine/NexusLink/releases)
+插件版本：见 `Plugins/NexusLink/VERSION` 或 [NexusLink Releases](https://github.com/bytepine/NexusLink/releases)
 
 ---
 
 ## MCP 接入
 
-1. 确保 NexusLink 子模块已初始化，或从 [NexusLink Releases](https://github.com/bytepine/NexusLink/releases) 下载 zip 放入 `Plugins/Developer/NexusLink`
+1. 确保 NexusLink 子模块已初始化，或从 [NexusLink Releases](https://github.com/bytepine/NexusLink/releases) 下载 zip 放入 `Plugins/NexusLink`
 2. 启用：**Editor Preferences → Plugins → NexusLink → 启用 MCP 服务器**（默认关）→ HTTP `:45000` / WS `:55000`
 3. IDE 代理：[NexusVSCode](https://github.com/bytepine/NexusVSCode)（`:6900`）或 [NexusRider](https://github.com/bytepine/NexusRider)（`:6800`）
 4. 完整配置：[NexusLink 使用指南](https://github.com/bytepine/NexusLink/blob/master/docs/usage-guide.md)
@@ -62,7 +64,7 @@ git submodule update --init --recursive
 
 | 层级 | 说明 |
 |------|------|
-| L1 C++ | `Plugins/Developer/NexusLink/Source/NexusLinkTests/` |
+| L1 C++ | `Plugins/NexusLinkTestSuite/` |
 | L2 pytest | 本仓 `Tests/` — 策略见 [Tests/README.md](Tests/README.md) |
 
 ---
@@ -81,4 +83,4 @@ git submodule update --init --recursive
 
 本仓源码与文档：[MIT](LICENSE) © byteyang
 
-示例关卡与 Mannequin 等 `.uasset` 基于 UE 模板内容，使用须遵守 [Unreal Engine EULA](https://www.unrealengine.com/eula)。NexusLink 插件许可见 [Plugins/Developer/NexusLink/LICENSE](Plugins/Developer/NexusLink/LICENSE)（MIT）。
+示例关卡与 Mannequin 等 `.uasset` 基于 UE 模板内容，使用须遵守 [Unreal Engine EULA](https://www.unrealengine.com/eula)。NexusLink 插件许可见 [Plugins/NexusLink/LICENSE](Plugins/NexusLink/LICENSE)（MIT）。

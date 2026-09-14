@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 CAP = Path(__file__).resolve().parent.parent.parent / (
-    "nexus-unreal/Plugins/Developer/NexusLink/Source/NexusLink/Private/Capabilities"
+    "nexus-unreal/Plugins/NexusLink/Source/NexusLink/Private/Capabilities"
 )
 pat = re.compile(r'TEXT\("((?:[^"\\]|\\.)*)"\)')
 

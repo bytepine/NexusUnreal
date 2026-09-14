@@ -13,7 +13,6 @@ PLUGIN_PRIVATE = (
     REPO
     / "nexus-unreal"
     / "Plugins"
-    / "Developer"
     / "NexusLink"
     / "Source"
     / "NexusLink"

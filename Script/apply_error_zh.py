@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-CAP_ROOT = ROOT / "nexus-unreal/Plugins/Developer/NexusLink/Source/NexusLink/Private"
+CAP_ROOT = ROOT / "nexus-unreal/Plugins/NexusLink/Source/NexusLink/Private"
 
 # 精确匹配 TEXT("...") 静态字符串
 EXACT: dict[str, str] = {
