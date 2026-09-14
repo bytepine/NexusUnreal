@@ -58,7 +58,7 @@ bool FNexusLinkPluginSmokeTest::RunTest(const FString& Parameters)
 	// ── Capability 注册表：业务能力在此，不在 ToolRegistry ──
 	const TArray<FCapRecord>& CapRecords = FNexusCapabilityRegistry::Get().GetAllRecords();
 	AddInfo(FString::Printf(TEXT("registered capabilities: %d"), CapRecords.Num()));
-	// 运行时随 WITH_* 门控变化，不能断言 ==227；源码精确数走 nexus-unreal/Script/audit_capability_naming.py
+	// 运行时随 WITH_* 门控变化，不能断言精确数；源码精确数走 Plugins/NexusLink/scripts/audit_capability_naming.py
 	TestTrue(TEXT("registered capability count >= 70"), CapRecords.Num() >= 70);
 
 	TSet<FString> CapNames;

@@ -259,22 +259,15 @@ def main() -> int:
     _ensure_deps()
     _purge_disk_artifacts("pre")
 
-    audit_script = SCRIPT_DIR / "audit_capability_naming.py"
-    if audit_script.is_file():
+    plugin_scripts = NEXUS_UNREAL_DIR / "Plugins/NexusLink/scripts"
+    for name in ("audit_capability_naming.py", "audit_capability_params.py"):
+        audit_script = plugin_scripts / name
+        if not audit_script.is_file():
+            continue
         print(f"[audit] {audit_script}", flush=True)
         audit_rc = subprocess.call([sys.executable, str(audit_script)])
         if audit_rc != 0:
             return audit_rc
-
-    params_audit = (
-        NEXUS_UNREAL_DIR
-        / "Plugins/NexusLink/scripts/audit_capability_params.py"
-    )
-    if params_audit.is_file():
-        print(f"[audit] {params_audit}", flush=True)
-        params_rc = subprocess.call([sys.executable, str(params_audit)])
-        if params_rc != 0:
-            return params_rc
 
     conn_args, mode = _resolve_connection(args)
     if not conn_args:
