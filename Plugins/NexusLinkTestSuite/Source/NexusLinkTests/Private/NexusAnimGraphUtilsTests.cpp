@@ -3,7 +3,9 @@
 #include "Misc/AutomationTest.h"
 #include "NexusCapabilityRegistry.h"
 #include "NexusSchemaTestUtils.h"
+#if WITH_EDITOR
 #include "Utils/NexusAnimGraphUtils.h"
+#endif
 
 #if WITH_DEV_AUTOMATION_TESTS
 

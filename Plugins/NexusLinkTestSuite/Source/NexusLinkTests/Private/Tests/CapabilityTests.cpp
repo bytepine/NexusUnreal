@@ -14,8 +14,8 @@
 #include "Utils/NexusEditorTransaction.h"
 #include "Utils/NexusAssetUtils.h"
 #if WITH_EDITOR
+#include "Utils/NexusAssetEditorUtils.h"
 #include "Editor.h"
-#include "ScopedTransaction.h"
 #include "Engine/Blueprint.h"
 #endif
 
@@ -489,13 +489,9 @@ bool FNexusLinkCapabilityEditorTransactionTest::RunTest(const FString& Parameter
 #if WITH_EDITOR
 	if (GEditor)
 	{
-		TUniquePtr<FScopedTransaction> Tx = FNexusEditorTransaction::Begin(TEXT("EditorTransactionTest"));
+		TUniquePtr<INexusTransactionHandle> Tx = FNexusEditorTransaction::Begin(TEXT("EditorTransactionTest"));
 		TestTrue(TEXT("Begin 后事务进行中"), FNexusEditorTransaction::IsTransactionActive());
-		if (Tx.IsValid())
-		{
-			Tx->Cancel();
-			Tx.Reset();
-		}
+		FNexusEditorTransaction::CancelAndRevert(Tx);
 		TestFalse(TEXT("Cancel 后事务结束"), FNexusEditorTransaction::IsTransactionActive());
 	}
 #endif
@@ -519,7 +515,7 @@ bool FNexusLinkCapabilityEditorTransactionUndoTest::RunTest(const FString& Param
 	UBlueprint* BP = LoadObject<UBlueprint>(nullptr, *Path);
 	if (!BP)
 	{
-		const FNexusAssetUtils::FAssetCreateOutcome Created = FNexusAssetUtils::CreateBlueprintAsset(
+		const FNexusAssetEditorUtils::FAssetCreateOutcome Created = FNexusAssetEditorUtils::CreateBlueprintAsset(
 			Path, TEXT("Actor"), UObject::StaticClass(), nullptr, nullptr, false);
 		if (!Created.Ok())
 		{
@@ -580,6 +576,10 @@ bool FNexusLinkCapabilitySettingsGroupPathTest::RunTest(const FString& Parameter
 		FNexusCapabilityRegistry::MakeSettingsGroupPath(
 			TEXT("E:\\repo\\Source\\NexusLink\\Private\\Capabilities\\Runtime\\Actor\\NexusListRuntimeActorsCapability.cpp")),
 		FString(TEXT("Runtime/Actor")));
+	TestEqual(TEXT("双模块拆分：NexusLinkEditor 根路径同样只认 Capabilities/ 锚点"),
+		FNexusCapabilityRegistry::MakeSettingsGroupPath(
+			TEXT("/repo/Source/NexusLinkEditor/Private/Capabilities/Asset/Blueprint/NexusGetAssetBlueprintCapability.cpp")),
+		FString(TEXT("Asset/Blueprint")));
 	TestEqual(TEXT("asset root file"),
 		FNexusCapabilityRegistry::MakeSettingsGroupPath(
 			TEXT("/repo/Private/Capabilities/Asset/NexusSearchAssetCapability.cpp")),

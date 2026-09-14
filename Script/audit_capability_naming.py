@@ -13,7 +13,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 NEXUS_UNREAL = SCRIPT_DIR.parent
 NEXUSLINK_PLUGIN_SOURCE = NEXUS_UNREAL / "Plugins/NexusLink/Source"
 NEXUSLINK_SOURCE = NEXUSLINK_PLUGIN_SOURCE / "NexusLink"
-CAP_ROOT = NEXUSLINK_SOURCE / "Private/Capabilities"
+NEXUSLINKEDITOR_SOURCE = NEXUSLINK_PLUGIN_SOURCE / "NexusLinkEditor"
+# 双模块拆分后 cap 分散在两个模块根的 Private/Capabilities/ 下
+CAP_ROOTS = [
+    NEXUSLINK_SOURCE / "Private/Capabilities",
+    NEXUSLINKEDITOR_SOURCE / "Private/Capabilities",
+]
 VERSION_COMPAT_FILE = NEXUSLINK_SOURCE / "Public/Utils/NexusVersionCompat.h"
 
 RE_NAME = re.compile(r'Out\.Name\s*=\s*TEXT\("([^"]+)"\)')
@@ -46,9 +51,11 @@ PLANNED_GAP_READ_CAPS = frozenset({
 
 
 def _scan_capability_cpp_files() -> list[Path]:
-    if not CAP_ROOT.is_dir():
-        return []
-    return sorted(CAP_ROOT.rglob("Nexus*Capability.cpp"))
+    files: list[Path] = []
+    for root in CAP_ROOTS:
+        if root.is_dir():
+            files.extend(root.rglob("Nexus*Capability.cpp"))
+    return sorted(files)
 
 
 def _scan_nexuslink_sources_for_raw_at_least() -> list[tuple[Path, int]]:

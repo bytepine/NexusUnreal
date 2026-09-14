@@ -10,7 +10,11 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 PLUGIN = REPO / "nexus-unreal/Plugins/NexusLink"
-CAP_DIR = PLUGIN / "Source/NexusLink/Private/Capabilities"
+# 双模块拆分后 cap 分散在两个模块根的 Private/Capabilities/ 下
+CAP_DIRS = [
+    PLUGIN / "Source/NexusLink/Private/Capabilities",
+    PLUGIN / "Source/NexusLinkEditor/Private/Capabilities",
+]
 README = REPO / "nexus-unreal/README.md"
 TOOL_REF = PLUGIN / "docs/tool-reference.md"
 TOOL_REF_ZH = PLUGIN / "docs/tool-reference.zh.md"
@@ -43,7 +47,8 @@ README_FEATURE_TOKENS: dict[str, list[str]] = {
 
 def load_caps() -> dict[str, dict]:
     caps: dict[str, dict] = {}
-    for cpp in sorted(CAP_DIR.rglob("*Capability.cpp")):
+    cpp_files = [p for d in CAP_DIRS if d.is_dir() for p in d.rglob("*Capability.cpp")]
+    for cpp in sorted(cpp_files):
         text = cpp.read_text(encoding="utf-8", errors="ignore")
         m = RE_NAME.search(text)
         if not m:
@@ -147,8 +152,14 @@ def main() -> int:
 
     # 域目录计数 vs AI_NAVIGATION
     by_dir: dict[str, list[str]] = {}
+    CAP_DIR_PREFIXES = (
+        "nexus-unreal/Plugins/NexusLink/Source/NexusLink/Private/Capabilities",
+        "nexus-unreal/Plugins/NexusLink/Source/NexusLinkEditor/Private/Capabilities",
+    )
     for name, info in caps.items():
-        rel = Path(info["file"]).relative_to("nexus-unreal/Plugins/NexusLink/Source/NexusLink/Private/Capabilities")
+        file_str = info["file"]
+        prefix = next(p for p in CAP_DIR_PREFIXES if file_str.startswith(p))
+        rel = Path(file_str).relative_to(prefix)
         parts = rel.parts
         key = parts[0] if len(parts) == 2 else f"{parts[0]}/{parts[1]}"
         by_dir.setdefault(key, []).append(name)

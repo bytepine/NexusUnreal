@@ -3,10 +3,10 @@
 #include "Misc/AutomationTest.h"
 #include "NexusCapabilityRegistry.h"
 #include "NexusSchemaTestUtils.h"
-#include "Utils/NexusWidgetAnimationUtils.h"
 #include "UObject/Package.h"
 
 #if WITH_EDITOR
+#include "Utils/NexusWidgetAnimationUtils.h"
 #include "WidgetBlueprint.h"
 #include "Animation/WidgetAnimation.h"
 #endif

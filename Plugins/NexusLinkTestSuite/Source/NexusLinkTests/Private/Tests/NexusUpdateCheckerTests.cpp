@@ -2,6 +2,9 @@
 
 #include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
+
+// FNexusUpdateChecker 现属 NexusLinkEditor 模块，仅编辑器目标链接；Game 目标整份跳过。
+#if WITH_EDITOR
 #include "NexusUpdateChecker.h"
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -102,3 +105,5 @@ bool FNexusLinkUpdateCheckerGetCurrentVersionTest::RunTest(const FString& /*Para
 	TestTrue(TEXT("Version contains dot separator"), Version.Contains(TEXT(".")));
 	return true;
 }
+
+#endif // WITH_EDITOR

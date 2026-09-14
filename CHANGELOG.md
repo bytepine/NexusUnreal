@@ -26,6 +26,7 @@
 - chore(test): `legacy_map` 与插件 C++ 旧名表对齐（补 `get_behavior_tree`，去掉恒等 `list_runtime_widgets`）
 - chore(script): `apply_ai_zh.py` 的 `CAP_DESC_ZH` 补 `exec_python` / `get_python_api` 中文描述
 - chore(unreal): 示例工程替换为 UE 5.7 第三人称模板（含 Combat/Platforming/SideScrolling 变体）；`EngineAssociation: 5.7`；默认关卡 `/Game/ThirdPerson/Lvl_ThirdPerson`；日常编译/E2E 跟 Association；`Nexus.uproject` 启用 ModelViewViewModel / PCG / PoseSearch / CommonUI / MoviePipeline——插件对这几个可选插件的 cap 已链接成功，不启用会让 DLL 缺 import 导致 NexusLink 加载失败
+- chore(test): 跟随 NexusLink 双模块拆分（`NexusLink` Runtime + `NexusLinkEditor` Editor）——`NexusLinkTests.Build.cs` 新增 `NexusLinkEditor` 模块依赖与对应 `PrivateIncludePaths`；`CapabilityTests.cpp` 补一条 `Source/NexusLinkEditor/...` 路径的 `MakeSettingsGroupPath` 用例；`Script/audit_capability_naming.py`/`Script/audit_doc_sync.py`/`Plugins/NexusLink/scripts/build_tool_reference.py` 的 cap 根路径改为同时扫描两个模块目录，`audit_capability_params.py` 增加基类与模块一致性断言
 
 ### Security
 

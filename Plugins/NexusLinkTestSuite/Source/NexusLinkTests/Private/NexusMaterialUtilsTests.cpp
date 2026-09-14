@@ -2,7 +2,9 @@
 
 #include "Misc/AutomationTest.h"
 #include "NexusCapabilityRegistry.h"
+#if WITH_EDITOR
 #include "Utils/NexusMaterialUtils.h"
+#endif
 #include "Materials/MaterialFunction.h"
 #include "UObject/Package.h"
 

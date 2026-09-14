@@ -17,7 +17,11 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 NEXUS_UNREAL = SCRIPT_DIR.parent
-CAP_ROOT = NEXUS_UNREAL / "Plugins" / "NexusLink" / "Source" / "NexusLink" / "Private" / "Capabilities"
+# 双模块拆分后 cap 分散在两个模块根的 Private/Capabilities/ 下
+CAP_ROOTS = [
+    NEXUS_UNREAL / "Plugins" / "NexusLink" / "Source" / "NexusLink" / "Private" / "Capabilities",
+    NEXUS_UNREAL / "Plugins" / "NexusLink" / "Source" / "NexusLinkEditor" / "Private" / "Capabilities",
+]
 
 # 目录名（含 Capabilities 下任意层级子目录）→ 默认功能分类（注：访问级别由 cap 名前缀决定）
 DIR_TO_CATEGORY = {
@@ -84,11 +88,13 @@ def category_for(cpp_path: Path, cap_name: str) -> str:
 def find_cpp_files() -> list[Path]:
     out = []
     seen = set()
-    for p in CAP_ROOT.rglob("*.cpp"):
-        rp = p.resolve()
-        if rp in seen: continue
-        seen.add(rp)
-        out.append(p)
+    for root in CAP_ROOTS:
+        if not root.is_dir(): continue
+        for p in root.rglob("*.cpp"):
+            rp = p.resolve()
+            if rp in seen: continue
+            seen.add(rp)
+            out.append(p)
     return sorted(out)
 
 
@@ -185,7 +191,7 @@ def ensure_includes(cpp_path: Path):
 
 def main() -> int:
     files = find_cpp_files()
-    print(f"Found {len(files)} cap .cpp files under {CAP_ROOT}")
+    print(f"Found {len(files)} cap .cpp files under {CAP_ROOTS}")
 
     cap_names_seen: dict[str, Path] = {}
     stats = {"registered": 0, "skipped": 0, "no_class": 0, "headers_patched": 0, "includes_patched": 0}
