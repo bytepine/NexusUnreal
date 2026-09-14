@@ -37,7 +37,7 @@ struct FUnLuaTest_Issue556 : FUnLuaTestBase
         const FURL URL;
         World->InitializeActorsForPlay(URL);
         World->BeginPlay();
-        World->bBegunPlay = true;
+        UnLuaTest_SetWorldBegunPlay(World, true);
 
         const auto Actor = (AIssue556Actor*)World->SpawnActor(AIssue556Actor::StaticClass());
 

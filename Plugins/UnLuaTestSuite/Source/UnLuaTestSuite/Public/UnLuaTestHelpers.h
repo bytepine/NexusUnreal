@@ -253,6 +253,16 @@ class UNLUATESTSUITE_API UUnLuaTestFunctionLibrary : public UBlueprintFunctionLi
 #define UNLUA_TEST_APP_CONTEXT EAutomationTestFlags::ApplicationContextMask
 #endif
 
+// UE 5.4+ 改用 SetBegunPlay；5.8 起 bBegunPlay 为 private
+FORCEINLINE void UnLuaTest_SetWorldBegunPlay(UWorld* World, bool bValue)
+{
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 4)
+    World->SetBegunPlay(bValue);
+#else
+    World->bBegunPlay = bValue;
+#endif
+}
+
 namespace UnLuaTestPrivate
 {
     template <typename T>

@@ -31,7 +31,7 @@ static void Run(TFunction<void(lua_State*, UWorld*)> Test)
     const FURL URL;
     World->InitializeActorsForPlay(URL);
     World->BeginPlay();
-    World->bBegunPlay = true;
+    UnLuaTest_SetWorldBegunPlay(World, true);
 
     UnLua::PushUObject(L, World);
     lua_setglobal(L, "World");
