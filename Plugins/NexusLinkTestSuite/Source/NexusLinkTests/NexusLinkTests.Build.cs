@@ -34,7 +34,7 @@ public class NexusLinkTests : ModuleRules
 			PrivateDependencyModuleNames.AddRange(
 				new string[]
 				{
-					// NexusLinkEditor（Editor 模块）：195 个 EditorOnly cap / 编辑器 Utils 的测试用例需要
+					// NexusLinkEditor（Editor 模块）：192 个 EditorOnly cap / 编辑器 Utils 的测试用例需要
 					"NexusLinkEditor",
 					"UnrealEd",
 					"BlueprintGraph",

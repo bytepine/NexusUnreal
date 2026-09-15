@@ -214,3 +214,49 @@ bool FNexusLinkHostRegistryScopeTest::RunTest(const FString& Parameters)
 
 	return true;
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// 4. 全表：非完整 Editor 宿主仅 Runtime 可见（与 tools/list / call_capability /
+//    MultiTool HandleToolsCall 共用 IsCapabilityVisibleOnHost）
+// ────────────────────────────────────────────────────────────────────────────
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FNexusLinkHostRegistryScopeAllTest,
+	"NexusLink.Host.RegistryScope.All",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FNexusLinkHostRegistryScopeAllTest::RunTest(const FString& Parameters)
+{
+	const FNexusCapabilityRegistry& Reg = FNexusCapabilityRegistry::Get();
+	int32 RuntimeCount = 0;
+	int32 EditorCount  = 0;
+
+	for (const FCapRecord& Record : Reg.GetAllRecords())
+	{
+		const bool bRuntime = Record.Instance->GetHostScope() == ENexusCapabilityHostScope::Runtime;
+		if (bRuntime)
+		{
+			++RuntimeCount;
+			if (!TestTrue(
+				FString::Printf(TEXT("runtime cap '%s' visible on non-editor host"), *Record.Def.Name),
+				FNexusHostUtils::IsCapabilityVisibleOnHost(Record, false)))
+			{
+				return false;
+			}
+		}
+		else
+		{
+			++EditorCount;
+			if (!TestFalse(
+				FString::Printf(TEXT("editor cap '%s' hidden on non-editor host"), *Record.Def.Name),
+				FNexusHostUtils::IsCapabilityVisibleOnHost(Record, false)))
+			{
+				return false;
+			}
+		}
+	}
+
+	TestTrue(TEXT("registry has runtime caps"), RuntimeCount > 0);
+	TestTrue(TEXT("registry has editor caps"), EditorCount > 0);
+	return true;
+}

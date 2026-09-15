@@ -8,6 +8,7 @@
 
 ### Added
 
+- test(plugin): L1 `NexusLink.Utils.Runtime.RequirePlayWorld`（未开 PIE 时拒绝 Editor World）与 `NexusLink.Host.RegistryScope.All`（全表宿主可见性）
 - feat(unreal): `Script/package.py` 任意平台打包（RunUAT BuildCookRun；默认 EngineAssociation + 本机平台 + Development；`--platform` 可多个/别名/原样透传；`--` 后参数转给 UAT）；入口 `package.bat` / `package.sh`
 - test(plugin): 将 NexusLink L1 Automation 抽成工程侧独立插件 `Plugins/NexusLinkTestSuite`（仿 UnLuaTestSuite；模块名仍为 `NexusLinkTests`；跨插件访问 `NexusMcpAuth.h` 走兄弟插件 Private 路径）
 - chore(deps): 以 git submodule 引入 UnLua（`Plugins/UnLua` → [bytepine/UnLua](https://github.com/bytepine/UnLua)）；`Nexus.uproject` 启用 UnLua
