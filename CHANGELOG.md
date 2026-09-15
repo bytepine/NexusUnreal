@@ -34,6 +34,8 @@
 
 ### Fixed
 
+- fix(test): GUI e2e 启动加 `-LiveCoding=false`，避免 `save_asset` 被 Live Coding 降级为 deferred
+- fix(test): `manage_asset_lua_binding` 未知 action 由 schema enum 拦下，断言改为 `MCPError`
 - fix(unlua): UnLuaTestSuite 在 UE 5.4+ 用 `SetBegunPlay` 替代直接写 `bBegunPlay`（5.8 起为 private，5.4–5.7 直接写会 C4996）
 - fix(unreal): 跨版本 Target/模块——`V2`（UE4 / 5.0–5.2）/`V4`（5.3）/`V5`（5.4–5.6）/`V6`+`Unreal5_7`（5.7）/`V7`+`Unreal5_8`（5.8）；玩法变体 `NexusGameplay` ExtraModuleNames 5.6+（5.3+ 仍会因 uproject Modules 编进该模块）；AI 控制器 UPROPERTY 用基类 `UStateTreeComponent*`，5.5+ 才创建 `UStateTreeAIComponent`（5.4 无 MODULE_API 导出）；编辑器 `GetDescription` 仅 5.5+；`MakeWeakExecutionContext` 仅 5.6+；`SetBodySimulatePhysics` 仅 5.4+；冲动量去掉 `Units=cm/s`；`InputAction.h` 不再写 `EnhancedInput/Public/` 前缀；4.26 用 `NexusInputStubs`；uproject 将 StateTree/MVVM/PCG 等标为 Optional；`UEnvQueryContext_Danger` 改 `NEXUSGAMEPLAY_API`；`LogNexus` 导出 `NEXUS_API`；StateTree 实例数据宏走 `NexusGameplayVersionCompat.h`（`NG_UE_HAS_*`）
 - fix(test): 全量 e2e 对齐——`skipif_ue_below` 移入 `pytest_runtest_setup`；用例统一 `cap_first` / `operations[]`；EQS 缺 cap 时 skip；`audit_capability_naming` 补 `unload`、期望数 176；GUI/PIE 对齐 `spawn_runtime_actor` 单条、`control_pie` results[]、`set_runtime_widget_property` 的 `updates[]`；补覆盖用例参数对齐真实 Schema（`rootMotion`/`anchorMin*`/`attribute`/`startFrame`/`halfHeight`/`updates[].actorName`），schema 校验失败 skip 而非 fail

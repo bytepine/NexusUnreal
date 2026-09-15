@@ -162,6 +162,8 @@ class UELauncher:
             # mirror the engine log to our capture file for early-exit triage.
             args += ["-stdout", "-FullStdOutLogOutput"]
         args.append("-skipcompile")
+        # GUI 编辑器默认会自动开 Live Coding，SavePackage 会被插件降级为 deferred
+        args.append("-LiveCoding=false")
         # 会话级强制开 MCP（不依赖 Preferences / Config 目录）
         args.append("-EnableNexusMcp")
         # 会话级打开危险 Capability，供 exec_command / Lua eval/dofile 用例；不写盘

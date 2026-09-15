@@ -217,12 +217,12 @@ def test_manage_asset_lua_binding(test_ns, mcp):
     assert not entry.get("error"), r
     got = cap_first(mcp.call_capability("get_asset_lua_binding", assetPath=bp))
     assert not got.get("error"), got
-    bad = mcp.call_capability(
-        "manage_asset_lua_binding",
-        assetPath=bp,
-        operations=[{"action": "not_a_real_action"}],
-    )
-    assert cap_first(bad).get("error"), bad
+    with pytest.raises(MCPError):
+        mcp.call_capability(
+            "manage_asset_lua_binding",
+            assetPath=bp,
+            operations=[{"action": "not_a_real_action"}],
+        )
     unbind = mcp.call_capability(
         "manage_asset_lua_binding",
         assetPath=bp,
