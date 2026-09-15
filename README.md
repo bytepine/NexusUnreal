@@ -47,7 +47,7 @@ git submodule update --init --recursive
 ## MCP 接入
 
 1. 确保 NexusLink 子模块已初始化，或从 [NexusLink Releases](https://github.com/bytepine/NexusLink/releases) 下载 zip 放入 `Plugins/NexusLink`
-2. 启用：**Editor Preferences → Plugins → NexusLink → 启用 MCP 服务器**（默认关）→ HTTP `:45000` / WS `:55000`
+2. 启用：**Editor Preferences → Plugins → NexusLink → 启用 MCP 服务器**（默认关）→ HTTP `:45000` / WS `:55000`。PIE / 独立 Development 包也可 `~` 后执行 `NexusLink.Mcp on`；`NexusLink.Mcp panel` 打开游戏内调试面板（会话级，不写盘）
 3. IDE 代理：[NexusVSCode](https://github.com/bytepine/NexusVSCode)（`:6900`）或 [NexusRider](https://github.com/bytepine/NexusRider)（`:6800`）
 4. 完整配置：[NexusLink 使用指南](https://github.com/bytepine/NexusLink/blob/master/docs/usage-guide.md)
 

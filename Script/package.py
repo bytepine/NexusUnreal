@@ -328,7 +328,8 @@ def main() -> int:
         if config == "Development":
             print(
                 "[package] Runtime MCP：启动加 -EnableNexusMcp，或包内 ~ 控制台 NexusLink.Mcp on"
-                "（可选 -NexusMcpPort= / -NexusWsPort= / -NexusAllowLan；status/restart 查看或重启）",
+                "（可选 -NexusMcpPort= / -NexusWsPort= / -NexusAllowLan；status/restart 查看或重启；"
+                "panel 打开游戏内调试面板）",
                 flush=True,
             )
     return 0
