@@ -434,6 +434,19 @@ def _anim_actor(mcp, pie, test_ns):
 
 
 @pytest.mark.l4_runtime
+def test_get_runtime_actor_animation_state_no_crash(mcp, _anim_actor, require_tools):
+    """`get_runtime_actor_animation` sections=state：ThirdPerson 角色不得空指针崩溃。"""
+    require_tools("get_runtime_actor_animation")
+    r = mcp.call(
+        "get_runtime_actor_animation",
+        actorName=_anim_actor,
+        sections=["state"],
+    )
+    entry = cap_first(r)
+    assert not entry.get("error"), entry
+
+
+@pytest.mark.l4_runtime
 def test_interact_runtime_actor_animation_play_montage(mcp, _anim_actor, test_ns, require_tools):
     """`interact_runtime_actor_animation` action=play_montage。"""
     require_tools("interact_runtime_actor_animation")
