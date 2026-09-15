@@ -203,6 +203,33 @@ def test_capture_viewport_validate_only(mcp, require_tools):
     assert not entry.get("error"), entry
 
 
+def test_capture_editor_panel_list(mcp, require_tools):
+    """list 模式不出图：登记面板名 + Tab ID + 当前是否打开。"""
+    require_tools("capture_editor_panel")
+    entry = cap_first(mcp.call_capability("capture_editor_panel", target="list"))
+    panels = entry.get("panels") or []
+    names = {p.get("name") for p in panels}
+    assert {"viewport", "content_browser", "details", "output_log"} <= names, entry
+    assert all(p.get("tabId") for p in panels), entry
+
+
+def test_capture_editor_panel_rejects_view_angle_without_actor(mcp, require_tools):
+    """viewAngle 必须配 actorName，否则请求本身矛盾。"""
+    require_tools("capture_editor_panel")
+    entry = cap_first(mcp.call_capability("capture_editor_panel", viewAngle="top"))
+    assert entry.get("success") is False, entry
+    assert "actorName" in (entry.get("error") or ""), entry
+
+
+@pytest.mark.requires_gui
+def test_capture_editor_panel_viewport_validate(mcp, require_tools):
+    """validateOnly 只确认面板 tab 存在，不写图片。"""
+    require_tools("capture_editor_panel")
+    entry = cap_first(mcp.call_capability("capture_editor_panel", target="viewport", validateOnly=True))
+    assert entry.get("validateOnly") is True, entry
+    assert not entry.get("error"), entry
+
+
 def test_manage_asset_lua_binding(test_ns, mcp):
     if not is_capability_available(mcp, "manage_asset_lua_binding"):
         pytest.skip("manage_asset_lua_binding 未编入（需 WITH_UNLUA）")

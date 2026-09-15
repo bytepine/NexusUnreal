@@ -17,6 +17,7 @@
 - test(e2e): `test_10` 补 Python 用例——`exec_python` eval/traceback 与 `file` 模式路径校验（越界、非 `.py` 均须 `arg_invalid`）；`undoRecorded` 的两条写路径差异（纯读须为 `false`；`obj.modify(False)` 只入事务缓冲、不把包标脏，其返回值即引擎自己的答案，用来交叉验证该字段不是假阳性）；`get_python_api` 内省、`target`/`query` 白名单注入拒绝（白名单是该 cap 敢默认开启的唯一依据，此前无覆盖）、`offset` 分页不重叠、`searchDoc` 按 docstring 检索、缺失 API 仍回 `engineVersion`/`pythonVersion`；`Nexus.uproject` 启用 PythonScriptPlugin（未启用时用例按 `require_tools` 自动 skip）
 - test(plugin): 新增 `NexusMcpActivationTests`，覆盖 NexusLink MCP 启停统一管理（`FNexusMcpActivation`）——控制台/启动参数/Preferences 三层优先级、控制台三态覆盖对 Preferences 改动的稳定压制、角色门控（`-game`/`-server` 子进程与 cook/commandlet 不读 Preferences）；`Script/package.py` 运行时提示同步为 `NexusLink.Mcp on` / `status` / `restart` / `panel`
 - test(plugin): 新增 `NexusCapabilitySessionOverrideTests`，覆盖游戏内 MCP 调试面板的 Capability 会话级临时启停——会话禁用压制持久启用、会话启用抬起持久禁用（均不写 `DisabledCapabilities`）、危险 cap 在「全部禁用」模式下仍可单条会话强制启用且不影响其他危险 cap、`ClearSessionCapabilityOverrides` 一键恢复；示例工程 README MCP 接入补 `NexusLink.Mcp on` / `panel`
+- test(e2e): `test_95` 补 Runtime 迁入后的 `get_output_log` 与 `capture_viewport target=pie validateOnly`；`test_10` 补 `capture_editor_panel` 的 `target=list` 面板枚举、`viewAngle` 缺 `actorName` 的拒绝路径与 `target=viewport validateOnly`
 
 ### Changed
 

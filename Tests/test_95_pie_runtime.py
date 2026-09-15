@@ -60,6 +60,21 @@ def test_pie_exec_slomo(mcp, pie):
     assert r.get("executed") is True, r
 
 
+def test_get_output_log_during_pie(mcp, pie):
+    r = cap_first(mcp.call("get_output_log", limit=5, preset="diagnose"))
+    assert "entries" in r, r
+    assert isinstance(r["entries"], list)
+
+
+@pytest.mark.requires_gui
+def test_capture_viewport_pie_validate(mcp, pie, require_tools):
+    require_tools("capture_viewport")
+    r = mcp.call_capability("capture_viewport", target="pie", validateOnly=True)
+    entry = cap_first(r)
+    assert entry.get("validateOnly") is True, entry
+    assert not entry.get("error"), entry
+
+
 # ─────────────────────────────────────────────────────────────
 # Actor
 # ─────────────────────────────────────────────────────────────
