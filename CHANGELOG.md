@@ -15,6 +15,7 @@
 - test(e2e): 新领域与写路径——`test_108` StringTable/Font、`test_109` FoliageType、`test_110` Paper2D、`test_111` GeometryCollection、`test_112` Media、`test_113` CommonUI、`test_114` MoviePipeline；GAS 扩 CueNotify；钉写 MF 写图、ABP Slot/Blend/IK/AimOffset、Niagara 空白 `add_emitter`+模块栈、WBP 动画绑定/`remove_key`、`test_98` Sequencer 绑定级 key；缺口 `test_90` DataAsset、`test_94` manage_asset_level spawn/remove、`test_96` GAS runtime、`test_95` widget/Lua、`test_10` get_asset_lua_binding；**manage 每个 action + get 每个 named section** 均有 happy-path；`Script/audit_e2e_coverage.py` 对照 C++ 注册表门禁
 - feat(test): `capability_probe` + `asset_helpers`——SearchMode 下用 `search_capabilities` 替代 `tools/list` 门禁；资产搜索统一 `cap_first`，缺失时在 `test_ns` 内创建；`ue_launcher` 强制 `WITH_GAS=1`/`WITH_NIAGARA=1`；`Nexus.uproject` 启用 Niagara
 - test(e2e): `test_10` 补 Python 用例——`exec_python` eval/traceback 与 `file` 模式路径校验（越界、非 `.py` 均须 `arg_invalid`）；`undoRecorded` 的两条写路径差异（纯读须为 `false`；`obj.modify(False)` 只入事务缓冲、不把包标脏，其返回值即引擎自己的答案，用来交叉验证该字段不是假阳性）；`get_python_api` 内省、`target`/`query` 白名单注入拒绝（白名单是该 cap 敢默认开启的唯一依据，此前无覆盖）、`offset` 分页不重叠、`searchDoc` 按 docstring 检索、缺失 API 仍回 `engineVersion`/`pythonVersion`；`Nexus.uproject` 启用 PythonScriptPlugin（未启用时用例按 `require_tools` 自动 skip）
+- test(plugin): 新增 `NexusMcpActivationTests`，覆盖 NexusLink MCP 启停统一管理（`FNexusMcpActivation`）——控制台/启动参数/Preferences 三层优先级、控制台三态覆盖对 Preferences 改动的稳定压制、角色门控（`-game`/`-server` 子进程与 cook/commandlet 不读 Preferences）；`Script/package.py` 运行时提示同步改为 `NexusLink.Mcp on`
 
 ### Changed
 

@@ -327,8 +327,8 @@ def main() -> int:
         print(f"[package] 完成。产物目录：{archive_dir}", flush=True)
         if config == "Development":
             print(
-                "[package] Runtime MCP：启动加 -EnableNexusMcp，或包内 ~ 控制台 NexusLink.EnableMcp 1"
-                "（可选 -NexusMcpPort= / -NexusWsPort= / -NexusAllowLan）",
+                "[package] Runtime MCP：启动加 -EnableNexusMcp，或包内 ~ 控制台 NexusLink.Mcp on"
+                "（可选 -NexusMcpPort= / -NexusWsPort= / -NexusAllowLan；status/restart 查看或重启）",
                 flush=True,
             )
     return 0
