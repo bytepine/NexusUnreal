@@ -4,7 +4,7 @@
 """
 engine_discovery.py -- UE 引擎安装目录自动探测
 
-供 build_test.py 和 run_e2e.py 共同复用，避免重复的 sys.path 动态导入。
+供 build_test.py / run_e2e.py / package.py 共同复用，避免重复的 sys.path 动态导入。
 """
 
 import json

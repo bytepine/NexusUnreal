@@ -8,6 +8,7 @@
 
 ### Added
 
+- feat(unreal): `Script/package.py` 任意平台打包（RunUAT BuildCookRun；默认 EngineAssociation + 本机平台 + Development；`--platform` 可多个/别名/原样透传；`--` 后参数转给 UAT）；入口 `package.bat` / `package.sh`
 - test(plugin): 将 NexusLink L1 Automation 抽成工程侧独立插件 `Plugins/NexusLinkTestSuite`（仿 UnLuaTestSuite；模块名仍为 `NexusLinkTests`；跨插件访问 `NexusMcpAuth.h` 走兄弟插件 Private 路径）
 - chore(deps): 以 git submodule 引入 UnLua（`Plugins/UnLua` → [bytepine/UnLua](https://github.com/bytepine/UnLua)）；`Nexus.uproject` 启用 UnLua
 - test(unlua): 引入上游 UnLuaTestSuite（工程侧 `Plugins/UnLuaTestSuite`）及 `Content/Script/Tests/` Lua 脚本；Editor 补 `LevelEditor` 依赖；排除依赖 TPS `/Game` 资产的 `LuaLib_Class.spec.cpp` / `Issue288Test.cpp`；补覆写回调 benchmark spec
