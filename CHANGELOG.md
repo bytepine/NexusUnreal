@@ -22,6 +22,7 @@
 
 ### Changed
 
+- chore(test): `build_test` 多引擎并行时给 UBT 加 `-MaxParallelActions`（总 cl.exe 约 CPU/2），C3859/C1076 PCH 内存耗尽自动单路重试
 - chore(plugin): NexusLink 子模块从 `Plugins/Developer/NexusLink` 迁到 `Plugins/NexusLink`；`Nexus.uproject` 启用 NexusLink / NexusLinkTestSuite
 - chore(test): 新增 `_framework/test_cleanup.py`——测试前后清理 `Saved/Logs` 下 `UE-auto-launch*` / `TestReport.xml` / `Automation-*.stdout.log`、`Content/_McpTest/`、历史 `Content/_NexusTest/` 与 `Content/__nexus_*__.uasset`；session 级 purge `/Game/_McpTest` 与 `/Game/_NexusTest`（`--keep-artifacts` 时保留）；`test_103`/`104`/`105`/`106` 写入改走 `test_ns`；`.gitignore` 忽略 `Content/_NexusTest/`
 - chore(test): pytest / `run_e2e.py` 自动拉起 UE **默认 headless**（`UnrealEditor-Cmd -unattended -nullrhi -NoSplash -NoSound`）；headless/命令行会话跳过 `l4_runtime`/`lua`/`requires_gui`；本地观察编辑器加 `--gui`；全量 `--gui`/`--full`

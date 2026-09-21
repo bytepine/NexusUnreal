@@ -57,7 +57,7 @@ git submodule update --init --recursive
 
 | 任务 | 命令 |
 |------|------|
-| 跨版本工程编译 | `py Script/build_test.py`（本机已装引擎编 `Nexus.uproject`；临时目录隔离、不改工程；`--max-workers` 并行；`--editor-only` / `--game-only`） |
+| 跨版本工程编译 | `py Script/build_test.py`（本机已装引擎编 `Nexus.uproject`；临时目录隔离、不改工程；`--max-workers` 并行并限制每路 `-MaxParallelActions`；C3859/C1076 自动单路重试；`--editor-only` / `--game-only`） |
 | 仅 Game 目标 | `py Script/build_test_game.py --versions UE_5.7` |
 | 打包（任意平台） | `py Script/package.py`（默认本机平台 + Development；`--platform Win64 Linux`；`--config Shipping`；`--` 后参数转给 UAT） |
 | L2 MCP 回归（日常，headless） | `py Script/run_e2e.py` |

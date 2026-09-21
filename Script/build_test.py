@@ -11,7 +11,9 @@ build_test.py -- NexusUnreal 工程跨版本编译
 不改仓库工程（不写 Intermediate/Binaries，不改 .uproject / .uplugin）。
 每套引擎在系统临时目录建隔离工程：junction Content/Source/Config，
 插件根建真实目录（Intermediate 落在临时树），然后对该副本调 UBT。
-多引擎可并行（默认 --max-workers 3）。
+多引擎可并行（默认 --max-workers 3）。workers>1 时给 UBT 加
+`-MaxParallelActions`（总 cl.exe 约 CPU/2），避免 MSVC PCH 打爆
+32-bit 堆（C3859/C1076）；仍出现则该版本自动 workers=1 重试。
 开跑前清残留 UBT / 调用 UBT 的 dotnet / 相关 MSBuild / VBCSCompiler，
 避免上次中断锁住 UnLuaDefaultParamCollectorUbtPlugin.dll 导致临时目录删不掉。
 
@@ -355,6 +357,11 @@ _WARN_SKIP = re.compile(
     r"[/\\]Engine[/\\]|compiler is not a preferred version",
     re.IGNORECASE,
 )
+# 多引擎并行时 cl.exe 共用巨型 PCH，易触发 32-bit 编译器堆耗尽
+_PCH_OOM_RE = re.compile(
+    r"C3859|C1076|未能创建 PCH|internal heap limit|PCH 的虚拟内存",
+    re.IGNORECASE,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -506,10 +513,40 @@ def _isolated_uproject(ver: str) -> Path:
     return path
 
 
+def _max_parallel_actions(max_workers: int) -> Optional[int]:
+    """多引擎并行时限制每路 UBT 的 cl.exe 数；单路不限制。"""
+    if max_workers <= 1:
+        return None
+    cpu = os.cpu_count() or 8
+    return max(2, cpu // (max_workers * 2))
+
+
+def _format_workers(editor_n: Optional[int] = None, game_n: Optional[int] = None) -> str:
+    def _one(n: int) -> str:
+        mpa = _max_parallel_actions(n)
+        return f"{n}" + (f" MaxParallelActions={mpa}" if mpa else "")
+
+    parts = []
+    if editor_n is not None:
+        parts.append(f"Editor={_one(editor_n)}")
+    if game_n is not None:
+        parts.append(f"Game={_one(game_n)}")
+    label = "; ".join(parts) if parts else "serial"
+    return f"Workers  : {label}; PCH OOM (C3859/C1076) retries serial"
+
+
+def _is_pch_oom(result: Dict) -> bool:
+    if result.get("exit_code") in (-1, 0):
+        return False
+    blob = "\n".join(result.get("error_lines") or result.get("output") or [])
+    return bool(_PCH_OOM_RE.search(blob))
+
+
 def _run_project_build(engine_path: str, target: str,
                        vs_version: Optional[str] = None,
                        uproject: Optional[Path] = None,
-                       ver: Optional[str] = None) -> Tuple[int, List[str]]:
+                       ver: Optional[str] = None,
+                       max_parallel_actions: Optional[int] = None) -> Tuple[int, List[str]]:
     """
     用指定引擎编某个 Target（默认编隔离副本，不写仓库 Intermediate）。
 
@@ -517,6 +554,7 @@ def _run_project_build(engine_path: str, target: str,
         传给 UBT 的 `-VS<ver>`。UE 4.26 / 4.27 在仅装 VS2019/VS2022 的机器上需要。
     :param uproject: 隔离副本的 .uproject；缺省则用仓库内文件（不推荐并行）。
     :param ver: 引擎目录名（如 UE_5.7）；并行时用来拆开 UBT `-log=`，避免抢同一份 Log.txt。
+    :param max_parallel_actions: 传给 UBT 的 `-MaxParallelActions=`；None 不限制。
     :return: (exit_code, output_lines)；exit_code=-1 表示找不到 Build 脚本（SKIP）。
     """
     script = _ubt_build_script(engine_path)
@@ -543,6 +581,8 @@ def _run_project_build(engine_path: str, target: str,
         log_dir = TEMP_BASE / ver
         log_dir.mkdir(parents=True, exist_ok=True)
         ubt_args.append(f"-log={log_dir / ('UBT-' + target + '.log')}")
+    if max_parallel_actions is not None and max_parallel_actions > 0:
+        ubt_args.append(f"-MaxParallelActions={max_parallel_actions}")
 
     env = os.environ.copy()
     dotnet_dir = _engine_dotnet_dir(engine_path)
@@ -610,9 +650,13 @@ def _format_result_block(r: Dict, lines_out: List[str], sep: str) -> Tuple[int, 
         lines_out.append(f"STATUS : SKIP  ({r['output'][0]})")
         return 0, 0, 0
     if exit_code == 0:
-        lines_out.append(
-            f"STATUS : PASS  (warnings={len(warn_lines)})" if warn_lines else "STATUS : PASS"
-        )
+        extra = []
+        if r.get("retried_pch_oom"):
+            extra.append("retried after PCH OOM")
+        if warn_lines:
+            extra.append(f"warnings={len(warn_lines)}")
+        suffix = f"  ({', '.join(extra)})" if extra else ""
+        lines_out.append(f"STATUS : PASS{suffix}")
         if warn_lines:
             lines_out.append(f"--- Warnings ({len(warn_lines)} lines) ---")
             lines_out.extend(f"  {ln}" for ln in warn_lines)
@@ -649,7 +693,8 @@ def _update_status_line(text: str, line_idx: int, total: int,
 def _build_one(engine: dict, target: str, line_idx: int, total: int,
                print_lock: Lock, is_tty: bool,
                vs_version: Optional[str] = None,
-               phase_label: str = "Editor") -> Dict:
+               phase_label: str = "Editor",
+               max_parallel_actions: Optional[int] = None) -> Dict:
     ver = engine["version"]
     eng_path = engine["path"]
 
@@ -673,7 +718,8 @@ def _build_one(engine: dict, target: str, line_idx: int, total: int,
 
     effective_vs = vs_version or ("2019" if ver in _VS2019_FALLBACK_VERSIONS else None)
     exit_code, output = _run_project_build(
-        eng_path, target, effective_vs, uproject=uproject, ver=ver
+        eng_path, target, effective_vs, uproject=uproject, ver=ver,
+        max_parallel_actions=max_parallel_actions,
     )
 
     error_lines = _extract_errors(output) if exit_code not in (-1, 0) else []
@@ -704,6 +750,7 @@ def _run_phase(engines: List[dict], target: str, max_workers: int,
     is_tty = sys.stdout.isatty()
     total = len(engines)
     ver_index = {e["version"]: i for i, e in enumerate(engines)}
+    mpa = _max_parallel_actions(max_workers)
 
     for e in engines:
         print(f"[{e['version']}] {label} Pending...", flush=True)
@@ -713,13 +760,29 @@ def _run_phase(engines: List[dict], target: str, max_workers: int,
         futures = {
             pool.submit(
                 _build_one, e, target, ver_index[e["version"]], total,
-                print_lock, is_tty, vs_version, label,
+                print_lock, is_tty, vs_version, label, mpa,
             ): e["version"]
             for e in engines
         }
         for fut in as_completed(futures):
             r = fut.result()
             results[r["ver"]] = r
+
+    if max_workers > 1:
+        oom = [e for e in engines if _is_pch_oom(results[e["version"]])]
+        if oom:
+            names = ", ".join(e["version"] for e in oom)
+            print(
+                f"\n{label}: PCH OOM on {names}; retry serial "
+                "(workers=1, no MaxParallelActions)",
+                flush=True,
+            )
+            retry, _, _, _ = _run_phase(oom, target, 1, vs_version, label)
+            for e in oom:
+                rr = dict(retry[e["version"]])
+                if rr["exit_code"] == 0:
+                    rr["retried_pch_oom"] = True
+                results[e["version"]] = rr
 
     pass_count = fail_count = total_warnings = 0
     for engine in engines:
@@ -762,6 +825,7 @@ def run_build_test_game(engines: List[dict], max_workers: int = 3,
     _kill_leftover_build_processes()
     _reset_temp_workspace()
     print(f"Isolated builds under: {TEMP_BASE}", flush=True)
+    print(_format_workers(game_n=max_workers), flush=True)
 
     platform_name = _PLATFORM_TARGET.get(_SYSTEM, "Linux")
     header = [
@@ -770,6 +834,7 @@ def run_build_test_game(engines: List[dict], max_workers: int = 3,
         f"Target   : {GAME_TARGET} {platform_name} Development",
         f"Method   : UBT Build.bat/sh -Project=<isolated temp> -NoMutex",
         f"Project  : {UPROJECT_PATH} (read-only; build dir {TEMP_BASE})",
+        _format_workers(game_n=max_workers),
         f"Versions : {', '.join(e['version'] for e in engines)}",
     ]
     results, pass_count, fail_count, total_warnings = _run_phase(
@@ -800,6 +865,7 @@ def run_build_test(engines: List[dict], max_workers: int = 3,
     _kill_leftover_build_processes()
     _reset_temp_workspace()
     print(f"Isolated builds under: {TEMP_BASE}", flush=True)
+    print(_format_workers(max_workers, game_max_workers if include_game else None), flush=True)
 
     platform_name = _PLATFORM_TARGET.get(_SYSTEM, "Linux")
     project = str(UPROJECT_PATH)
@@ -824,8 +890,7 @@ def run_build_test(engines: List[dict], max_workers: int = 3,
         f"Platform : {_SYSTEM}  (UBT Platform={platform_name})",
         f"Project  : {project} (read-only)",
         f"BuildDir : {TEMP_BASE}",
-        f"Workers  : Editor={max_workers}"
-        + (f" Game={game_max_workers}" if include_game else ""),
+        _format_workers(max_workers, game_max_workers if include_game else None),
         f"Targets  : {EDITOR_TARGET} (Editor) / {GAME_TARGET} (Game)",
         f"Versions : {', '.join(e['version'] for e in engines)}",
         f"Phases   : Editor{' + Game (WITH_EDITOR=0)' if include_game else ''}",
@@ -903,7 +968,8 @@ def main() -> int:
         type=int,
         default=3,
         metavar="N",
-        help="Max concurrent Editor-phase builds (default 3). Each engine uses an isolated temp project.",
+        help="Max concurrent Editor-phase builds (default 3). workers>1 时限制每路 "
+             "-MaxParallelActions；C3859/C1076 自动单路重试。",
     )
     parser.add_argument(
         "--versions",
@@ -936,7 +1002,8 @@ def main() -> int:
         type=int,
         default=None,
         metavar="N",
-        help="Max concurrent Game-phase workers (default: same as --max-workers)",
+        help="Max concurrent Game-phase workers (default: same as --max-workers). "
+             "同样限制 MaxParallelActions，PCH OOM 同样单路重试。",
     )
     args = parser.parse_args()
 
