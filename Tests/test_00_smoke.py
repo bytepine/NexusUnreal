@@ -102,6 +102,48 @@ def test_search_capabilities_not_found(mcp):
     assert "capability" not in r
 
 
+def _search_cap_names(r: dict) -> list[str]:
+    cap = r.get("capability")
+    if isinstance(cap, dict) and cap.get("name"):
+        return [str(cap["name"])]
+    return [
+        str(c.get("name"))
+        for c in (r.get("capabilities") or [])
+        if isinstance(c, dict) and c.get("name")
+    ]
+
+
+def test_search_capabilities_current_map(mcp):
+    """口语 current map 应命中 get_editor_context，而不是 get_asset_level。"""
+    r = mcp.call("search_capabilities", query="current map")
+    names = _search_cap_names(r)
+    assert "get_editor_context" in names, r
+
+
+def test_search_capabilities_get_refs(mcp):
+    r = mcp.call("search_capabilities", query="get refs")
+    names = _search_cap_names(r)
+    assert "get_asset_refs" in names, r
+
+
+def test_search_capabilities_cpp_enum_hint(mcp):
+    r = mcp.call("search_capabilities", query="cpp enum")
+    hint = (r.get("hint") or "").lower()
+    assert "uenum" in hint or "get_asset_enum" in hint, r
+
+
+def test_search_capabilities_routing_hints_resolvable(mcp):
+    r = mcp.call("search_capabilities", query="zzzz_no_such_cap_xyz")
+    hints = r.get("routingHints") or []
+    for item in hints:
+        name = item.get("name") if isinstance(item, dict) else None
+        if not name:
+            continue
+        detail = mcp.call("search_capabilities", capabilityName=name)
+        cap = detail.get("capability") or detail
+        assert cap.get("name") == name, detail
+
+
 def test_submit_feedback_smoke(mcp):
     """submit_feedback 最小通路：写入后返回 ok。"""
     r = mcp.call(

@@ -155,11 +155,19 @@ def test_get_editor_context_sections(mcp, require_tools):
     require_tools("get_editor_context")
     r = mcp.call_capability(
         "get_editor_context",
-        sections=["selection_actors", "content_browser_path", "selection_assets"],
+        sections=["selection_actors", "content_browser_path", "selection_assets", "current_map"],
         limit=10,
     )
     entry = cap_first(r)
-    assert "sections" in entry or "actors" in entry or "path" in entry, entry
+    assert "sections" in entry or "actors" in entry or "path" in entry or "assetPath" in entry, entry
+
+
+def test_get_editor_context_current_map(mcp, require_tools):
+    require_tools("get_editor_context")
+    r = mcp.call_capability("get_editor_context", sections=["current_map"])
+    entry = cap_first(r)
+    path = entry.get("assetPath") or ""
+    assert path.startswith("/Game") or path.startswith("/Engine") or path.startswith("/Temp"), entry
 
 
 def test_search_console_variables_stat(mcp, require_tools):

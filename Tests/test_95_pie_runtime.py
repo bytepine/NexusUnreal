@@ -53,6 +53,8 @@ def spawned_actors(mcp, pie, test_ns):
 def test_pie_status_is_running(mcp, pie):
     r = mcp.call("control_pie", action="status")
     assert pie_is_running(r), f"PIE not running: {r!r}"
+    entry = cap_first(r) if r.get("results") else r
+    assert entry.get("hasPlayWorld") is True, entry
 
 
 def test_pie_exec_slomo(mcp, pie):
