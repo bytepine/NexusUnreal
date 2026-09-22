@@ -104,6 +104,14 @@ pytest Tests --ue-url http://127.0.0.1:45000/stream
 | StateTree | `test_97_statetree_manage.py`（UE 5.5+） |
 | Sequencer / Physics / EQS | `test_98_sequencer_physics_eqs.py` |
 | 响应压缩 | `test_99_response_compact.py` |
+| BlendSpace / AnimSequence 关键帧 | `test_100_blendspace_animkeys.py` |
+| MetaSound / PCG / PoseSearch | `test_101_metasound_pcg_posesearch.py` |
+| Curve / UserDefinedEnum | `test_102_curve_enum.py` |
+| AnimComposite / PhysicalMaterial / RenderTarget | `test_103_anim_phys_rt.py` |
+| SoundClass / Submix | `test_104_audio_system.py` |
+| MetaSoundPatch | `test_105_metasound_patch.py` |
+| DataLayer | `test_106_data_layer.py` |
+| ControlRig | `test_107_control_rig.py` |
 | StringTable / Font | `test_108_string_table_font.py` |
 | FoliageType | `test_109_foliage.py` |
 | Paper2D | `test_110_paper2d.py` |
@@ -111,3 +119,8 @@ pytest Tests --ue-url http://127.0.0.1:45000/stream
 | FileMediaSource | `test_112_media.py` |
 | CommonUI Style | `test_113_common_ui.py` |
 | MoviePipeline | `test_114_movie_pipeline.py` |
+| Enhanced Input | `test_115_enhanced_input.py` |
+| 材质子类型 | `test_116_material_subtypes.py` |
+| IKRig / IKRetargeter | `test_117_ik.py` |
+| MVVM | `test_118_mvvm.py`（UE 5.5+） |
+| PCG Graph | `test_119_pcg.py`（UE 5.4+） |

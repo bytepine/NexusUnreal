@@ -37,6 +37,8 @@ git submodule update --init --recursive
 | **UnLua 插件**（子模块） | `Plugins/UnLua/` |
 | **UnLuaTestSuite** | `Plugins/UnLuaTestSuite/` |
 | 游戏 C++ | `Source/Nexus/` |
+| 模板变体 C++ | `Source/NexusGameplay/`（Combat / Platforming / SideScrolling，UE 5.6+） |
+| UE 4 输入垫片 | `Source/NexusInputStubs/`（仅 4.x Target） |
 | **NexusLink 插件**（子模块） | `Plugins/NexusLink/` |
 | **NexusLinkTestSuite** | `Plugins/NexusLinkTestSuite/` |
 

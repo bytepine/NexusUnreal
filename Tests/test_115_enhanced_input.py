@@ -1,5 +1,5 @@
 # Copyright byteyang. All Rights Reserved.
-"""阶段九七：Enhanced Input — InputAction / InputMappingContext（UE5+）。"""
+"""Enhanced Input — InputAction / InputMappingContext（UE5+）。"""
 
 from __future__ import annotations
 

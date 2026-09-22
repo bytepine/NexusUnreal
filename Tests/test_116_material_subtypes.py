@@ -1,5 +1,5 @@
 # Copyright byteyang. All Rights Reserved.
-"""阶段九七：材质子类型 — MaterialFunction / MaterialParameterCollection。"""
+"""材质子类型 — MaterialFunction / MaterialParameterCollection。"""
 
 from __future__ import annotations
 

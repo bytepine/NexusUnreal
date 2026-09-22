@@ -22,6 +22,7 @@
 
 ### Changed
 
+- chore(test): e2e 文件编号去重。`test_97` 只留 StateTree；Enhanced Input、材质子类型、IK、MVVM、PCG 改为 `test_115`–`test_119`
 - chore(test): `build_test` 多引擎并行时给 UBT 加 `-MaxParallelActions`（总 cl.exe 约 CPU/2），C3859/C1076 PCH 内存耗尽自动单路重试
 - chore(plugin): NexusLink 子模块从 `Plugins/Developer/NexusLink` 迁到 `Plugins/NexusLink`；`Nexus.uproject` 启用 NexusLink / NexusLinkTestSuite
 - chore(test): 新增 `_framework/test_cleanup.py`——测试前后清理 `Saved/Logs` 下 `UE-auto-launch*` / `TestReport.xml` / `Automation-*.stdout.log`、`Content/_McpTest/`、历史 `Content/_NexusTest/` 与 `Content/__nexus_*__.uasset`；session 级 purge `/Game/_McpTest` 与 `/Game/_NexusTest`（`--keep-artifacts` 时保留）；`test_103`/`104`/`105`/`106` 写入改走 `test_ns`；`.gitignore` 忽略 `Content/_NexusTest/`
