@@ -1,6 +1,6 @@
 ﻿# NexusUnreal
 
-**公开** UE 5.7 **示例工程**：演示如何在 ThirdPerson 模板项目中集成 [NexusLink](https://github.com/bytepine/NexusLink) MCP 插件。含 UnLua 脚本、游戏 C++ 模块与 MCP 回归测试宿主。
+**公开** UE 5.7 **示例工程**：演示如何在 ThirdPerson 模板项目中集成 [NexusLink](https://github.com/bytepine/NexusLink) MCP 插件。含 UnLua 脚本、游戏 C++ 模块，MCP 回归测试放在这个工程里。
 
 > 本仓**不包含** NexusLink、UnLua 插件本体（以 git 子模块挂载）；Fab / 商店用户请单独安装 NexusLink，或克隆时 `--recurse-submodules`。
 >
@@ -38,7 +38,7 @@ git submodule update --init --recursive
 | **UnLuaTestSuite** | `Plugins/UnLuaTestSuite/` |
 | 游戏 C++ | `Source/Nexus/` |
 | 模板变体 C++ | `Source/NexusGameplay/`（Combat / Platforming / SideScrolling，UE 5.6+） |
-| UE 4 输入垫片 | `Source/NexusInputStubs/`（仅 4.x Target） |
+| UE 4 输入兼容层 | `Source/NexusInputStubs/`（仅 4.x Target） |
 | **NexusLink 插件**（子模块） | `Plugins/NexusLink/` |
 | **NexusLinkTestSuite** | `Plugins/NexusLinkTestSuite/` |
 
