@@ -186,6 +186,38 @@ def test_get_output_log_filtered_offset(mcp):
     assert isinstance(r.get("entries"), list)
 
 
+def test_get_output_log_watch_roundtrip(mcp, require_tools):
+    """watch 装上后只收命中行；collectWatch / disarm 与互斥参数。"""
+    require_tools("get_output_log")
+    token = "NXWATCH_ROUNDTRIP_NO_HIT"
+    try:
+        with pytest.raises(MCPError):
+            mcp.call(
+                "get_output_log",
+                watch={"textIncludes": [token]},
+                collectWatch=True,
+            )
+        armed = cap_first(mcp.call(
+            "get_output_log",
+            watch={"textIncludes": [token], "verbosity": "all"},
+        ))
+        assert armed.get("watch") == "armed", armed
+        assert armed.get("entries") == []
+        assert "collectWatch" in (armed.get("hint") or ""), armed
+        got = cap_first(mcp.call("get_output_log", collectWatch=True))
+        assert got.get("entries") == [], got
+        assert got.get("watch") == "armed", got
+        done = cap_first(mcp.call("get_output_log", collectWatch=True, disarm=True))
+        assert done.get("watch") == "disarmed", done
+        with pytest.raises(MCPError):
+            mcp.call("get_output_log", collectWatch=True)
+    finally:
+        try:
+            mcp.call("get_output_log", disarm=True)
+        except MCPError:
+            pass
+
+
 def test_set_log_capture_filter_roundtrip(mcp):
     r1 = cap_first(mcp.call("set_log_capture_filter", categories=["LogNexusLink", "LogTemp"]))
     assert r1.get("captureFilter") == "custom"
