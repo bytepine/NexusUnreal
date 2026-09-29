@@ -479,8 +479,6 @@ bool FNexusLinkCapabilityEditorTransactionTest::RunTest(const FString& Parameter
 		FNexusEditorTransaction::ShouldTransact(TEXT("compile_blueprint"), WriteEditor));
 	TestFalse(TEXT("runtime 不包事务"),
 		FNexusEditorTransaction::ShouldTransact(TEXT("list_runtime_actors"), WriteRuntime));
-	TestFalse(TEXT("lua 不包事务"),
-		FNexusEditorTransaction::ShouldTransact(TEXT("eval_runtime_lua"), WriteEditor));
 	TestFalse(TEXT("control_pie 不包事务"),
 		FNexusEditorTransaction::ShouldTransact(TEXT("control_pie"), WriteEditor));
 	TestFalse(TEXT("control_movie_pipeline 不包事务"),

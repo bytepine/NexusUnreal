@@ -2,7 +2,7 @@
 
 **公开** UE 5.7 **示例工程**：演示如何在 ThirdPerson 模板项目中集成 [NexusLink](https://github.com/bytepine/NexusLink) MCP 插件。含 UnLua 脚本、游戏 C++ 模块，MCP 回归测试放在这个工程里。
 
-> 本仓**不包含** NexusLink、UnLua 插件本体（以 git 子模块挂载）；Fab / 商店用户请单独安装 NexusLink，或克隆时 `--recurse-submodules`。
+> 本仓**不包含** NexusLink、UnLua、NexusLinkExt 插件本体（以 git 子模块挂载）；Fab / 商店用户请单独安装 NexusLink，或克隆时 `--recurse-submodules`。
 >
 > **NexusLink 插件文档与发版**见公开仓 [bytepine/NexusLink](https://github.com/bytepine/NexusLink)。
 
@@ -10,7 +10,7 @@
 
 ## 克隆
 
-**推荐**（同时拉取 NexusLink、UnLua 子模块）：
+**推荐**（同时拉取 NexusLink、UnLua、NexusLinkExt 子模块）：
 
 ```bash
 git clone --recurse-submodules https://github.com/bytepine/NexusUnreal.git
@@ -40,7 +40,9 @@ git submodule update --init --recursive
 | 模板变体 C++ | `Source/NexusGameplay/`（Combat / Platforming / SideScrolling，UE 5.6+） |
 | UE 4 输入兼容层 | `Source/NexusInputStubs/`（仅 4.x Target） |
 | **NexusLink 插件**（子模块） | `Plugins/NexusLink/` |
+| **NexusLinkExt**（子模块） | `Plugins/NexusLinkExt/` |
 | **NexusLinkTestSuite** | `Plugins/NexusLinkTestSuite/` |
+| **NexusLinkExtTestSuite** | `Plugins/NexusLinkExtTestSuite/` |
 
 插件版本：见 `Plugins/NexusLink/VERSION` 或 [NexusLink Releases](https://github.com/bytepine/NexusLink/releases)
 
@@ -67,7 +69,7 @@ git submodule update --init --recursive
 
 | 层级 | 说明 |
 |------|------|
-| L1 C++ | `Plugins/NexusLinkTestSuite/` |
+| L1 C++ | `Plugins/NexusLinkTestSuite/`（`NexusLink.`）；UnLua 在 `Plugins/NexusLinkExtTestSuite/`（`NexusLinkExt.`） |
 | L2 pytest | 本仓 `Tests/` — 策略见 [Tests/README.md](Tests/README.md) |
 
 ---
@@ -77,6 +79,7 @@ git submodule update --init --recursive
 | 仓库 | 可见性 | 关系 |
 |------|--------|------|
 | [NexusLink](https://github.com/bytepine/NexusLink) | 公开 | UE MCP 插件（本仓子模块） |
+| [NexusLinkExt](https://github.com/bytepine/NexusLinkExt) | 公开 | 可选插件 Capability（本仓子模块；当前为 UnLua） |
 | [NexusRider](https://github.com/bytepine/NexusRider) | 公开 | Rider MCP 代理 |
 | [NexusVSCode](https://github.com/bytepine/NexusVSCode) | 公开 | VSCode / Cursor MCP 扩展 |
 
@@ -86,4 +89,4 @@ git submodule update --init --recursive
 
 本仓源码与文档：[MIT](LICENSE) © byteyang
 
-示例关卡与 Mannequin 等 `.uasset` 基于 UE 模板内容，使用须遵守 [Unreal Engine EULA](https://www.unrealengine.com/eula)。NexusLink 插件许可见 [Plugins/NexusLink/LICENSE](Plugins/NexusLink/LICENSE)（MIT）。
+示例关卡与 Mannequin 等 `.uasset` 基于 UE 模板内容，使用须遵守 [Unreal Engine EULA](https://www.unrealengine.com/eula)。NexusLink 插件许可见 [Plugins/NexusLink/LICENSE](Plugins/NexusLink/LICENSE)（MIT）。NexusLinkExt 许可见 [Plugins/NexusLinkExt/LICENSE](Plugins/NexusLinkExt/LICENSE)（MIT）。

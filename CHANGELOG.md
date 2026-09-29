@@ -8,6 +8,7 @@
 
 ### Added
 
+- feat(plugin): `NexusLinkExt` 以子模块挂载 [bytepine/NexusLinkExt](https://github.com/bytepine/NexusLinkExt)；`NexusLinkExt`（Runtime）与 `NexusLinkExtEditor`（Editor）承接从 NexusLink 迁出的 UnLua Capability。L1 拆到工程侧 `Plugins/NexusLinkExtTestSuite`（模块 `NexusLinkExtTests`，过滤前缀 `NexusLinkExt.`）；`NexusLinkTestSuite` 不再依赖 NexusLinkExt
 - test(e2e): `test_00` 覆盖 `get_output_log` 的 `watch` / `collectWatch` / `disarm`；L1 `NexusLink.Log.Watch.CollapseFilterDrop` 覆盖连续合并、筛选与旁路溢出
 - test(e2e): `test_00` 覆盖 `current map` / `get refs` / `cpp enum` hint / `routingHints` 可精确点名；`test_10` `get_editor_context` `current_map`；`test_95` PIE `hasPlayWorld`
 - feat(unreal): `Script/package.py` 任意平台打包（RunUAT BuildCookRun；默认 EngineAssociation + 本机平台 + Development；`--platform` 可多个/别名/原样透传；`--` 后参数转给 UAT）；入口 `package.bat` / `package.sh`

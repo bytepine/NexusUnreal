@@ -40,11 +40,6 @@ bool FNexusCapabilityGapNewCapsRegistered::RunTest(const FString& Parameters)
 	ExpectPresent(TEXT("create_asset_state_tree"), true);
 	TestTrue(TEXT("ST add_task"), NexusSchemaActionContains(TEXT("manage_asset_state_tree"), TEXT("add_task"), *this));
 #endif
-#if WITH_UNLUA
-	ExpectPresent(TEXT("manage_asset_lua_binding"), true);
-#else
-	ExpectPresent(TEXT("manage_asset_lua_binding"), false);
-#endif
 #if WITH_GAS
 	ExpectPresent(TEXT("create_asset_gameplay_cue_notify"), true);
 	TestTrue(TEXT("GCNotify set_cue_name"), NexusSchemaActionContains(TEXT("manage_asset_gameplay_cue_notify"), TEXT("set_cue_name"), *this));

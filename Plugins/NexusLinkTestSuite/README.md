@@ -2,7 +2,7 @@
 
 NexusLink 的 L1 C++ Automation 测试插件，放在本示例工程侧，**不**进入 [NexusLink](https://github.com/bytepine/NexusLink) 插件仓。
 
-依赖同级插件 `Plugins/NexusLink`。模块名仍为 `NexusLinkTests`（Automation 过滤前缀 `NexusLink.`）。
+依赖同级插件 `Plugins/NexusLink`。模块名仍为 `NexusLinkTests`（Automation 过滤前缀 `NexusLink.`）。UnLua Capability 的 L1 在 `Plugins/NexusLinkExtTestSuite`（前缀 `NexusLinkExt.`）。
 
 ## 跑测
 

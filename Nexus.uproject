@@ -79,7 +79,15 @@
 			"Enabled": true
 		},
 		{
+			"Name": "NexusLinkExt",
+			"Enabled": true
+		},
+		{
 			"Name": "NexusLinkTestSuite",
+			"Enabled": true
+		},
+		{
+			"Name": "NexusLinkExtTestSuite",
 			"Enabled": true
 		},
 		{

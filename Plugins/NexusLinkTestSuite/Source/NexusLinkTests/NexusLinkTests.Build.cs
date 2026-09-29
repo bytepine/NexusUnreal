@@ -34,7 +34,7 @@ public class NexusLinkTests : ModuleRules
 			PrivateDependencyModuleNames.AddRange(
 				new string[]
 				{
-					// NexusLinkEditor（Editor 模块）：192 个 EditorOnly cap / 编辑器 Utils 的测试用例需要
+					// NexusLinkEditor：EditorOnly cap 测试
 					"NexusLinkEditor",
 					"UnrealEd",
 					"BlueprintGraph",
@@ -50,12 +50,12 @@ public class NexusLinkTests : ModuleRules
 		}
 		else
 		{
-			// Game 目标不链接 NexusLinkEditor，WITH_STATETREE 等 13 个 Editor 域可选插件宏没有
+			// Game 目标不链接 NexusLinkEditor，WITH_STATETREE 等 Editor 域可选插件宏没有
 			// 定义来源；测试文件里直接 #if WITH_STATETREE 检测（非 #ifdef），未定义时 MSVC 报
-			// C4668。这里兜底置 0，语义等价于「Game 目标下这些 Editor 域能力必不存在」。
+			// C4668。这里兜底置 0。WITH_GAS/WITH_NIAGARA 由 NexusLink 定义。
 			foreach (var C in NexusLinkOptionalPlugins.BuildFullTable())
 			{
-				if (C.Define != "WITH_UNLUA" && C.Define != "WITH_GAS" && C.Define != "WITH_NIAGARA")
+				if (C.Define != "WITH_GAS" && C.Define != "WITH_NIAGARA")
 				{
 					PublicDefinitions.Add(C.Define + "=0");
 				}

@@ -18,8 +18,6 @@ bool FNexusDangerousCapTagTest::RunTest(const FString& Parameters)
 {
 	const TCHAR* Names[] = {
 		TEXT("exec_command"),
-		TEXT("eval_runtime_lua"),
-		TEXT("dofile_runtime_lua"),
 		TEXT("exec_python"),
 	};
 	int32 Found = 0;
@@ -166,7 +164,6 @@ bool FNexusDangerousCapConfirmOrDenyTest::RunTest(const FString& Parameters)
 	S->SessionEnabledCapabilities.Empty();
 	S->DangerousCapAccess = ENexusDangerousCapAccess::Confirm;
 	S->DisabledCapabilities.Remove(TEXT("exec_command"));
-	S->DisabledCapabilities.Remove(TEXT("eval_runtime_lua"));
 
 	TSharedPtr<FJsonObject> Args = MakeShared<FJsonObject>();
 	Args->SetStringField(TEXT("command"), TEXT("stat fps"));
@@ -184,7 +181,7 @@ bool FNexusDangerousCapConfirmOrDenyTest::RunTest(const FString& Parameters)
 	{
 		const FCapabilityResult First = FNexusDangerousCapGate::ConfirmOrDeny(TEXT("exec_command"), Args);
 		TestTrue(TEXT("unattended Confirm → user_denied"), First.bIsUserDenied);
-		const FCapabilityResult Second = FNexusDangerousCapGate::ConfirmOrDeny(TEXT("eval_runtime_lua"), Args);
+		const FCapabilityResult Second = FNexusDangerousCapGate::ConfirmOrDeny(TEXT("exec_command"), Args);
 		TestTrue(TEXT("batch skip after first deny"), Second.bIsUserDenied);
 		TestTrue(TEXT("batch skip mentions previous"), Second.FatalError.Contains(TEXT("batch")));
 	}
