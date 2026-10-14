@@ -15,8 +15,8 @@ def some_assets(test_ns, mcp):
     """Create a minimal BP + material to have deterministic ref graph."""
     bp = f"{test_ns}/BP_RefTest"
     mat = f"{test_ns}/M_RefTest"
-    mcp.call("create_asset_blueprint", assetPath=bp, parentClass="Actor")
-    mcp.call("create_asset_material", assetPath=mat)
+    mcp.call("CreateAssetBlueprint", AssetPath=bp, ParentClass="Actor")
+    mcp.call("CreateAssetMaterial", AssetPath=mat)
     return bp, mat
 
 
@@ -26,14 +26,14 @@ def inheritance_chain(test_ns, mcp):
     parent = f"{test_ns}/BP_RefParent"
     child = f"{test_ns}/BP_RefChild"
     grand = f"{test_ns}/BP_RefGrand"
-    mcp.call("create_asset_blueprint", assetPath=parent, parentClass="Actor")
-    mcp.call("save_asset", assetPath=parent)
+    mcp.call("CreateAssetBlueprint", AssetPath=parent, ParentClass="Actor")
+    mcp.call("SaveAsset", AssetPath=parent)
     parent_class = f"{parent}.BP_RefParent_C"
-    mcp.call("create_asset_blueprint", assetPath=child, parentClass=parent_class)
-    mcp.call("save_asset", assetPath=child)
+    mcp.call("CreateAssetBlueprint", AssetPath=child, ParentClass=parent_class)
+    mcp.call("SaveAsset", AssetPath=child)
     child_class = f"{child}.BP_RefChild_C"
-    mcp.call("create_asset_blueprint", assetPath=grand, parentClass=child_class)
-    mcp.call("save_asset", assetPath=grand)
+    mcp.call("CreateAssetBlueprint", AssetPath=grand, ParentClass=child_class)
+    mcp.call("SaveAsset", AssetPath=grand)
     return parent, child, grand
 
 
@@ -42,78 +42,78 @@ def test_dependencies_batch(mcp, some_assets):
     # get_asset_refs 已单数化为 assetPath，分别查询每个资产
     for asset in (bp, mat):
         r = mcp.call(
-            "get_asset_refs",
-            assetPath=asset,
-            direction="dependencies",
-            recursive=True,
+            "GetAssetRefs",
+            AssetPath=asset,
+            Direction="Dependencies",
+            bRecursive=True,
         )
         assert isinstance(r, dict), f"get_asset_refs {asset}: {r!r}"
 
 
 def test_referencers(mcp, some_assets):
     bp, _ = some_assets
-    r = mcp.call("get_asset_refs", assetPath=bp, direction="referencers")
+    r = mcp.call("GetAssetRefs", AssetPath=bp, Direction="Referencers")
     # 单条提升后顶层即含 refs/direction；兼容旧 results[] / referencers 键
     entry = cap_first(r)
     assert (
-        "results" in r
-        or "referencers" in r
-        or "refs" in entry
-        or entry.get("direction") == "referencers"
+        "Results" in r
+        or "Referencers" in r
+        or "Refs" in entry
+        or entry.get("Direction") == "Referencers"
     ), r
 
 
 def test_referencers_with_filter(mcp, some_assets):
     _, mat = some_assets
-    r = mcp.call("get_asset_refs",
-                 assetPath=mat,
-                 direction="referencers",
-                 nameFilter="MI_")
+    r = mcp.call("GetAssetRefs",
+                 AssetPath=mat,
+                 Direction="Referencers",
+                 NameFilter="MI_")
     # No crash / graceful empty is OK
     assert isinstance(r, dict)
 
 
 def test_children_direct(mcp, inheritance_chain):
     parent, child, grand = inheritance_chain
-    r = mcp.call("get_asset_refs", assetPath=parent, direction="children")
+    r = mcp.call("GetAssetRefs", AssetPath=parent, Direction="Children")
     entry = cap_first(r)
-    paths = {item.get("path") for item in entry.get("refs") or []}
+    paths = {item.get("Path") for item in entry.get("Refs") or []}
     assert child in paths, r
     assert grand not in paths, r
 
 
 def test_descendants(mcp, inheritance_chain):
     parent, child, grand = inheritance_chain
-    r = mcp.call("get_asset_refs", assetPath=parent, direction="descendants")
+    r = mcp.call("GetAssetRefs", AssetPath=parent, Direction="Descendants")
     entry = cap_first(r)
-    paths = {item.get("path") for item in entry.get("refs") or []}
+    paths = {item.get("Path") for item in entry.get("Refs") or []}
     assert child in paths and grand in paths, r
-    by_path = {item["path"]: item for item in entry.get("refs") or []}
-    assert by_path[child].get("depth") == 1
-    assert by_path[grand].get("depth") == 2
+    by_path = {item["Path"]: item for item in entry.get("Refs") or []}
+    assert by_path[child].get("Depth") == 1
+    assert by_path[grand].get("Depth") == 2
 
 
 def test_parent_and_ancestors(mcp, inheritance_chain):
     parent, child, grand = inheritance_chain
-    r = mcp.call("get_asset_refs", assetPath=grand, direction="parent")
+    r = mcp.call("GetAssetRefs", AssetPath=grand, Direction="Parent")
     entry = cap_first(r)
-    paths = [item.get("path") for item in entry.get("refs") or []]
+    paths = [item.get("Path") for item in entry.get("Refs") or []]
     assert paths and paths[0] == child, r
 
-    r2 = mcp.call("get_asset_refs", assetPath=grand, direction="ancestors")
+    r2 = mcp.call("GetAssetRefs", AssetPath=grand, Direction="Ancestors")
     entry2 = cap_first(r2)
-    paths2 = [item.get("path") for item in entry2.get("refs") or []]
+    paths2 = [item.get("Path") for item in entry2.get("Refs") or []]
     assert child in paths2 and parent in paths2, r2
 
 
 def test_asset_type_filter(mcp, inheritance_chain):
     parent, _, _ = inheritance_chain
     r = mcp.call(
-        "get_asset_refs",
-        assetPath=parent,
-        direction="descendants",
-        assetTypeFilter="Blueprint",
+        "GetAssetRefs",
+        AssetPath=parent,
+        Direction="Descendants",
+        AssetTypeFilter="Blueprint",
     )
     entry = cap_first(r)
-    for item in entry.get("refs") or []:
-        assert "Blueprint" in (item.get("assetType") or ""), item
+    for item in entry.get("Refs") or []:
+        assert "Blueprint" in (item.get("AssetType") or ""), item

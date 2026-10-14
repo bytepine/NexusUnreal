@@ -13,70 +13,70 @@ pytestmark = pytest.mark.l3_asset
 def test_string_table_roundtrip(test_ns, mcp):
     # 不要叫 ST_Created：test_97_statetree_manage 用同名建 StateTree，会抢同一个包
     path = f"{test_ns}/StrTable_Created"
-    cr = mcp.call_capability("create_asset_string_table", assetPath=path, namespace="NxTest")
+    cr = mcp.call_capability("CreateAssetStringTable", AssetPath=path, Namespace="NxTest")
     entry = cap_first(cr)
-    if entry.get("error") and "already exists" not in str(entry.get("error")).lower():
+    if entry.get("Error") and "already exists" not in str(entry.get("Error")).lower():
         pytest.fail(f"create_asset_string_table 失败: {entry}")
 
     man = mcp.call_capability(
-        "manage_asset_string_table",
-        assetPath=path,
-        operations=[{"action": "add_key", "key": "Hello", "source": "World"}],
+        "ManageAssetStringTable",
+        AssetPath=path,
+        Operations=[{"Action": "AddKey", "Key": "Hello", "Source": "World"}],
     )
     m = cap_first(man)
-    assert not m.get("error"), man
+    assert not m.get("Error"), man
 
-    got = cap_first(mcp.call_capability("get_asset_string_table", assetPath=path))
-    assert not got.get("error"), got
-    keys = got.get("keys") or []
-    assert any(isinstance(k, dict) and k.get("key") == "Hello" for k in keys), got
+    got = cap_first(mcp.call_capability("GetAssetStringTable", AssetPath=path))
+    assert not got.get("Error"), got
+    keys = got.get("Keys") or []
+    assert any(isinstance(k, dict) and k.get("Key") == "Hello" for k in keys), got
 
     extra = mcp.call_capability(
-        "manage_asset_string_table",
-        assetPath=path,
-        operations=[
-            {"action": "set_source", "key": "Hello", "source": "World2"},
-            {"action": "remove_key", "key": "Hello"},
+        "ManageAssetStringTable",
+        AssetPath=path,
+        Operations=[
+            {"Action": "SetSource", "Key": "Hello", "Source": "World2"},
+            {"Action": "RemoveKey", "Key": "Hello"},
         ],
     )
-    for e in (extra.get("results") or [cap_first(extra)]):
+    for e in (extra.get("Results") or [cap_first(extra)]):
         if isinstance(e, dict):
-            assert not e.get("error"), extra
+            assert not e.get("Error"), extra
 
     try:
         bad = cap_first(
             mcp.call_capability(
-                "manage_asset_string_table",
-                assetPath=path,
-                operations=[{"action": "not_a_real_action", "key": "x"}],
+                "ManageAssetStringTable",
+                AssetPath=path,
+                Operations=[{"Action": "not_a_real_action", "Key": "x"}],
             )
         )
     except MCPError as exc:
-        bad = {"error": str(exc)}
-    assert bad.get("error"), bad
+        bad = {"Error": str(exc)}
+    assert bad.get("Error"), bad
 
 
 def test_font_get_manage(mcp):
-    r = mcp.call_capability("search_asset", assetType="Font", pathFilter="/Engine/", limit=1)
+    r = mcp.call_capability("SearchAsset", AssetType="Font", PathFilter="/Engine/", Limit=1)
     payload = r if isinstance(r, dict) else {}
-    assets = payload.get("assets") or payload.get("results") or []
+    assets = payload.get("Assets") or payload.get("Results") or []
     if not assets:
-        r = mcp.call_capability("search_asset", assetType="Font", pathFilter="/Game/", limit=1)
+        r = mcp.call_capability("SearchAsset", AssetType="Font", PathFilter="/Game/", Limit=1)
         payload = r if isinstance(r, dict) else {}
-        assets = payload.get("assets") or payload.get("results") or []
+        assets = payload.get("Assets") or payload.get("Results") or []
     if not assets:
         pytest.skip("未找到 Font 资产")
     first = assets[0] if isinstance(assets[0], dict) else {}
-    path = first.get("assetPath") or first.get("path") or ""
+    path = first.get("AssetPath") or first.get("Path") or ""
     if not path:
         pytest.skip("Font 路径为空")
-    got = cap_first(mcp.call_capability("get_asset_font", assetPath=path))
-    assert "scalingFactor" in got or "characterCount" in got, got
+    got = cap_first(mcp.call_capability("GetAssetFont", AssetPath=path))
+    assert "ScalingFactor" in got or "CharacterCount" in got, got
     man = cap_first(
         mcp.call_capability(
-            "manage_asset_font",
-            assetPath=path,
-            operations=[{"action": "set_property", "propertyPath": "ScalingFactor", "value": "1.0"}],
+            "ManageAssetFont",
+            AssetPath=path,
+            Operations=[{"Action": "SetProperty", "PropertyPath": "ScalingFactor", "Value": "1.0"}],
         )
     )
     assert isinstance(man, dict), man

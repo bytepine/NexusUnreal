@@ -29,79 +29,82 @@ pytestmark = pytest.mark.smoke
 
 def test_search_asset_defaults_shape(mcp):
     """search_asset 返回体若产生 assets_defaults，必须是合法 dict 且合并后字段完整。"""
-    r = mcp.call("search_asset", assetType="Blueprint", limit=200)
+    r = mcp.call("SearchAsset", AssetType="Blueprint", Limit=200)
     merged = assert_respecting_defaults(
         cap_first(r),
-        list_key="assets",
-        defaults_prefix="assets",
-        required_fields=("name", "path", "assetType"),
+        list_key="Assets",
+        defaults_prefix="Assets",
+        required_fields=("name", "Path", "AssetType"),
         context="search_asset Blueprint",
     )
     for entry in merged:
-        assert entry["assetType"], f"assetType empty after merge: {entry!r}"
+        assert entry["AssetType"], f"assetType empty after merge: {entry!r}"
 
 
 def test_search_asset_all_still_valid(mcp):
-    """assetType='all' 下 assetType 值五花八门，多半不触发压缩；条目字段依然完整。"""
+    """AssetType='All' 下 assetType 值五花八门，多半不触发压缩；条目字段依然完整。"""
     try:
-        r = mcp.call("search_asset", assetType="all",
-                     pathFilter="/Game/ThirdPerson", limit=50)
+        r = mcp.call("SearchAsset", AssetType="All",
+                     PathFilter="/Game/ThirdPersonBP", Limit=50)
     except MCPError as e:
         pytest.skip(f"search_asset all 被安全策略拒绝：{e}")
     assert_respecting_defaults(
         cap_first(r),
-        list_key="assets",
-        defaults_prefix="assets",
-        required_fields=("name", "path", "assetType"),
+        list_key="Assets",
+        defaults_prefix="Assets",
+        required_fields=("name", "Path", "AssetType"),
         context="search_asset all",
     )
 
 
 def test_list_actors_defaults_shape(mcp):
     """list_runtime_actors 返回体若产生 actors_defaults，必须是合法 dict 且合并后字段完整。"""
-    r = mcp.call("list_runtime_actors", limit=200)
+    try:
+        r = mcp.call("ListRuntimeActors", Limit=200)
+    except MCPError as e:
+        pytest.skip(f"ListRuntimeActors 需要 PIE：{e}")
     assert_respecting_defaults(
         cap_first(r),
-        list_key="actors",
-        defaults_prefix="actors",
-        required_fields=("name", "class", "location"),
-        context="list_runtime_actors",
+        list_key="Actors",
+        defaults_prefix="Actors",
+        required_fields=("name", "Class", "Location"),
+        context="ListRuntimeActors",
     )
 
 
 def test_get_asset_blueprint_defaults_shape(mcp):
-    """对任意一个 BP 发 sections=['all']，properties_defaults / graphs_defaults 可选，
+    """对任意一个 BP 发 Sections=['All']，properties_defaults / graphs_defaults 可选，
     出现时必须是合法 dict 且合并后字段完整。"""
-    listing = mcp.call("search_asset", assetType="Blueprint", limit=1)
-    assets = cap_first(listing).get("assets") or []
+    listing = mcp.call("SearchAsset", AssetType="Blueprint", Limit=1)
+    assets = cap_first(listing).get("Assets") or []
     if not assets:
         pytest.skip("项目中无 Blueprint 资产可用于探测")
-    bp_path = assets[0].get("path") or assets[0].get("assetPath")
+    bp_path = assets[0].get("Path") or assets[0].get("AssetPath")
     if not bp_path:
         pytest.skip(f"无法从资产列表解析 BP 路径：{assets[0]!r}")
 
     try:
-        bp = mcp.call_capability("get_asset_blueprint", assetPath=bp_path, sections=["all"])
+        bp = mcp.call_capability("GetAssetBlueprint", AssetPath=bp_path, Sections=["All"])
     except MCPError as e:
         pytest.skip(f"get_asset_blueprint 调用失败（{bp_path}）：{e}")
 
-    if bp.get("error"):
-        pytest.skip(f"get_asset_blueprint 返回错误：{bp['error']}")
+    if bp.get("Error"):
+        pytest.skip(f"get_asset_blueprint 返回错误：{bp['Error']}")
 
     if isinstance(bp.get("properties"), list):
         assert_respecting_defaults(
             bp,
             list_key="properties",
             defaults_prefix="properties",
-            required_fields=("name", "kind"),
+            required_fields=("name", "Kind"),
             context=f"get_asset_blueprint {bp_path} properties",
         )
-    if isinstance(bp.get("graphs"), list):
+    if isinstance(bp.get("Graphs"), list):
         assert_respecting_defaults(
             bp,
-            list_key="graphs",
-            defaults_prefix="graphs",
-            required_fields=("graphName", "graphType"),
+            list_key="Graphs",
+            defaults_prefix="Graphs",
+            required_fields=("GraphName", "GraphType"),
             context=f"get_asset_blueprint {bp_path} graphs",
         )
 
@@ -110,9 +113,9 @@ def test_get_asset_blueprint_defaults_shape(mcp):
 def test_diff_actors_baseline_values_shape(mcp):
     """diff_runtime_actors 批量模式若产出任何 diff，baseline.values 必须是字符串字典，
     且 comparisons[].diffs[] 里不再出现 valueA。"""
-    listing = mcp.call("list_runtime_actors", limit=10)
+    listing = mcp.call("ListRuntimeActors", Limit=10)
     payload = cap_first(listing)
-    actors = payload.get("actors") or []
+    actors = payload.get("Actors") or []
     merged = merge_with_defaults(actors, payload.get("actors_defaults") or {})
     names = [a.get("name") for a in merged if a.get("name")]
     if len(names) < 2:
@@ -120,15 +123,15 @@ def test_diff_actors_baseline_values_shape(mcp):
 
     try:
         r = mcp.call(
-            "diff_runtime_actors",
-            actorNameA=names[0],
-            actorNameB=names[1],
+            "DiffRuntimeActors",
+            ActorNameA=names[0],
+            ActorNameB=names[1],
         )
     except MCPError as e:
         pytest.skip(f"diff_runtime_actors rejected: {e}")
 
     baseline = r.get("baseline") or {}
-    values = baseline.get("values")
+    values = baseline.get("Values")
     if values is not None:
         assert isinstance(values, dict), f"baseline.values must be dict: {values!r}"
         for k, v in values.items():
@@ -139,8 +142,8 @@ def test_diff_actors_baseline_values_shape(mcp):
     for comp in comparisons:
         if not isinstance(comp, dict):
             continue
-        for d in comp.get("diffs") or []:
-            assert "valueA" not in d, (
+        for d in comp.get("Diffs") or []:
+            assert "ValueA" not in d, (
                 f"diff still carries valueA (should migrate to baseline.values): {d!r}"
             )
 
@@ -181,7 +184,7 @@ def _probe_blackboard(mcp, test_ns: str) -> str:
     if path:
         return path
     path = f"{test_ns}/BB_CompactProbe"
-    mcp.call("create_asset_blackboard", assetPath=path)
+    mcp.call("CreateAssetBlackboard", AssetPath=path)
     return path
 
 
@@ -191,60 +194,60 @@ def test_get_asset_refs_defaults_shape(mcp, test_ns):
     assert bp, "无法定位或创建 Blueprint 探测资产"
 
     try:
-        r = mcp.call("get_asset_refs", assetPath=bp, direction="dependencies")
+        r = mcp.call("GetAssetRefs", AssetPath=bp, Direction="Dependencies")
     except MCPError as e:
         pytest.skip(f"get_asset_refs 调用失败：{e}")
 
     entries = [cap_first(r)] if cap_first(r) else []
     assert entries, f"get_asset_refs returned no results: {r!r}"
     for entry in entries:
-        if not isinstance(entry, dict) or entry.get("error"):
+        if not isinstance(entry, dict) or entry.get("Error"):
             continue
-        if not isinstance(entry.get("refs"), list):
+        if not isinstance(entry.get("Refs"), list):
             continue
         assert_respecting_defaults(
             entry,
-            list_key="refs",
-            defaults_prefix="refs",
-            required_fields=("path",),
-            context=f"get_asset_refs {entry.get('assetPath') or entry.get('path')}",
+            list_key="Refs",
+            defaults_prefix="Refs",
+            required_fields=("Path",),
+            context=f"get_asset_refs {entry.get('AssetPath') or entry.get('Path')}",
         )
 
 
 def test_get_asset_graph_nodes_defaults_shape(mcp, test_ns):
-    """BP sections=['graph'] 指定 graphName 的 nodes_defaults（候选 nodeClass）。"""
+    """BP Sections=['graph'] 指定 graphName 的 nodes_defaults（候选 nodeClass）。"""
     bp = _probe_blueprint(mcp, test_ns)
     assert bp, "无法定位或创建 Blueprint 探测资产"
 
     try:
-        overview = mcp.call_capability("get_asset_blueprint", assetPath=bp, sections=["graph"])
+        overview = mcp.call_capability("GetAssetBlueprint", AssetPath=bp, Sections=["graph"])
     except MCPError as e:
         pytest.skip(f"get_asset_blueprint graph 概览失败：{e}")
 
-    if overview.get("error"):
-        pytest.skip(f"get_asset_blueprint graph 概览返回错误：{overview['error']!r}")
-    graphs_list = overview.get("graphs") or []
+    if overview.get("Error"):
+        pytest.skip(f"get_asset_blueprint graph 概览返回错误：{overview['Error']!r}")
+    graphs_list = overview.get("Graphs") or []
     graphs = merge_with_defaults(graphs_list, overview.get("graphs_defaults") or {})
     target_graph = next(
-        (g.get("graphName") for g in graphs if g.get("nodeCount", 0) > 0 and g.get("graphName")),
+        (g.get("GraphName") for g in graphs if g.get("NodeCount", 0) > 0 and g.get("GraphName")),
         None,
     )
     if not target_graph:
         pytest.skip(f"no non-empty graph on {bp}: {graphs!r}")
 
     try:
-        r = mcp.call_capability("get_asset_blueprint", assetPath=bp,
-                                sections=["graph"], graphName=target_graph)
+        r = mcp.call_capability("GetAssetBlueprint", AssetPath=bp,
+                                Sections=["graph"], GraphName=target_graph)
     except MCPError as e:
         pytest.skip(f"get_asset_blueprint graph {target_graph} 失败：{e}")
 
-    if r.get("error"):
-        pytest.skip(f"graph 节点查询返回错误：{r['error']!r}")
+    if r.get("Error"):
+        pytest.skip(f"graph 节点查询返回错误：{r['Error']!r}")
     assert_respecting_defaults(
         r,
-        list_key="nodes",
-        defaults_prefix="nodes",
-        required_fields=("nodeId", "nodeClass"),
+        list_key="Nodes",
+        defaults_prefix="Nodes",
+        required_fields=("NodeId", "NodeClass"),
         context=f"get_asset_blueprint graph {bp}:{target_graph}",
     )
 
@@ -254,19 +257,19 @@ def test_get_asset_struct_fields_defaults_shape(mcp, test_ns):
     path = _probe_struct(mcp, test_ns)
 
     try:
-        r = mcp.call_capability("get_asset_struct", assetPath=path)
+        r = mcp.call_capability("GetAssetStruct", AssetPath=path)
     except MCPError as e:
         pytest.skip(f"get_asset_struct 调用失败：{e}")
 
-    if r.get("error"):
-        pytest.skip(f"get_asset_struct 返回错误：{r['error']!r}")
-    if not isinstance(r.get("fields"), list):
+    if r.get("Error"):
+        pytest.skip(f"get_asset_struct 返回错误：{r['Error']!r}")
+    if not isinstance(r.get("Fields"), list):
         pytest.skip(f"struct 无 fields 列表：{r!r}")
 
     assert_respecting_defaults(
         r,
-        list_key="fields",
-        defaults_prefix="fields",
+        list_key="Fields",
+        defaults_prefix="Fields",
         required_fields=("name", "type"),
         context=f"get_asset_struct {path}",
     )
@@ -277,20 +280,20 @@ def test_get_asset_material_params_defaults_shape(mcp, test_ns):
     path = _probe_material(mcp, test_ns)
 
     try:
-        r = mcp.call_capability("get_asset_material", assetPath=path, sections=["params"])
+        r = mcp.call_capability("GetAssetMaterial", AssetPath=path, Sections=["Params"])
     except MCPError as e:
         pytest.skip(f"get_asset_material 调用失败：{e}")
 
-    if r.get("error"):
-        pytest.skip(f"get_asset_material 返回错误：{r['error']!r}")
-    if not isinstance(r.get("parameters"), list):
+    if r.get("Error"):
+        pytest.skip(f"get_asset_material 返回错误：{r['Error']!r}")
+    if not isinstance(r.get("Parameters"), list):
         pytest.skip(f"返回体无 parameters 列表：{r!r}")
 
-    merged = merge_with_defaults(r["parameters"], r.get("parameters_defaults") or {})
+    merged = merge_with_defaults(r["Parameters"], r.get("parameters_defaults") or {})
     for entry in merged:
-        assert "paramType" in entry, (
+        assert "ParamType" in entry, (
             f"parameters[].paramType missing after merge: {entry!r} "
-            f"defaults={r.get('parameters_defaults')!r}"
+            f"Defaults={r.get('parameters_defaults')!r}"
         )
 
 
@@ -299,16 +302,16 @@ def test_get_asset_user_widget_defaults_shape(mcp, test_ns):
     path = _probe_widget(mcp, test_ns)
 
     try:
-        r = mcp.call("get_asset_user_widget", assetPath=path)
+        r = mcp.call("GetAssetUserWidget", AssetPath=path)
     except MCPError as e:
         pytest.skip(f"get_asset_user_widget 调用失败：{e}")
 
     payload = cap_first(r)
     assert_respecting_defaults(
         payload,
-        list_key="widgets",
-        defaults_prefix="widgets",
-        required_fields=("name", "class"),
+        list_key="Widgets",
+        defaults_prefix="Widgets",
+        required_fields=("name", "Class"),
         context=f"get_asset_user_widget {path}",
     )
 
@@ -318,81 +321,81 @@ def test_list_runtime_widgets_defaults_shape(mcp):
     """list_runtime_widgets widgets_defaults（候选 widgetClass + class）。
     非 PIE 时可能无数据，跳过。"""
     try:
-        r = mcp.call("list_runtime_widgets", limit=200)
+        r = mcp.call("ListRuntimeWidgets", Limit=200)
     except MCPError as e:
         pytest.skip(f"list_runtime_widgets 失败（可能未进入 PIE）：{e}")
 
-    widgets = r.get("widgets") or []
+    widgets = r.get("Widgets") or []
     if not widgets:
         pytest.skip("无运行时 Widget（PIE 未启动？）")
 
     assert_respecting_defaults(
         r,
-        list_key="widgets",
-        defaults_prefix="widgets",
-        required_fields=("name", "widgetClass", "class"),
-        context="list_runtime_widgets",
+        list_key="Widgets",
+        defaults_prefix="Widgets",
+        required_fields=("name", "WidgetClass", "Class"),
+        context="ListRuntimeWidgets",
     )
 
 
 def test_get_output_log_defaults_shape(mcp):
-    """get_output_log entries_defaults（候选 category + verbosity）。"""
+    """get_output_log Entries_defaults（候选 category + verbosity）。"""
     try:
-        r = mcp.call("get_output_log", limit=200, verbosity="log")
+        r = mcp.call("GetOutputLog", Limit=200, Verbosity="Log")
     except MCPError as e:
         pytest.skip(f"get_output_log 调用失败：{e}")
 
-    entries = r.get("entries") or []
+    entries = r.get("Entries") or []
     if not entries:
         pytest.skip("无日志条目")
 
-    merged = merge_with_defaults(entries, r.get("entries_defaults") or {})
+    merged = merge_with_defaults(entries, r.get("Entries_defaults") or {})
     for entry in merged:
-        assert "verbosity" in entry, (
+        assert "Verbosity" in entry, (
             f"entries[].verbosity missing after merge: {entry!r} "
-            f"defaults={r.get('entries_defaults')!r}"
+            f"Defaults={r.get('Entries_defaults')!r}"
         )
 
 
 def test_get_output_log_category_filter_forced_default(mcp):
     """categoryFilter 命中后，仅当本页实际 category 全员一致才 ForcedDefault 该值（不是过滤子串）。"""
     try:
-        r = mcp.call("get_output_log", categoryFilter="LogTemp", limit=100, verbosity="all")
+        r = mcp.call("GetOutputLog", CategoryFilter="LogTemp", Limit=100, Verbosity="All")
     except MCPError as e:
         pytest.skip(f"get_output_log 调用失败：{e}")
 
-    entries = r.get("entries") or []
+    entries = r.get("Entries") or []
     if not entries:
         pytest.skip("无 LogTemp 日志条目")
 
-    merged = merge_with_defaults(entries, r.get("entries_defaults") or {})
-    cats = {e.get("category") for e in merged if e.get("category")}
+    merged = merge_with_defaults(entries, r.get("Entries_defaults") or {})
+    cats = {e.get("Category") for e in merged if e.get("Category")}
     if len(cats) != 1:
         pytest.skip(f"本页 category 不唯一，无法断言 ForcedDefault: {cats!r}")
 
     only = next(iter(cats))
-    defaults = r.get("entries_defaults") or {}
-    assert defaults.get("category") == only, (
-        f"expected entries_defaults.category={only!r} (actual unanimous), got: {defaults!r}"
+    defaults = r.get("Entries_defaults") or {}
+    assert defaults.get("Category") == only, (
+        f"expected Entries_defaults.Category={only!r} (actual unanimous), got: {defaults!r}"
     )
 
 
 def test_get_gameplay_tags_hierarchy_defaults_shape(mcp):
-    """get_gameplay_tags sections=['hierarchy']：扁平 tags 或树 children 均可；合并后每条含 tag。"""
+    """get_gameplay_tags Sections=['Hierarchy']：扁平 tags 或树 children 均可；合并后每条含 tag。"""
     try:
-        r = mcp.call("get_gameplay_tags", sections=["hierarchy"], limit=200)
+        r = mcp.call("GetGameplayTags", Sections=["Hierarchy"], Limit=200)
     except MCPError as e:
         pytest.skip(f"get_gameplay_tags 调用失败：{e}")
 
-    tags = r.get("tags") or []
+    tags = r.get("Tags") or []
     if len(tags) < 3:
         pytest.skip(f"tag 数量不足以触发压缩（{len(tags)} 条）")
 
     def _walk(nodes, defaults):
         merged = merge_with_defaults(nodes, defaults)
         for entry in merged:
-            assert "tag" in entry, f"tags[].tag missing after merge: {entry!r}"
-            children = entry.get("children") or []
+            assert "Tag" in entry, f"tags[].tag missing after merge: {entry!r}"
+            children = entry.get("Children") or []
             if isinstance(children, list) and children:
                 _walk(children, entry.get("children_defaults") or {})
 
@@ -404,11 +407,11 @@ def test_get_asset_blackboard_type_defaults(mcp, test_ns):
     path = _probe_blackboard(mcp, test_ns)
 
     try:
-        bt_r = mcp.call("get_asset_blackboard", assetPath=path)
+        bt_r = mcp.call("GetAssetBlackboard", AssetPath=path)
     except MCPError as e:
         pytest.skip(f"get_asset_behavior_tree blackboard 调用失败：{e}")
 
-    keys = bt_r.get("keys") or []
+    keys = bt_r.get("Keys") or []
     if len(keys) < 3:
         pytest.skip(f"blackboard key 数量不足以触发压缩（{len(keys)} 条）")
 
@@ -419,33 +422,33 @@ def test_get_asset_blackboard_type_defaults(mcp, test_ns):
 
 
 def test_get_asset_bp_defaults_section_inherited_compression(mcp, test_ns):
-    """get_asset_blueprint sections=['defaults']：inherited 全员写出（true/false），
+    """get_asset_blueprint Sections=['Defaults']：inherited 全员写出（true/false），
     主流值可抽到 defaults_defaults；合并后每条均为 bool。"""
     bp = _probe_blueprint(mcp, test_ns)
     assert bp, "无法定位或创建 Blueprint 探测资产"
 
     try:
-        payload = mcp.call_capability("get_asset_blueprint", assetPath=bp,
-                                      sections=["defaults"], limit=100)
+        payload = mcp.call_capability("GetAssetBlueprint", AssetPath=bp,
+                                      Sections=["Defaults"], Limit=100)
     except MCPError as e:
         pytest.skip(f"get_asset_blueprint defaults 调用失败：{e}")
 
-    if payload.get("error"):
-        pytest.skip(f"get_asset_blueprint defaults 返回错误：{payload['error']!r}")
+    if payload.get("Error"):
+        pytest.skip(f"get_asset_blueprint defaults 返回错误：{payload['Error']!r}")
 
-    defs_list = payload.get("defaults") or []
+    defs_list = payload.get("Defaults") or []
     if len(defs_list) < 3:
         pytest.skip(f"too few defaults to trigger compaction (got {len(defs_list)})")
 
     merged = assert_respecting_defaults(
         payload,
-        list_key="defaults",
-        defaults_prefix="defaults",
-        required_fields=("path", "type", "inherited"),
+        list_key="Defaults",
+        defaults_prefix="Defaults",
+        required_fields=("Path", "type", "bInherited"),
         context=f"get_asset_blueprint defaults {bp}",
     )
     for entry in merged:
-        assert isinstance(entry.get("inherited"), bool), (
+        assert isinstance(entry.get("bInherited"), bool), (
             f"defaults[].inherited must be bool after merge: {entry!r}"
         )
 
@@ -453,13 +456,13 @@ def test_get_asset_bp_defaults_section_inherited_compression(mcp, test_ns):
 def test_auto_discover_undeclared_fields_in_defaults(mcp):
     """自动扫描模式覆盖验证：assets_defaults 里出现的任何字段（包括未被显式 AddCandidate
     声明的字段）合并回条目后仍必须存在；同时 name/path 等身份字段不得出现在 defaults 里。"""
-    r = mcp.call("search_asset", assetType="Blueprint", limit=200)
+    r = mcp.call("SearchAsset", AssetType="Blueprint", Limit=200)
     payload = cap_first(r)
     defaults = payload.get("assets_defaults") or {}
-    assets = payload.get("assets") or []
+    assets = payload.get("Assets") or []
 
     # 身份字段绝对不能出现在 defaults 里（AutoDiscoverExclusions 保护）
-    identity_fields = {"name", "path", "assetPath", "id", "label", "error"}
+    identity_fields = {"name", "Path", "AssetPath", "Id", "Label", "Error"}
     for field in identity_fields:
         assert field not in defaults, (
             f"identity field '{field}' must not appear in assets_defaults: {defaults!r}"
@@ -477,15 +480,15 @@ def test_auto_discover_undeclared_fields_in_defaults(mcp):
 
 @pytest.mark.requires_gui
 def test_get_actor_animation_variables_defaults_shape(mcp):
-    """get_runtime_actor_animation view=variables：variables_defaults 候选 type + value。
+    """get_runtime_actor_animation View=variables：variables_defaults 候选 type + value。
     需要 PIE 运行中的 Actor；若无 Actor 或 AnimInstance 则跳过。"""
     try:
-        actors_r = mcp.call("list_runtime_actors", limit=50)
+        actors_r = mcp.call("ListRuntimeActors", Limit=50)
     except MCPError as e:
         pytest.skip(f"list_runtime_actors 失败：{e}")
 
     actors_payload = cap_first(actors_r)
-    actors = actors_payload.get("actors") or []
+    actors = actors_payload.get("Actors") or []
     actors_defaults = actors_payload.get("actors_defaults") or {}
     merged_actors = merge_with_defaults(actors, actors_defaults)
 
@@ -493,7 +496,7 @@ def test_get_actor_animation_variables_defaults_shape(mcp):
     target = None
     for a in merged_actors:
         name = a.get("name", "")
-        cls = a.get("class", "")
+        cls = a.get("Class", "")
         # 优先选 Character 类
         if "Character" in cls or "Pawn" in cls:
             target = name
@@ -504,16 +507,16 @@ def test_get_actor_animation_variables_defaults_shape(mcp):
         pytest.skip("PIE 世界中无 Actor")
 
     try:
-        r = mcp.call("get_runtime_actor_animation", actorName=target, sections=["variables"])
+        r = mcp.call("GetRuntimeActorAnimation", ActorName=target, Sections=["Variables"])
     except MCPError as e:
         pytest.skip(f"get_runtime_actor_animation 调用失败：{e}")
 
-    results = r.get("results") or []
-    if not results or results[0].get("error"):
+    results = r.get("Results") or []
+    if not results or results[0].get("Error"):
         pytest.skip(f"get_runtime_actor_animation 返回错误：{results!r}")
 
     entry = results[0]
-    variables = entry.get("variables") or []
+    variables = entry.get("Variables") or []
     if len(variables) < 3:
         pytest.skip(f"变量数量不足以触发压缩（{len(variables)} 条）")
 
@@ -529,7 +532,7 @@ def test_structured_content_toggle(mcp):
     """验证：ContentMode 枚举二选一逻辑。
     Content（默认）：仅 content，无 structuredContent；
     StructuredContent：仅 structuredContent，无 content。"""
-    result = mcp.try_call("get_editor_info")
+    result = mcp.try_call("GetEditorInfo")
     content = result.get("content") or []
     structured = result.get("structuredContent")
 

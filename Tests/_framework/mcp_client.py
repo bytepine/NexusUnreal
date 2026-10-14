@@ -171,7 +171,7 @@ class MCPClient:
         if tool in META_TOOLS:
             return self._tool_call_raw(tool, arguments)
         cap_name = LEGACY_CAP_NAMES.get(tool, tool)
-        return self._tool_call_raw("call_capability", {"capability": cap_name, "arguments": arguments})
+        return self._tool_call_raw("CallCapability", {"Capability": cap_name, "Arguments": arguments})
 
     def call_capability(self, name: str, arguments: Optional[Dict[str, Any]] = None,
                         **kwargs: Any) -> Dict[str, Any]:
@@ -181,7 +181,7 @@ class MCPClient:
         Raises MCPError on tool-level or JSON-RPC errors.
         """
         all_args: Dict[str, Any] = dict(arguments or {}, **kwargs)
-        return self._tool_call_raw("call_capability", {"capability": name, "arguments": all_args})
+        return self._tool_call_raw("CallCapability", {"Capability": name, "Arguments": all_args})
 
     def try_call(self, tool: str, **arguments: Any) -> Dict[str, Any]:
         """Call a tool but return the full result object (including isError)
@@ -192,8 +192,8 @@ class MCPClient:
         if tool in META_TOOLS:
             return self._rpc("tools/call", {"name": tool, "arguments": arguments})
         cap_name = LEGACY_CAP_NAMES.get(tool, tool)
-        return self._rpc("tools/call", {"name": "call_capability",
-                                        "arguments": {"capability": cap_name, "arguments": arguments}})
+        return self._rpc("tools/call", {"name": "CallCapability",
+                                        "arguments": {"Capability": cap_name, "Arguments": arguments}})
 
     def _tool_call_raw(self, tool: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute tools/call and unpack structuredContent. Raises MCPError on isError."""
@@ -256,13 +256,15 @@ def cap_entries(result: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     if not isinstance(result, dict):
         return []
-    if any(result.get(k) not in (None, "") for k in ("path", "assetPath", "actorName", "widgetName")):
+    if any(result.get(k) not in (None, "") for k in ("Path", "AssetPath", "ActorName", "WidgetName", "path", "assetPath")):
         return [result]
-    results = result.get("results")
+    results = result.get("Results")
+    if not isinstance(results, list) or not results:
+        results = result.get("results")
     if isinstance(results, list) and results:
         return [e for e in results if isinstance(e, dict)]
     # 列表类顶层字段：不是单条 entry
-    if any(k in result for k in ("assets", "capabilities", "widgets", "actors", "messages")):
+    if any(k in result for k in ("Assets", "Capabilities", "Widgets", "Actors", "Messages", "assets", "capabilities")):
         return []
     if result:
         return [result]
@@ -281,14 +283,14 @@ def list_asset_paths(mcp: MCPClient, path_prefix: str) -> List[str]:
     """Collect every asset path under a given /Game/... prefix (all types)."""
     out: List[str] = []
     try:
-        r = mcp.call_capability("search_asset", assetType="all", pathFilter=path_prefix, limit=500)
+        r = mcp.call_capability("SearchAsset", AssetType="All", PathFilter=path_prefix, Limit=500)
     except MCPError as e:
         log.warning("search_asset failed while enumerating %s: %s", path_prefix, e)
         return out
     # 新版顶层 assets（无 results 信封）；旧版 results[{assets}]；cap_first 兼容两者
     payload = cap_first(r)
-    for item in payload.get("assets", []) or []:
-        p = item.get("path") or item.get("assetPath")
+    for item in payload.get("Assets") or payload.get("assets") or []:
+        p = item.get("AssetPath") or item.get("Path") or item.get("path")
         if p and p.startswith(path_prefix):
             out.append(p)
     return out

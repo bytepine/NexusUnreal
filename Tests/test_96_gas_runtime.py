@@ -16,7 +16,7 @@ pytestmark = pytest.mark.l4_runtime
 
 @pytest.fixture(scope="module", autouse=True)
 def require_gas(mcp):
-    if not is_capability_available(mcp, "get_runtime_actor_ability_system"):
+    if not is_capability_available(mcp, "GetRuntimeActorAbilitySystem"):
         pytest.skip("GAS runtime capability 未编入（请确认 WITH_GAS 并重新编译 Editor）")
 
 
@@ -25,22 +25,22 @@ def gas_runtime_assets(test_ns, mcp) -> dict:
     """带 ASC 的 Character BP + 用于 apply 的 GE。"""
     bp = f"{test_ns}/BP_GasRuntimeChar"
     ge = f"{test_ns}/GE_GasRuntimeProbe"
-    mcp.call("create_blueprint", assetPath=bp, parentClass="Character")
+    mcp.call("create_blueprint", AssetPath=bp, ParentClass="Character")
     try:
         mcp.call_capability(
-            "manage_asset_blueprint",
-            assetPath=bp,
-            operations=[{
-                "action": "add_component",
-                "componentClass": "AbilitySystemComponent",
-                "componentName": "AbilitySystem",
+            "ManageAssetBlueprint",
+            AssetPath=bp,
+            Operations=[{
+                "Action": "AddComponent",
+                "ComponentClass": "AbilitySystemComponent",
+                "ComponentName": "AbilitySystem",
             }],
         )
     except MCPError as e:
         pytest.skip(f"无法添加 AbilitySystemComponent：{e}")
-    mcp.call_capability("compile_blueprint", assetPath=bp)
+    mcp.call_capability("CompileBlueprint", AssetPath=bp)
     with contextlib.suppress(MCPError):
-        mcp.call("create_asset_gameplay_effect", assetPath=ge)
+        mcp.call("CreateAssetGameplayEffect", AssetPath=ge)
     return {"bp": bp, "ge": ge}
 
 
@@ -48,7 +48,7 @@ def gas_runtime_assets(test_ns, mcp) -> dict:
 def gas_runtime_actor(mcp, pie, gas_runtime_assets) -> str:
     names = spawn_runtime_actors(
         mcp,
-        [{"assetPath": gas_runtime_assets["bp"], "locationZ": 120}],
+        [{"AssetPath": gas_runtime_assets["bp"], "LocationZ": 120}],
     )
     if not names:
         pytest.skip("GAS 角色 spawn 失败")
@@ -58,27 +58,27 @@ def gas_runtime_actor(mcp, pie, gas_runtime_assets) -> str:
 
 def test_get_runtime_actor_ability_system_sections(mcp, gas_runtime_actor):
     r = mcp.call_capability(
-        "get_runtime_actor_ability_system",
-        actorName=gas_runtime_actor,
-        sections=["abilities", "effects", "attributes"],
+        "GetRuntimeActorAbilitySystem",
+        ActorName=gas_runtime_actor,
+        Sections=["Abilities", "Effects", "Attributes"],
     )
     entry = cap_first(r)
-    assert not entry.get("error"), entry
-    for key in ("abilities", "effects", "attributes"):
+    assert not entry.get("Error"), entry
+    for key in ("Abilities", "Effects", "Attributes"):
         val = entry.get(key)
         assert val is None or isinstance(val, list), f"{key}: {entry!r}"
 
 
 def test_interact_runtime_apply_effect_smoke(mcp, gas_runtime_actor, gas_runtime_assets):
     ge = gas_runtime_assets["ge"]
-    if not is_capability_available(mcp, "interact_runtime_actor_ability_system"):
+    if not is_capability_available(mcp, "InteractRuntimeActorAbilitySystem"):
         pytest.skip("interact_runtime_actor_ability_system 不可用")
     try:
         r = mcp.call_capability(
-            "interact_runtime_actor_ability_system",
-            action="apply_effect",
-            actorName=gas_runtime_actor,
-            effectPath=ge,
+            "InteractRuntimeActorAbilitySystem",
+            Action="ApplyEffect",
+            ActorName=gas_runtime_actor,
+            EffectPath=ge,
         )
     except MCPError as e:
         pytest.skip(f"apply_effect 被拒绝（ASC 未初始化？）：{e}")
@@ -89,29 +89,29 @@ def test_interact_runtime_apply_effect_smoke(mcp, gas_runtime_actor, gas_runtime
 def test_interact_runtime_give_ability_and_tags(mcp, gas_runtime_actor, test_ns):
     ga = f"{test_ns}/GA_RuntimeGive"
     try:
-        mcp.call_capability("create_asset_gameplay_ability", assetPath=ga)
+        mcp.call_capability("CreateAssetGameplayAbility", AssetPath=ga)
     except MCPError as e:
         pytest.skip(f"无法创建 GA：{e}")
     give = mcp.call_capability(
-        "interact_runtime_actor_ability_system",
-        action="give_ability",
-        actorName=gas_runtime_actor,
-        abilityPath=ga,
+        "InteractRuntimeActorAbilitySystem",
+        Action="GiveAbility",
+        ActorName=gas_runtime_actor,
+        AbilityPath=ga,
     )
     ge = cap_first(give)
-    if ge.get("error"):
+    if ge.get("Error"):
         pytest.skip(f"give_ability 被拒绝：{ge}")
     tag_r = mcp.call_capability(
-        "interact_runtime_actor_ability_system",
-        action="add_loose_tag",
-        actorName=gas_runtime_actor,
-        tag="Ability.Jump",
+        "InteractRuntimeActorAbilitySystem",
+        Action="AddLooseTag",
+        ActorName=gas_runtime_actor,
+        Tag="Ability.Jump",
     )
     assert isinstance(cap_first(tag_r), dict), tag_r
     cue = mcp.call_capability(
-        "interact_runtime_actor_ability_system",
-        action="execute_cue",
-        actorName=gas_runtime_actor,
-        tag="GameplayCue.Ability.Activate",
+        "InteractRuntimeActorAbilitySystem",
+        Action="ExecuteCue",
+        ActorName=gas_runtime_actor,
+        Tag="GameplayCue.Ability.Activate",
     )
     assert isinstance(cap_first(cue), dict), cue

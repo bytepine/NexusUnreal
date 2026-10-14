@@ -14,30 +14,30 @@ pytestmark = pytest.mark.l3_asset
 @pytest.fixture(scope="module")
 def wbp_path(test_ns, mcp):
     path = f"{test_ns}/WBP_TestHUD"
-    mcp.call("create_asset_user_widget", assetPath=path)
+    mcp.call("CreateAssetUserWidget", AssetPath=path)
     yield path
 
 
 def test_widget_tree_batch_build(mcp, wbp_path):
     """5.2：一次批量建完整控件树（关键用例）。"""
     r = mcp.call(
-        "manage_asset_user_widget",
-        assetPath=wbp_path,
-        operations=[
-            {"action": "add", "widgetClass": "CanvasPanel",    "widgetName": "RootCanvas"},
-            {"action": "add", "widgetClass": "TextBlock",      "widgetName": "TitleText",   "parentWidget": "RootCanvas"},
-            {"action": "add", "widgetClass": "Button",         "widgetName": "ClickBtn",    "parentWidget": "RootCanvas"},
-            {"action": "add", "widgetClass": "CheckBox",       "widgetName": "TestCheck",   "parentWidget": "RootCanvas"},
-            {"action": "add", "widgetClass": "Slider",         "widgetName": "TestSlider",  "parentWidget": "RootCanvas"},
-            {"action": "add", "widgetClass": "EditableTextBox","widgetName": "TestInput",   "parentWidget": "RootCanvas"},
-            {"action": "add", "widgetClass": "ProgressBar",    "widgetName": "RemoveMe",    "parentWidget": "RootCanvas"},
+        "ManageAssetUserWidget",
+        AssetPath=wbp_path,
+        Operations=[
+            {"Action": "Add", "WidgetClass": "CanvasPanel",    "WidgetName": "RootCanvas"},
+            {"Action": "Add", "WidgetClass": "TextBlock",      "WidgetName": "TitleText",   "ParentWidget": "RootCanvas"},
+            {"Action": "Add", "WidgetClass": "Button",         "WidgetName": "ClickBtn",    "ParentWidget": "RootCanvas"},
+            {"Action": "Add", "WidgetClass": "CheckBox",       "WidgetName": "TestCheck",   "ParentWidget": "RootCanvas"},
+            {"Action": "Add", "WidgetClass": "Slider",         "WidgetName": "TestSlider",  "ParentWidget": "RootCanvas"},
+            {"Action": "Add", "WidgetClass": "EditableTextBox","WidgetName": "TestInput",   "ParentWidget": "RootCanvas"},
+            {"Action": "Add", "WidgetClass": "ProgressBar",    "WidgetName": "RemoveMe",    "ParentWidget": "RootCanvas"},
         ],
     )
     assert_success_count(r, 7, context="widget tree batch")
 
 
 def test_widget_tree_filter(mcp, wbp_path):
-    r = mcp.call("get_asset_user_widget", assetPath=wbp_path, nameFilter="Test")
+    r = mcp.call("GetAssetUserWidget", AssetPath=wbp_path, NameFilter="Test")
     dump = str(r)
     assert "TestCheck" in dump or "TestSlider" in dump or "TestInput" in dump, \
         f"filter Test did not match expected widgets: {dump}"
@@ -46,13 +46,13 @@ def test_widget_tree_filter(mcp, wbp_path):
 def test_widget_animations_section(mcp, wbp_path):
     """读取 WBP animations section（无动画时返回空数组）。"""
     r = mcp.call_capability(
-        "get_asset_user_widget",
-        assetPath=wbp_path,
-        sections=["animations"],
+        "GetAssetUserWidget",
+        AssetPath=wbp_path,
+        Sections=["Animations"],
     )
     payload = cap_first(r)
-    assert "animations" in payload, f"animations section missing: {r!r}"
-    assert isinstance(payload.get("animations"), list), f"animations must be array: {r!r}"
+    assert "Animations" in payload, f"animations section missing: {r!r}"
+    assert isinstance(payload.get("Animations"), list), f"animations must be array: {r!r}"
 
 
 def test_widget_set_text(mcp, wbp_path):
@@ -64,62 +64,62 @@ def test_widget_set_text(mcp, wbp_path):
 
 def test_widget_remove_one(mcp, wbp_path):
     r = mcp.call(
-        "manage_asset_user_widget",
-        assetPath=wbp_path,
-        operations=[{"action": "remove", "widgetName": "RemoveMe"}],
+        "ManageAssetUserWidget",
+        AssetPath=wbp_path,
+        Operations=[{"Action": "Remove", "WidgetName": "RemoveMe"}],
     )
     assert_success_count(r, 1, context="widget remove")
 
 
 def test_widget_save(mcp, wbp_path):
-    save = mcp.call("save_asset", assetPath=wbp_path)
-    assert (save.get("saved") or 0) == 1, f"wbp save: {save!r}"
+    save = mcp.call("SaveAsset", AssetPath=wbp_path)
+    assert (save.get("bSaved") or 0) == 1, f"wbp save: {save!r}"
 
 
 def test_widget_animation_crud(mcp, wbp_path):
     """动画 CRUD：add_animation → add_track → add_key → get tracks → remove。"""
     r = mcp.call(
-        "manage_asset_user_widget",
-        assetPath=wbp_path,
-        operations=[
-            {"action": "add_animation", "animationName": "FadeIn"},
-            {"action": "add_track", "animationName": "FadeIn", "trackName": "Alpha"},
-            {"action": "add_key", "animationName": "FadeIn", "time": 0.5, "keyValue": 1.0},
+        "ManageAssetUserWidget",
+        AssetPath=wbp_path,
+        Operations=[
+            {"Action": "AddAnimation", "AnimationName": "FadeIn"},
+            {"Action": "AddTrack", "AnimationName": "FadeIn", "TrackName": "Alpha"},
+            {"Action": "AddKey", "AnimationName": "FadeIn", "Time": 0.5, "KeyValue": 1.0},
         ],
     )
     assert_success_count(r, 3, context="widget animation crud")
 
     got = mcp.call_capability(
-        "get_asset_user_widget",
-        assetPath=wbp_path,
-        sections=["animations"],
+        "GetAssetUserWidget",
+        AssetPath=wbp_path,
+        Sections=["Animations"],
     )
     payload = cap_first(got)
-    anims = payload.get("animations") or []
+    anims = payload.get("Animations") or []
     names = [a.get("name") for a in anims if isinstance(a, dict)]
     assert any("FadeIn" in (n or "") for n in names), f"FadeIn missing: {payload!r}"
     fade = next((a for a in anims if isinstance(a, dict) and "FadeIn" in (a.get("name") or "")), None)
-    assert fade and fade.get("tracks"), f"tracks missing: {payload!r}"
+    assert fade and fade.get("Tracks"), f"tracks missing: {payload!r}"
 
     rm = mcp.call(
-        "manage_asset_user_widget",
-        assetPath=wbp_path,
-        operations=[{"action": "remove_animation", "animationName": "FadeIn"}],
+        "ManageAssetUserWidget",
+        AssetPath=wbp_path,
+        Operations=[{"Action": "RemoveAnimation", "AnimationName": "FadeIn"}],
     )
-    assert_success_count(rm, 1, context="remove_animation")
+    assert_success_count(rm, 1, context="RemoveAnimation")
 
 
 def test_widget_graph_overview(mcp, wbp_path):
     r = mcp.call_capability(
-        "get_asset_user_widget",
-        assetPath=wbp_path,
-        sections=["graphOverview"],
+        "GetAssetUserWidget",
+        AssetPath=wbp_path,
+        Sections=["graphOverview"],
     )
     entry = cap_first(r)
-    assert not entry.get("error"), entry
-    graphs = entry.get("graphs") or []
+    assert not entry.get("Error"), entry
+    graphs = entry.get("Graphs") or []
     assert isinstance(graphs, list), entry
-    names = [g.get("name") or g.get("graphName") for g in graphs if isinstance(g, dict)]
+    names = [g.get("name") or g.get("GraphName") for g in graphs if isinstance(g, dict)]
     joined = " ".join(n or "" for n in names)
     assert "EventGraph" in joined or graphs, f"expected EventGraph in graphOverview: {entry!r}"
 
@@ -127,95 +127,95 @@ def test_widget_graph_overview(mcp, wbp_path):
 def test_widget_animation_bind_and_remove_key(mcp, wbp_path):
     """绑定控件 RenderOpacity 轨，打 key 后再 remove_key / remove_track。"""
     r = mcp.call(
-        "manage_asset_user_widget",
-        assetPath=wbp_path,
-        operations=[
-            {"action": "add_animation", "animationName": "FadeBound"},
+        "ManageAssetUserWidget",
+        AssetPath=wbp_path,
+        Operations=[
+            {"Action": "AddAnimation", "AnimationName": "FadeBound"},
             {
-                "action": "add_track",
-                "animationName": "FadeBound",
-                "widgetName": "TitleText",
-                "propertyPath": "RenderOpacity",
-                "trackName": "Opacity",
+                "Action": "AddTrack",
+                "AnimationName": "FadeBound",
+                "WidgetName": "TitleText",
+                "PropertyPath": "RenderOpacity",
+                "TrackName": "Opacity",
             },
             {
-                "action": "add_key",
-                "animationName": "FadeBound",
-                "trackName": "Opacity",
-                "time": 0.25,
-                "keyValue": 0.5,
+                "Action": "AddKey",
+                "AnimationName": "FadeBound",
+                "TrackName": "Opacity",
+                "Time": 0.25,
+                "KeyValue": 0.5,
             },
         ],
     )
     assert_success_count(r, 3, context="bound animation track")
 
     rm_key = mcp.call(
-        "manage_asset_user_widget",
-        assetPath=wbp_path,
-        operations=[{
-            "action": "remove_key",
-            "animationName": "FadeBound",
-            "trackName": "Opacity",
-            "time": 0.25,
+        "ManageAssetUserWidget",
+        AssetPath=wbp_path,
+        Operations=[{
+            "Action": "RemoveKey",
+            "AnimationName": "FadeBound",
+            "TrackName": "Opacity",
+            "Time": 0.25,
         }],
     )
-    assert_success_count(rm_key, 1, context="remove_key")
+    assert_success_count(rm_key, 1, context="RemoveKey")
 
     rm_track = mcp.call(
-        "manage_asset_user_widget",
-        assetPath=wbp_path,
-        operations=[{
-            "action": "remove_track",
-            "animationName": "FadeBound",
-            "trackName": "Opacity",
+        "ManageAssetUserWidget",
+        AssetPath=wbp_path,
+        Operations=[{
+            "Action": "RemoveTrack",
+            "AnimationName": "FadeBound",
+            "TrackName": "Opacity",
         }],
     )
-    assert_success_count(rm_track, 1, context="remove_track")
+    assert_success_count(rm_track, 1, context="RemoveTrack")
 
     mcp.call(
-        "manage_asset_user_widget",
-        assetPath=wbp_path,
-        operations=[{"action": "remove_animation", "animationName": "FadeBound"}],
+        "ManageAssetUserWidget",
+        AssetPath=wbp_path,
+        Operations=[{"Action": "RemoveAnimation", "AnimationName": "FadeBound"}],
     )
 
 
 def test_wbp_event_graph_via_blueprint(mcp, wbp_path):
     """WBP EventGraph 走 manage_asset_blueprint，不在 user_widget 复制图 API。"""
     add = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=wbp_path,
-        operations=[{
-            "action": "add_node",
-            "graphName": "EventGraph",
-            "nodeClass": "K2Node_CallFunction",
-            "functionName": "PrintString",
-            "posX": 200,
-            "posY": 100,
+        "ManageAssetBlueprint",
+        AssetPath=wbp_path,
+        Operations=[{
+            "Action": "AddNode",
+            "GraphName": "EventGraph",
+            "NodeClass": "K2Node_CallFunction",
+            "FunctionName": "PrintString",
+            "PosX": 200,
+            "PosY": 100,
         }],
     )
-    pn_id = cap_first(add).get("nodeId")
+    pn_id = cap_first(add).get("NodeId")
     assert pn_id, f"WBP EventGraph add_node: {add!r}"
 
 
 def test_widget_set_slot_and_property(mcp, wbp_path):
     try:
         r = mcp.call_capability(
-            "manage_asset_user_widget",
-            assetPath=wbp_path,
-            operations=[
+            "ManageAssetUserWidget",
+            AssetPath=wbp_path,
+            Operations=[
                 {
-                    "action": "set_slot",
-                    "widgetName": "TitleText",
-                    "anchorMinX": 0.5,
-                    "anchorMinY": 0.5,
-                    "anchorMaxX": 0.5,
-                    "anchorMaxY": 0.5,
+                    "Action": "SetSlot",
+                    "WidgetName": "TitleText",
+                    "AnchorMinX": 0.5,
+                    "AnchorMinY": 0.5,
+                    "AnchorMaxX": 0.5,
+                    "AnchorMaxY": 0.5,
                 },
-                {"action": "set_property", "widgetName": "TitleText", "propertyPath": "Visibility", "value": "Visible"},
+                {"Action": "SetProperty", "WidgetName": "TitleText", "PropertyPath": "Visibility", "Value": "Visible"},
             ],
         )
     except MCPError as e:
         pytest.skip(f"widget set_slot/set_property 跳过: {e}")
-    for e in (r.get("results") or [cap_first(r)]):
-        if isinstance(e, dict) and e.get("error"):
+    for e in (r.get("Results") or [cap_first(r)]):
+        if isinstance(e, dict) and e.get("Error"):
             pytest.skip(f"widget set_slot/set_property 跳过: {e}")

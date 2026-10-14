@@ -105,7 +105,7 @@ def _purge_prefix(mcp: MCPClient, prefix: str) -> int:
     deleted = 0
     for asset_path in paths:
         with contextlib.suppress(MCPError):
-            mcp.call("delete_asset", assetPath=asset_path)
+            mcp.call("DeleteAsset", AssetPath=asset_path)
             deleted += 1
     if deleted:
         log.info("purged %d UE asset(s) under %s", deleted, prefix)

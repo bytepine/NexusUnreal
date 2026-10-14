@@ -24,7 +24,7 @@
       "full_response_tokens": 740,
       "asset_path": "/Game/Common/GestureLinker/BP_GestureLinker"
     },
-    "get_output_log": {
+    "GetOutputLog": {
       "structured_bytes": 100807,
       "structured_tokens": 26159,
       "full_response_bytes": 239538,

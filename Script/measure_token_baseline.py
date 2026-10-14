@@ -5,7 +5,7 @@
 
 测量内容：
   1. tools/list 整体响应字节数与 token 估算
-  2. 代表工具响应：get_asset(section=all) / list_actors / get_output_log
+  2. 代表工具响应：get_asset(Section=all) / list_actors / get_output_log
      - structured_bytes: structuredContent 字节数（AI 实际消费）
      - full_response_bytes: 完整 MCP 响应包字节数（content+structuredContent，用于 P0 前后对比）
   3. 结果写入 nexus-unreal/Tests/_baselines/token_baseline.json
@@ -62,10 +62,10 @@ def _load_tiktoken():
 def _probe_asset_path(mcp: MCPClient) -> Optional[str]:
     """探测一个 Blueprint 资产路径，用于 get_asset 测量。"""
     try:
-        r = mcp.call("search_asset", assetType="Blueprint", limit=1)
+        r = mcp.call("SearchAsset", AssetType="Blueprint", Limit=1)
     except MCPError:
         return None
-    assets = r.get("assets") or []
+    assets = r.get("Assets") or []
     if not assets:
         return None
     first = assets[0]
@@ -73,7 +73,7 @@ def _probe_asset_path(mcp: MCPClient) -> Optional[str]:
     defaults = r.get("assets_defaults") or {}
     combined = dict(defaults)
     combined.update(first)
-    return combined.get("path") or combined.get("assetPath")
+    return combined.get("Path") or combined.get("AssetPath")
 
 
 def _measure_entry(structured: Any, full_response: Any, encoder) -> Dict[str, Any]:
@@ -104,13 +104,13 @@ def main() -> int:
 
     encoder = _load_tiktoken()
     if encoder is None:
-        print("[info] tiktoken 未安装 — token 数按 4 字符 ≈ 1 token 粗估", file=sys.stderr)
+        print("[info] tiktoken 未安装 — token 数按 4 字符 ≈ 1 token 粗估", File=sys.stderr)
 
     mcp = MCPClient(args.ue_url)
     try:
         mcp.initialize()
     except Exception as e:
-        print(f"[fatal] initialize 失败: {e}", file=sys.stderr)
+        print(f"[fatal] initialize 失败: {e}", File=sys.stderr)
         return 2
 
     baseline: Dict[str, Any] = {
@@ -126,13 +126,13 @@ def main() -> int:
     try:
         tools = mcp.list_tools()
         # tools/list 无 structuredContent 概念，两者相同
-        tools_list_result = {"tools": tools}
+        tools_list_result = {"Tools": tools}
         entry = _measure_entry(tools_list_result, tools_list_result, encoder)
         entry["tool_count"] = len(tools)
         baseline["tools_list"] = entry
         print(f"OK  {len(tools)} 工具, {entry['structured_bytes']} 字节, ~{entry['structured_tokens']} tokens")
     except MCPError as e:
-        print(f"FAIL 失败: {e}", file=sys.stderr)
+        print(f"FAIL 失败: {e}", File=sys.stderr)
 
     # ── 2. 代表工具响应 ──
     probe_tools = []
@@ -140,45 +140,45 @@ def main() -> int:
     # list_actors
     print("测量 list_actors ...", end=" ", flush=True)
     try:
-        full = mcp.try_call("list_actors", limit=200)
+        full = mcp.try_call("list_actors", Limit=200)
         structured = full.get("structuredContent") or {}
         entry = _measure_entry(structured, full, encoder)
-        entry["item_count"] = len(structured.get("actors") or [])
+        entry["item_count"] = len(structured.get("Actors") or [])
         baseline["tool_responses"]["list_actors"] = entry
         probe_tools.append("list_actors")
-        print(f"OK  structured={entry['structured_bytes']}B full={entry['full_response_bytes']}B ~{entry['structured_tokens']} tokens")
+        print(f"OK  structured={entry['structured_bytes']}B Full={entry['full_response_bytes']}B ~{entry['structured_tokens']} tokens")
     except MCPError as e:
-        print(f"SKIP 跳过: {e}", file=sys.stderr)
+        print(f"SKIP 跳过: {e}", File=sys.stderr)
 
-    # get_asset(section=all)
+    # get_asset(Section=all)
     bp = _probe_asset_path(mcp)
     if bp:
-        print(f"测量 get_asset(section=all, {bp.rsplit('/', 1)[-1]}) ...", end=" ", flush=True)
+        print(f"测量 get_asset(Section=all, {bp.rsplit('/', 1)[-1]}) ...", end=" ", flush=True)
         try:
-            full = mcp.try_call("get_asset", assetPaths=[bp], section="all")
+            full = mcp.try_call("GetAsset", assetPaths=[bp], Section="All")
             structured = full.get("structuredContent") or {}
             entry = _measure_entry(structured, full, encoder)
             entry["asset_path"] = bp
             baseline["tool_responses"]["get_asset_section_all"] = entry
-            probe_tools.append("get_asset")
-            print(f"OK  structured={entry['structured_bytes']}B full={entry['full_response_bytes']}B ~{entry['structured_tokens']} tokens")
+            probe_tools.append("GetAsset")
+            print(f"OK  structured={entry['structured_bytes']}B Full={entry['full_response_bytes']}B ~{entry['structured_tokens']} tokens")
         except MCPError as e:
-            print(f"SKIP 跳过: {e}", file=sys.stderr)
+            print(f"SKIP 跳过: {e}", File=sys.stderr)
     else:
-        print("[skip] get_asset — 未找到 Blueprint 资产", file=sys.stderr)
+        print("[skip] get_asset — 未找到 Blueprint 资产", File=sys.stderr)
 
     # get_output_log
     print("测量 get_output_log ...", end=" ", flush=True)
     try:
-        full = mcp.try_call("get_output_log", limit=500, verbosity="log")
+        full = mcp.try_call("GetOutputLog", Limit=500, Verbosity="Log")
         structured = full.get("structuredContent") or {}
         entry = _measure_entry(structured, full, encoder)
-        entry["item_count"] = len(structured.get("entries") or [])
-        baseline["tool_responses"]["get_output_log"] = entry
-        probe_tools.append("get_output_log")
-        print(f"OK  structured={entry['structured_bytes']}B full={entry['full_response_bytes']}B ~{entry['structured_tokens']} tokens")
+        entry["item_count"] = len(structured.get("Entries") or [])
+        baseline["tool_responses"]["GetOutputLog"] = entry
+        probe_tools.append("GetOutputLog")
+        print(f"OK  structured={entry['structured_bytes']}B Full={entry['full_response_bytes']}B ~{entry['structured_tokens']} tokens")
     except MCPError as e:
-        print(f"SKIP 跳过: {e}", file=sys.stderr)
+        print(f"SKIP 跳过: {e}", File=sys.stderr)
 
     mcp.close()
 
@@ -198,7 +198,7 @@ def main() -> int:
               f"{tl.get('structured_bytes', '?')} 字节, ~{tl.get('structured_tokens', '?')} tokens")
     for key, entry in baseline.get("tool_responses", {}).items():
         print(f"  {key:<30}: structured={entry.get('structured_bytes', '?')}B "
-              f"full={entry.get('full_response_bytes', '?')}B "
+              f"Full={entry.get('full_response_bytes', '?')}B "
               f"~{entry.get('structured_tokens', '?')} tokens")
 
     return 0

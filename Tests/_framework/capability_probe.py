@@ -8,7 +8,7 @@ from typing import Iterable, List
 from _framework.legacy_map import LEGACY_CAP_NAMES
 from _framework.mcp_client import MCPClient, MCPError
 
-_META_ALWAYS = frozenset({"search_capabilities", "call_capability", "submit_feedback"})
+_META_ALWAYS = frozenset({"SearchCapabilities", "CallCapability", "SubmitFeedback"})
 
 
 def resolve_capability_name(tool_or_cap: str) -> str:
@@ -21,14 +21,14 @@ def is_capability_available(mcp: MCPClient, tool_or_cap: str) -> bool:
     if name in _META_ALWAYS:
         return True
     try:
-        r = mcp.call("search_capabilities", capabilityName=name)
+        r = mcp.call("SearchCapabilities", CapabilityName=name)
     except MCPError:
         return False
-    if r.get("errorKind") in ("not_found", "disabled"):
+    if r.get("ErrorKind") in ("NotFound", "disabled"):
         return False
-    if r.get("capability"):
+    if r.get("Capability"):
         return True
-    caps = r.get("capabilities")
+    caps = r.get("Capabilities")
     if isinstance(caps, list):
         return any(
             isinstance(c, dict) and c.get("name") == name for c in caps

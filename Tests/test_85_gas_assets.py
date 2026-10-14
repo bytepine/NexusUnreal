@@ -19,7 +19,7 @@ pytestmark = pytest.mark.l3_asset
 @pytest.fixture(scope="module", autouse=True)
 def require_gas(mcp):
     """GameplayAbilities 已在 .uproject 启用；探测 GAS capability 是否已编入 NexusLink。"""
-    if not is_capability_available(mcp, "create_asset_gameplay_ability"):
+    if not is_capability_available(mcp, "CreateAssetGameplayAbility"):
         pytest.skip(
             "GAS capability 未注册（请确认 GameplayAbilities 已启用并重新编译 Editor）"
         )
@@ -30,38 +30,38 @@ def require_gas(mcp):
 
 def test_ga_create(test_ns, mcp):
     path = f"{test_ns}/GA_TestAbility"
-    r = mcp.call("create_asset_gameplay_ability", assetPath=path)
+    r = mcp.call("CreateAssetGameplayAbility", AssetPath=path)
     entry = cap_first(r)
-    assert not entry.get("error") and entry.get("success") is not False, f"create_asset_gameplay_ability 返回: {r!r}"
-    assert entry.get("name") or entry.get("path"), entry
+    assert not entry.get("Error") and entry.get("bSuccess") is not False, f"create_asset_gameplay_ability 返回: {r!r}"
+    assert entry.get("name") or entry.get("Path"), entry
 
 
 def test_ga_get_metadata(test_ns, mcp):
     path = f"{test_ns}/GA_TestAbility"
-    r = mcp.call("get_asset_gameplay_ability", assetPath=path, sections=["metadata"])
+    r = mcp.call("GetAssetGameplayAbility", AssetPath=path, Sections=["metadata"])
     assert isinstance(r, dict), r
     entry = cap_first(r)
-    assert "instancingPolicy" in entry, f"缺少 instancingPolicy: {entry!r}"
+    assert "InstancingPolicy" in entry, f"缺少 instancingPolicy: {entry!r}"
 
 
 def test_ga_get_tags(test_ns, mcp):
     path = f"{test_ns}/GA_TestAbility"
-    r = mcp.call("get_asset_gameplay_ability", assetPath=path, sections=["tags"])
+    r = mcp.call("GetAssetGameplayAbility", AssetPath=path, Sections=["Tags"])
     assert isinstance(r, dict), r
 
 
 def test_ga_manage_set_policy(test_ns, mcp):
     path = f"{test_ns}/GA_TestAbility"
     r = mcp.call(
-        "manage_asset_gameplay_ability",
-        assetPath=path,
-        operations=[{
-            "action": "set_policy",
-            "instancingPolicy": "InstancedPerActor",
+        "ManageAssetGameplayAbility",
+        AssetPath=path,
+        Operations=[{
+            "Action": "SetPolicy",
+            "InstancingPolicy": "InstancedPerActor",
         }],
     )
     entry = cap_first(r)
-    assert not entry.get("error") and entry.get("success") is not False, (
+    assert not entry.get("Error") and entry.get("bSuccess") is not False, (
         f"manage_asset_gameplay_ability set_policy 返回: {r!r}"
     )
 
@@ -69,53 +69,53 @@ def test_ga_manage_set_policy(test_ns, mcp):
 def test_ga_policy_readback(test_ns, mcp):
     """确认 set_policy 写入后可读回。"""
     path = f"{test_ns}/GA_TestAbility"
-    r = mcp.call("get_asset_gameplay_ability", assetPath=path, sections=["metadata"])
+    r = mcp.call("GetAssetGameplayAbility", AssetPath=path, Sections=["metadata"])
     entry = cap_first(r)
-    assert entry.get("instancingPolicy") == "InstancedPerActor", (
-        f"期望 InstancedPerActor，实际: {entry.get('instancingPolicy')!r}"
+    assert entry.get("InstancingPolicy") == "InstancedPerActor", (
+        f"期望 InstancedPerActor，实际: {entry.get('InstancingPolicy')!r}"
     )
 
 
 def test_ga_manage_blueprint_set_defaults_non_actor(test_ns, mcp):
     """回归：此前 set_defaults 与 add_component 绑在同一 Actor 门后，GameplayAbility
     （非 Actor 子类）CDO 完全无法写自定义属性；修复后应可写任意 Blueprint 的 CDO。
-    add_variable 单独一次调用且 compile=true——同批 operations 内部处于事务中会跳过全量
+    add_variable 单独一次调用且 bCompile=true——同批 operations 内部处于事务中会跳过全量
     Compile（见 NexusManageAssetBlueprintCapability.cpp:206），新变量不会立即出现在 CDO 上；
-    compile=true 走事务外的 ApplyIfRequested，确保下一步 set_defaults 能解析到该属性。"""
+    bCompile=true 走事务外的 ApplyIfRequested，确保下一步 set_defaults 能解析到该属性。"""
     path = f"{test_ns}/GA_TestAbility"
     r_var = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=path,
-        compile=True,
-        operations=[{"action": "add_variable", "variableName": "TestCdoFlag",
-                     "variableType": "bool", "defaultValue": "true"}],
+        "ManageAssetBlueprint",
+        AssetPath=path,
+        bCompile=True,
+        Operations=[{"Action": "AddVariable", "VariableName": "TestCdoFlag",
+                     "VariableType": "bool", "DefaultValue": "true"}],
     )
-    assert not cap_first(r_var).get("error"), f"add_variable on GA: {r_var!r}"
+    assert not cap_first(r_var).get("Error"), f"add_variable on GA: {r_var!r}"
 
     r_set = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=path,
-        operations=[{"action": "set_defaults", "propertyPath": "TestCdoFlag", "value": "false"}],
+        "ManageAssetBlueprint",
+        AssetPath=path,
+        Operations=[{"Action": "SetDefaults", "PropertyPath": "TestCdoFlag", "Value": "false"}],
     )
     entry = cap_first(r_set)
-    assert not entry.get("error"), f"set_defaults on non-Actor (GA) BP should now succeed: {entry!r}"
+    assert not entry.get("Error"), f"set_defaults on non-Actor (GA) BP should now succeed: {entry!r}"
 
-    r_get = mcp.call_capability("get_asset_blueprint", assetPath=path, sections=["defaults"])
-    assert isinstance(cap_first(r_get).get("defaults"), list), f"defaults read-back failed: {r_get!r}"
+    r_get = mcp.call_capability("GetAssetBlueprint", AssetPath=path, Sections=["Defaults"])
+    assert isinstance(cap_first(r_get).get("Defaults"), list), f"defaults read-back failed: {r_get!r}"
 
 
 def test_ga_manage_blueprint_add_component_still_actor_only(test_ns, mcp):
     """回归：GameplayAbility 仍不是 Actor 子类，add_component 应继续被拒绝（Actor 门未被误删）。"""
     path = f"{test_ns}/GA_TestAbility"
     r = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=path,
-        operations=[{"action": "add_component", "componentClass": "SceneComponent",
-                     "componentName": "ShouldFail"}],
+        "ManageAssetBlueprint",
+        AssetPath=path,
+        Operations=[{"Action": "AddComponent", "ComponentClass": "SceneComponent",
+                     "ComponentName": "ShouldFail"}],
     )
     entry = cap_first(r)
-    assert entry.get("error"), f"add_component on GA (non-Actor) BP should still fail: {entry!r}"
-    assert "Actor" in entry.get("error", ""), entry
+    assert entry.get("Error"), f"add_component on GA (non-Actor) BP should still fail: {entry!r}"
+    assert "Actor" in entry.get("Error", ""), entry
 
 
 # ── GameplayEffect ───────────────────────────────────────────────────────────
@@ -123,31 +123,31 @@ def test_ga_manage_blueprint_add_component_still_actor_only(test_ns, mcp):
 
 def test_ge_create(test_ns, mcp):
     path = f"{test_ns}/GE_TestEffect"
-    r = mcp.call("create_asset_gameplay_effect", assetPath=path)
-    assert not cap_first(r).get("error") and cap_first(r).get("success") is not False, f"create_asset_gameplay_effect 返回: {r!r}"
+    r = mcp.call("CreateAssetGameplayEffect", AssetPath=path)
+    assert not cap_first(r).get("Error") and cap_first(r).get("bSuccess") is not False, f"create_asset_gameplay_effect 返回: {r!r}"
 
 
 def test_ge_get_policy(test_ns, mcp):
     path = f"{test_ns}/GE_TestEffect"
-    r = mcp.call("get_asset_gameplay_effect", assetPath=path, sections=["policy"])
+    r = mcp.call("GetAssetGameplayEffect", AssetPath=path, Sections=["policy"])
     assert isinstance(r, dict), r
     entry = cap_first(r)
-    assert "durationPolicy" in entry, f"缺少 durationPolicy: {entry!r}"
+    assert "DurationPolicy" in entry, f"缺少 durationPolicy: {entry!r}"
 
 
 def test_ge_manage_set_policy(test_ns, mcp):
     path = f"{test_ns}/GE_TestEffect"
     r = mcp.call(
-        "manage_asset_gameplay_effect",
-        assetPath=path,
-        operations=[{"action": "set_policy", "durationPolicy": "Infinite"}],
+        "ManageAssetGameplayEffect",
+        AssetPath=path,
+        Operations=[{"Action": "SetPolicy", "DurationPolicy": "Infinite"}],
     )
-    assert not cap_first(r).get("error"), f"manage set_policy 返回: {r!r}"
+    assert not cap_first(r).get("Error"), f"manage set_policy 返回: {r!r}"
 
 
 def test_ge_get_modifiers_empty(test_ns, mcp):
     path = f"{test_ns}/GE_TestEffect"
-    r = mcp.call("get_asset_gameplay_effect", assetPath=path, sections=["modifiers"])
+    r = mcp.call("GetAssetGameplayEffect", AssetPath=path, Sections=["Modifiers"])
     assert isinstance(r, dict), r
 
 
@@ -156,16 +156,16 @@ def test_ge_manage_tags(test_ns, mcp):
     path = f"{test_ns}/GE_TestEffect"
     try:
         r = mcp.call(
-            "manage_asset_gameplay_effect",
-            assetPath=path,
-            operations=[{
-                "action": "set_tags",
-                "tagContainer": "grantedTags",
-                "tags": [],
-                "mode": "set",
+            "ManageAssetGameplayEffect",
+            AssetPath=path,
+            Operations=[{
+                "Action": "SetTags",
+                "TagContainer": "GrantedTags",
+                "Tags": [],
+                "Mode": "Set",
             }],
         )
-        assert not r.get("error"), r
+        assert not r.get("Error"), r
     except MCPError:
         pass  # Tag 未在项目注册时允许失败
 
@@ -173,16 +173,16 @@ def test_ge_manage_tags(test_ns, mcp):
 def test_ga_remaining_sections_and_cost(test_ns, mcp):
     path = f"{test_ns}/GA_TestAbility"
     r = mcp.call(
-        "get_asset_gameplay_ability",
-        assetPath=path,
-        sections=["costs", "graphOverview"],
+        "GetAssetGameplayAbility",
+        AssetPath=path,
+        Sections=["costs", "graphOverview"],
     )
     assert isinstance(r, dict), r
     try:
         mcp.call(
-            "manage_asset_gameplay_ability",
-            assetPath=path,
-            operations=[{"action": "set_cost_cooldown", "cost": "0", "cooldown": "0"}],
+            "ManageAssetGameplayAbility",
+            AssetPath=path,
+            Operations=[{"Action": "SetCostCooldown", "cost": "0", "cooldown": "0"}],
         )
     except MCPError:
         pass
@@ -191,35 +191,35 @@ def test_ga_remaining_sections_and_cost(test_ns, mcp):
 def test_ge_modifiers_and_cues(test_ns, mcp):
     path = f"{test_ns}/GE_TestEffect"
     mcp.call(
-        "get_asset_gameplay_effect",
-        assetPath=path,
-        sections=["tags", "cues"],
+        "GetAssetGameplayEffect",
+        AssetPath=path,
+        Sections=["Tags", "cues"],
     )
     try:
         r = mcp.call(
-            "manage_asset_gameplay_effect",
-            assetPath=path,
-            operations=[
-                {"action": "add_modifier", "attribute": "Health", "modifierOp": "Add", "magnitude": 10},
-                {"action": "set_modifier", "index": 0, "magnitude": 5},
-                {"action": "remove_modifier", "index": 0},
+            "ManageAssetGameplayEffect",
+            AssetPath=path,
+            Operations=[
+                {"Action": "AddModifier", "Attribute": "Health", "ModifierOp": "Add", "Magnitude": 10},
+                {"Action": "SetModifier", "Index": 0, "Magnitude": 5},
+                {"Action": "RemoveModifier", "Index": 0},
             ],
         )
     except MCPError as e:
         pytest.skip(f"GE modifier 跳过: {e}")
-    for e in (r.get("results") or [cap_first(r)]):
-        if isinstance(e, dict) and e.get("error"):
+    for e in (r.get("Results") or [cap_first(r)]):
+        if isinstance(e, dict) and e.get("Error"):
             pytest.skip(f"GE modifier 跳过: {e}")
 
 
 def test_as_manage_set(test_ns, mcp):
     path = f"{test_ns}/AS_TestStats"
-    mcp.call("create_asset_attribute_set", assetPath=path)
+    mcp.call("CreateAssetAttributeSet", AssetPath=path)
     try:
         r = mcp.call(
-            "manage_asset_attribute_set",
-            assetPath=path,
-            operations=[{"action": "set", "attributeName": "Health", "value": "100"}],
+            "ManageAssetAttributeSet",
+            AssetPath=path,
+            Operations=[{"Action": "Set", "AttributeName": "Health", "Value": "100"}],
         )
     except MCPError:
         pytest.skip("manage_asset_attribute_set set 不可用")
@@ -231,20 +231,20 @@ def test_as_manage_set(test_ns, mcp):
 
 def test_as_create(test_ns, mcp):
     path = f"{test_ns}/AS_TestStats"
-    r = mcp.call("create_asset_attribute_set", assetPath=path)
-    err = str(cap_first(r).get("error") or "")
+    r = mcp.call("CreateAssetAttributeSet", AssetPath=path)
+    err = str(cap_first(r).get("Error") or "")
     if err and "already exists" not in err.lower() and "已存在" not in err:
-        assert not cap_first(r).get("error") and cap_first(r).get("success") is not False, f"create_asset_attribute_set 返回: {r!r}"
+        assert not cap_first(r).get("Error") and cap_first(r).get("bSuccess") is not False, f"create_asset_attribute_set 返回: {r!r}"
 
 
 def test_as_get_empty(test_ns, mcp):
     """新建的 AS 不含 FGameplayAttributeData 属性时，attributes 为空数组而非 error。"""
     path = f"{test_ns}/AS_TestStats"
-    r = mcp.call("get_asset_attribute_set", assetPath=path)
+    r = mcp.call("GetAssetAttributeSet", AssetPath=path)
     assert isinstance(r, dict), r
     entry = cap_first(r)
-    assert "attributes" in entry, f"缺少 attributes 字段: {entry!r}"
-    assert isinstance(entry["attributes"], list), entry
+    assert "Attributes" in entry, f"缺少 attributes 字段: {entry!r}"
+    assert isinstance(entry["Attributes"], list), entry
 
 
 def test_as_manage_reset_smoke(test_ns, mcp):
@@ -252,9 +252,9 @@ def test_as_manage_reset_smoke(test_ns, mcp):
     path = f"{test_ns}/AS_TestStats"
     try:
         r = mcp.call(
-            "manage_asset_attribute_set",
-            assetPath=path,
-            operations=[{"action": "reset", "attributeName": "Health"}],
+            "ManageAssetAttributeSet",
+            AssetPath=path,
+            Operations=[{"Action": "Reset", "AttributeName": "Health"}],
         )
     except MCPError:
         pytest.skip("manage_asset_attribute_set 不可用或未编译")
@@ -265,20 +265,20 @@ def test_as_manage_reset_smoke(test_ns, mcp):
 
 
 def test_gc_notify_create_get(test_ns, mcp):
-    if not is_capability_available(mcp, "create_asset_gameplay_cue_notify"):
+    if not is_capability_available(mcp, "CreateAssetGameplayCueNotify"):
         pytest.skip("create_asset_gameplay_cue_notify 未编入")
     path = f"{test_ns}/GCN_Created"
-    r = mcp.call("create_asset_gameplay_cue_notify", assetPath=path)
+    r = mcp.call("CreateAssetGameplayCueNotify", AssetPath=path)
     entry = cap_first(r)
-    if entry.get("error") and "already exists" not in str(entry.get("error")).lower():
+    if entry.get("Error") and "already exists" not in str(entry.get("Error")).lower():
         pytest.fail(f"create_asset_gameplay_cue_notify 失败: {entry}")
-    got = cap_first(mcp.call("get_asset_gameplay_cue_notify", assetPath=path))
-    assert not got.get("error"), got
+    got = cap_first(mcp.call("GetAssetGameplayCueNotify", AssetPath=path))
+    assert not got.get("Error"), got
     man = cap_first(
         mcp.call(
-            "manage_asset_gameplay_cue_notify",
-            assetPath=path,
-            operations=[{"action": "set_cue_name", "cueName": "GameplayCue.Nx.Test"}],
+            "ManageAssetGameplayCueNotify",
+            AssetPath=path,
+            Operations=[{"Action": "SetCueName", "CueName": "GameplayCue.Nx.Test"}],
         )
     )
     assert isinstance(man, dict), man

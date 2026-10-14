@@ -26,7 +26,7 @@ def spawned_actors(mcp, pie, test_ns):
     # BP_TestActor should have been created by test_30_blueprint; recreate as
     # a safety net so this file can run in isolation too.
     try:
-        mcp.call("create_asset_blueprint", assetPath=bp, parentClass="Actor")
+        mcp.call("CreateAssetBlueprint", AssetPath=bp, ParentClass="Actor")
     except MCPError:
         # Already exists — fine.
         pass
@@ -34,8 +34,8 @@ def spawned_actors(mcp, pie, test_ns):
     r = spawn_runtime_actors(
         mcp,
         [
-            {"assetPath": bp, "locationZ": 100},
-            {"assetPath": bp, "locationX": 200, "locationZ": 100, "rotationYaw": 90},
+            {"AssetPath": bp, "LocationZ": 100},
+            {"AssetPath": bp, "LocationX": 200, "LocationZ": 100, "RotationYaw": 90},
         ],
     )
     names = r
@@ -51,30 +51,30 @@ def spawned_actors(mcp, pie, test_ns):
 # ─────────────────────────────────────────────────────────────
 
 def test_pie_status_is_running(mcp, pie):
-    r = mcp.call("control_pie", action="status")
+    r = mcp.call("ControlPie", Action="Status")
     assert pie_is_running(r), f"PIE not running: {r!r}"
-    entry = cap_first(r) if r.get("results") else r
-    assert entry.get("hasPlayWorld") is True, entry
+    entry = cap_first(r) if r.get("Results") else r
+    assert entry.get("bHasPlayWorld") is True, entry
 
 
 def test_pie_exec_slomo(mcp, pie):
-    r = cap_first(mcp.call("exec_command", command="slomo 1", silent=True))
-    assert r.get("executed") is True, r
+    r = cap_first(mcp.call("ExecCommand", Command="slomo 1", bSilent=True))
+    assert r.get("bExecuted") is True, r
 
 
 def test_get_output_log_during_pie(mcp, pie):
-    r = cap_first(mcp.call("get_output_log", limit=5, preset="diagnose"))
-    assert "entries" in r, r
-    assert isinstance(r["entries"], list)
+    r = cap_first(mcp.call("GetOutputLog", Limit=5, Preset="Diagnose"))
+    assert "Entries" in r, r
+    assert isinstance(r["Entries"], list)
 
 
 @pytest.mark.requires_gui
 def test_capture_viewport_pie_validate(mcp, pie, require_tools):
-    require_tools("capture_viewport")
-    r = mcp.call_capability("capture_viewport", target="pie", validateOnly=True)
+    require_tools("CaptureViewport")
+    r = mcp.call_capability("CaptureViewport", Target="PIE", bValidateOnly=True)
     entry = cap_first(r)
-    assert entry.get("validateOnly") is True, entry
-    assert not entry.get("error"), entry
+    assert entry.get("bValidateOnly") is True, entry
+    assert not entry.get("Error"), entry
 
 
 # ─────────────────────────────────────────────────────────────
@@ -82,12 +82,12 @@ def test_capture_viewport_pie_validate(mcp, pie, require_tools):
 # ─────────────────────────────────────────────────────────────
 
 def test_list_actors_contains_spawned(mcp, spawned_actors):
-    r = mcp.call("list_runtime_actors")
+    r = mcp.call("ListRuntimeActors")
     payload = cap_first(r)
     names = []
-    for a in payload.get("actors", []) or []:
+    for a in payload.get("Actors", []) or []:
         if isinstance(a, dict):
-            names.append(a.get("name") or a.get("actorName") or "")
+            names.append(a.get("name") or a.get("ActorName") or "")
     for n in spawned_actors:
         assert n in names, f"spawned actor {n} missing: {names}"
 
@@ -96,13 +96,13 @@ def test_actor_property_batch_write(mcp, spawned_actors):
     a, b = spawned_actors
     results = [
         mcp.call(
-            "set_runtime_actor_property",
-            updates=[{"actorName": actor, "propertyPath": "Health", "value": value}],
+            "SetRuntimeActorProperty",
+            Updates=[{"ActorName": actor, "PropertyPath": "Health", "Value": value}],
         )
         for actor, value in ((a, "50"), (b, "150"))
     ]
     # Health may not exist on a generic Actor subclass — treat missing as skip.
-    sc = sum(r.get("successCount") or 0 for r in results)
+    sc = sum(r.get("SuccessCount") or 0 for r in results)
     if sc == 0:
         pytest.skip(f"spawned actor has no Health property: {results!r}")
     assert sc == 2
@@ -111,13 +111,13 @@ def test_actor_property_batch_write(mcp, spawned_actors):
 def test_actor_property_multi_path(mcp, spawned_actors):
     a = spawned_actors[0]
     r = mcp.call(
-        "get_runtime_actor_property",
-        actorName=a,
-        propertyPaths=["RootComponent.RelativeLocation"],
+        "GetRuntimeActorProperty",
+        ActorName=a,
+        PropertyPaths=["RootComponent.RelativeLocation"],
     )
     # 单条已提升到顶层；内嵌 results[] 仍为 ResolveBatch 属性结果
     entry = cap_first(r)
-    inner = entry.get("results")
+    inner = entry.get("Results")
     assert isinstance(inner, list) and len(inner) >= 1, r
 
 
@@ -125,43 +125,43 @@ def test_actor_property_multi_actor(mcp, spawned_actors):
     results = []
     for actor in spawned_actors:
         r = mcp.call(
-            "get_runtime_actor_property",
-            actorName=actor,
-            propertyPaths=["RootComponent.RelativeLocation"],
+            "GetRuntimeActorProperty",
+            ActorName=actor,
+            PropertyPaths=["RootComponent.RelativeLocation"],
         )
         results.append(cap_first(r))
     assert len(results) == len(spawned_actors)
 
 
 def test_actor_diagnose_transform(mcp, spawned_actors):
-    r = mcp.call("get_runtime_actor_property", actorName=spawned_actors[0], diagnose="transform")
+    r = mcp.call("GetRuntimeActorProperty", ActorName=spawned_actors[0], Diagnose="Transform")
     entry = cap_first(r)
     dump = str(entry)
-    assert "Relative" in dump or "Location" in dump or "results" in dump, r
+    assert "Relative" in dump or "Location" in dump or "Results" in dump, r
 
 
 def test_actor_view_all(mcp, spawned_actors):
-    """view="all"：返回组件/层级类信息即可。"""
-    r = mcp.call("get_runtime_actor_property", actorName=spawned_actors[0], view="all")
+    """View="All"：返回组件/层级类信息即可。"""
+    r = mcp.call("GetRuntimeActorProperty", ActorName=spawned_actors[0], View="All")
     entry = cap_first(r)
-    has_components = isinstance(entry.get("components"), list) and entry["components"]
-    has_children = isinstance(entry.get("children"), list) and entry["children"]
-    has_hierarchy = isinstance(entry.get("hierarchy"), list)
+    has_components = isinstance(entry.get("Components"), list) and entry["Components"]
+    has_children = isinstance(entry.get("Children"), list) and entry["Children"]
+    has_hierarchy = isinstance(entry.get("Hierarchy"), list)
     assert has_components or has_children or has_hierarchy, entry
 
 
 def test_actor_view_invalid_hints_all(mcp, spawned_actors):
     """未知 view：schema enum 拒绝、条目级 error，或回退为默认视图。"""
     try:
-        r = mcp.call("get_runtime_actor_property", actorName=spawned_actors[0], view="bogus")
+        r = mcp.call("GetRuntimeActorProperty", ActorName=spawned_actors[0], View="bogus")
     except MCPError as e:
         dump = str(e).lower()
-        assert "enum" in dump or "view" in dump or "bogus" in dump, e
+        assert "enum" in dump or "View" in dump or "bogus" in dump, e
         return
     entry = cap_first(r) or {}
-    err = entry.get("error") or ""
+    err = entry.get("Error") or ""
     if err:
-        assert "all" in err or "components" in err or "view" in err, r
+        assert "All" in err or "Components" in err or "View" in err, r
     else:
         pytest.skip(f"bogus view 未返回 error（当前插件行为）：{entry!r}")
 
@@ -169,10 +169,10 @@ def test_actor_view_invalid_hints_all(mcp, spawned_actors):
 def test_diff_actors(mcp, spawned_actors):
     a, b = spawned_actors
     r = mcp.call(
-        "diff_runtime_actors",
-        actorNameA=a,
-        actorNameB=b,
-        propertyPaths=["RootComponent.RelativeLocation"],
+        "DiffRuntimeActors",
+        ActorNameA=a,
+        ActorNameB=b,
+        PropertyPaths=["RootComponent.RelativeLocation"],
     )
     assert isinstance(r, dict), r
 
@@ -181,8 +181,8 @@ def test_runtime_destroy_one(mcp, spawned_actors):
     # Destroy only second spawned actor — first stays for other cases in file.
     second = spawned_actors[1]
     try:
-        r = mcp.call("destroy_runtime_actor", actorName=second)
-        assert not cap_first(r).get("error"), r
+        r = mcp.call("DestroyRuntimeActor", ActorName=second)
+        assert not cap_first(r).get("Error"), r
     except MCPError:
         # Actor already gone is acceptable.
         pass
@@ -191,9 +191,9 @@ def test_runtime_destroy_one(mcp, spawned_actors):
 def test_get_behavior_tree_runtime(mcp, pie, spawned_actors, require_tools):
     """get_runtime_actor_behavior_tree：查询运行中 Actor 的行为树状态。
     Actor 未运行 BT 时返回空或 error 均合法，只要 Capability 不崩溃即通过。"""
-    require_tools("get_runtime_actor_behavior_tree")
+    require_tools("GetRuntimeActorBehaviorTree")
     try:
-        r = mcp.call("get_runtime_actor_behavior_tree", actorName=spawned_actors[0])
+        r = mcp.call("GetRuntimeActorBehaviorTree", ActorName=spawned_actors[0])
     except MCPError as e:
         # runtime 查询对未运行的 BT 可能直接拒绝，属合法契约
         pytest.skip(f"get_runtime_actor_behavior_tree rejected (BT not running): {e}")
@@ -201,17 +201,17 @@ def test_get_behavior_tree_runtime(mcp, pie, spawned_actors, require_tools):
 
 
 def test_get_gameplay_tags_actor(mcp, pie, spawned_actors, require_tools):
-    """get_gameplay_tags view=actor：查询运行中 Actor 的 Gameplay Tags。
+    """get_gameplay_tags View=actor：查询运行中 Actor 的 Gameplay Tags。
     Actor 无 Tag 时返回空列表，只要形状合法即通过。"""
-    require_tools("get_gameplay_tags")
+    require_tools("GetGameplayTags")
     actor = spawned_actors[0]
     try:
-        r = mcp.call("get_gameplay_tags", sections=["actor"], actorName=actor)
+        r = mcp.call("GetGameplayTags", Sections=["Actor"], ActorName=actor)
     except MCPError as e:
         pytest.skip(f"get_gameplay_tags actor 查询失败：{e}")
     assert isinstance(r, dict), r
     # tags 字段应为列表（可为空）
-    tags = r.get("tags")
+    tags = r.get("Tags")
     assert tags is None or isinstance(tags, list), f"unexpected tags shape: {r!r}"
 
 
@@ -222,30 +222,30 @@ def test_get_gameplay_tags_actor(mcp, pie, spawned_actors, require_tools):
 def test_spawn_and_interact_widget(mcp, pie, test_ns):
     wbp = ensure_test_hud_widget(mcp, test_ns)
     try:
-        r0 = mcp.call("spawn_runtime_widget", assetPath=wbp)
+        r0 = mcp.call("SpawnRuntimeWidget", AssetPath=wbp)
     except MCPError as e:
         pytest.skip(f"spawn_runtime_widget 失败（WBP 不存在？）：{e}")
     spawn_entry = cap_first(r0)
-    assert not spawn_entry.get("error"), spawn_entry
+    assert not spawn_entry.get("Error"), spawn_entry
 
     # spawn 成功即可；list 可能只含关卡自带 HUD（WBP_Main）
     ops = [
-        ("TitleText", "read"),
-        ("TitleText", "set", "Runtime Text"),
-        ("ClickBtn", "click"),
-        ("TestCheck", "toggle"),
-        ("TestSlider", "set", "0.75"),
-        ("TestInput", "set", "Hello Input"),
+        ("TitleText", "Read"),
+        ("TitleText", "Set", "Runtime Text"),
+        ("ClickBtn", "Click"),
+        ("TestCheck", "Toggle"),
+        ("TestSlider", "Set", "0.75"),
+        ("TestInput", "Set", "Hello Input"),
     ]
     ok = 0
     for row in ops:
-        kwargs = {"widgetName": row[0], "action": row[1]}
+        kwargs = {"WidgetName": row[0], "Action": row[1]}
         if len(row) > 2:
-            kwargs["value"] = row[2]
+            kwargs["Value"] = row[2]
         try:
-            ir = mcp.call("interact_runtime_widget", **kwargs)
+            ir = mcp.call("InteractRuntimeWidget", **kwargs)
             entry = cap_first(ir)
-            if not entry.get("error"):
+            if not entry.get("Error"):
                 ok += 1
         except MCPError:
             pass
@@ -258,47 +258,47 @@ def test_interact_runtime_widget_progressbar(mcp, pie, test_ns):
     wbp = ensure_test_hud_widget(mcp, test_ns)
     try:
         mcp.call_capability(
-            "manage_asset_user_widget",
-            assetPath=wbp,
-            operations=[
+            "ManageAssetUserWidget",
+            AssetPath=wbp,
+            Operations=[
                 {
-                    "action": "add",
-                    "widgetClass": "ProgressBar",
-                    "widgetName": "TestProgress",
-                    "parentWidget": "RootCanvas",
+                    "Action": "Add",
+                    "WidgetClass": "ProgressBar",
+                    "WidgetName": "TestProgress",
+                    "ParentWidget": "RootCanvas",
                 },
             ],
         )
-        mcp.call("save_asset", assetPath=wbp)
-        mcp.call("spawn_runtime_widget", assetPath=wbp)
+        mcp.call("SaveAsset", AssetPath=wbp)
+        mcp.call("SpawnRuntimeWidget", AssetPath=wbp)
     except MCPError as e:
         pytest.skip(f"ProgressBar 运行时前置失败：{e}")
 
     set_r = mcp.call_capability(
-        "interact_runtime_widget",
-        widgetName="TestProgress",
-        action="set",
-        value="0.42",
+        "InteractRuntimeWidget",
+        WidgetName="TestProgress",
+        Action="Set",
+        Value="0.42",
     )
     set_entry = cap_first(set_r)
-    if set_entry.get("error"):
+    if set_entry.get("Error"):
         pytest.skip(f"ProgressBar 运行时不可用：{set_entry}")
-    assert abs(float(set_entry.get("percent", -1)) - 0.42) < 0.01, set_entry
+    assert abs(float(set_entry.get("Percent", -1)) - 0.42) < 0.01, set_entry
 
     read_r = mcp.call_capability(
-        "interact_runtime_widget",
-        widgetName="TestProgress",
-        action="read",
+        "InteractRuntimeWidget",
+        WidgetName="TestProgress",
+        Action="Read",
     )
     read_entry = cap_first(read_r)
-    assert not read_entry.get("error"), read_entry
-    assert abs(float(read_entry.get("percent", -1)) - 0.42) < 0.01, read_entry
+    assert not read_entry.get("Error"), read_entry
+    assert abs(float(read_entry.get("Percent", -1)) - 0.42) < 0.01, read_entry
 
 
 def test_runtime_widget_batch_read(mcp, pie):
     try:
-        r = mcp.call_capability("get_runtime_widget_property",
-                                widgetName="TitleText")
+        r = mcp.call_capability("GetRuntimeWidgetProperty",
+                                WidgetName="TitleText")
     except MCPError as e:
         pytest.skip(f"运行时 Widget 读取失败：{e}")
     assert isinstance(r, dict), r
@@ -308,31 +308,31 @@ def test_set_runtime_widget_property_title(mcp, pie, test_ns):
     """set_runtime_widget_property：直接写 UMG 属性（非 interact 路径）。"""
     wbp = ensure_test_hud_widget(mcp, test_ns)
     try:
-        mcp.call("spawn_runtime_widget", assetPath=wbp)
+        mcp.call("SpawnRuntimeWidget", AssetPath=wbp)
     except MCPError as e:
         pytest.skip(f"spawn_widget 前置失败：{e}")
     try:
         r = mcp.call_capability(
-            "set_runtime_widget_property",
-            updates=[{
-                "widgetName": "TitleText",
-                "propertyPath": "Text",
-                "value": "MCP SetProperty",
+            "SetRuntimeWidgetProperty",
+            Updates=[{
+                "WidgetName": "TitleText",
+                "PropertyPath": "Text",
+                "Value": "MCP SetProperty",
             }],
         )
     except MCPError as e:
         pytest.skip(f"set_runtime_widget_property 不可用：{e}")
     entry = cap_first(r)
-    if entry.get("error"):
+    if entry.get("Error"):
         pytest.skip(f"set_runtime_widget_property 不可用：{entry}")
     read_r = mcp.call_capability(
-        "get_runtime_widget_property",
-        widgetName="TitleText",
-        propertyPaths=["Text"],
+        "GetRuntimeWidgetProperty",
+        WidgetName="TitleText",
+        PropertyPaths=["Text"],
     )
     read_entry = cap_first(read_r)
-    assert not read_entry.get("error"), read_entry
-    text_val = str(read_entry.get("value") or read_entry.get("text") or "")
+    assert not read_entry.get("Error"), read_entry
+    text_val = str(read_entry.get("Value") or read_entry.get("text") or "")
     assert "MCP SetProperty" in text_val, read_entry
 
 
@@ -340,17 +340,17 @@ def test_destroy_runtime_widget(mcp, pie, test_ns):
     """destroy_runtime_widget：spawn 后按实例名销毁。"""
     wbp = ensure_test_hud_widget(mcp, test_ns)
     try:
-        mcp.call("spawn_runtime_widget", assetPath=wbp)
+        mcp.call("SpawnRuntimeWidget", AssetPath=wbp)
     except MCPError as e:
         pytest.skip(f"spawn_widget 前置失败：{e}")
 
-    listed = mcp.call("list_runtime_widgets")
-    widgets = listed.get("widgets") or []
+    listed = mcp.call("ListRuntimeWidgets")
+    widgets = listed.get("Widgets") or []
     target = None
     for row in widgets:
         if not isinstance(row, dict):
             continue
-        name = row.get("name") or row.get("widgetName") or row.get("instanceName") or ""
+        name = row.get("name") or row.get("WidgetName") or row.get("instanceName") or ""
         if name in ("RootCanvas", "CanvasPanel"):
             continue
         dump = str(row)
@@ -361,16 +361,16 @@ def test_destroy_runtime_widget(mcp, pie, test_ns):
         pytest.skip(f"list_runtime_widgets 未找到 WBP 实例：{listed!r}")
 
     try:
-        dr = mcp.call_capability("destroy_runtime_widget", widgetName=target)
+        dr = mcp.call_capability("DestroyRuntimeWidget", WidgetName=target)
     except MCPError as e:
         pytest.skip(f"destroy_runtime_widget 跳过: {e}")
     del_entry = cap_first(dr)
-    if del_entry.get("error"):
+    if del_entry.get("Error"):
         pytest.skip(f"destroy_runtime_widget 跳过: {del_entry}")
 
-    listed2 = mcp.call("list_runtime_widgets")
+    listed2 = mcp.call("ListRuntimeWidgets")
     dump2 = str(listed2)
-    assert target not in dump2 or len(listed2.get("widgets") or []) < len(widgets), (
+    assert target not in dump2 or len(listed2.get("Widgets") or []) < len(widgets), (
         listed2
     )
 
@@ -382,9 +382,9 @@ def test_destroy_runtime_widget(mcp, pie, test_ns):
 @pytest.fixture(scope="module")
 def _unlua_available(mcp, pie, tool_names):
     # SearchMode 下 tools/list 仅含元工具；直接调用探测 UnLua 是否可用
-    if "get_runtime_lua_stack" not in tool_names:
+    if "GetRuntimeLuaStack" not in tool_names:
         try:
-            mcp.call_capability("get_runtime_lua_stack")
+            mcp.call_capability("GetRuntimeLuaStack")
         except MCPError as e:
             pytest.skip(f"UnLua 运行时不可用：{e}")
     return True
@@ -392,68 +392,68 @@ def _unlua_available(mcp, pie, tool_names):
 
 @pytest.mark.lua
 def test_lua_version(mcp, _unlua_available):
-    r = mcp.call_capability("get_runtime_lua_value", luaPath="_VERSION")
+    r = mcp.call_capability("GetRuntimeLuaValue", LuaPath="_VERSION")
     entry = cap_first(r)
-    assert entry.get("luaPath") == "_VERSION", f"expected luaPath echo: {entry}"
-    assert "Lua" in str(entry.get("value", "")), f"expected Lua version: {entry}"
+    assert entry.get("LuaPath") == "_VERSION", f"expected luaPath echo: {entry}"
+    assert "Lua" in str(entry.get("Value", "")), f"expected Lua version: {entry}"
 
 
 @pytest.mark.lua
 def test_lua_eval(mcp, _unlua_available):
-    r = mcp.call_capability("eval_runtime_lua", code="return 1+1")
+    r = mcp.call_capability("EvalRuntimeLua", Code="return 1+1")
     entry = cap_first(r)
-    assert entry.get("value") == 2, f"expected value=2: {entry}"
+    assert entry.get("Value") == 2, f"expected Value=2: {entry}"
 
 
 @pytest.mark.lua
 def test_lua_memory_gc(mcp, _unlua_available):
-    before = mcp.call_capability("get_runtime_lua_memory")
-    gc = mcp.call_capability("gc_runtime_lua", mode="collect")
-    after = mcp.call_capability("get_runtime_lua_memory")
+    before = mcp.call_capability("GetRuntimeLuaMemory")
+    gc = mcp.call_capability("GcRuntimeLua", Mode="Collect")
+    after = mcp.call_capability("GetRuntimeLuaMemory")
     before_e, gc_e, after_e = cap_first(before), cap_first(gc), cap_first(after)
-    assert "memoryKB" in before_e and "memoryKB" in after_e
-    assert gc_e.get("mode") == "collect"
+    assert "MemoryKB" in before_e and "MemoryKB" in after_e
+    assert gc_e.get("Mode") == "Collect"
 
 
 @pytest.mark.lua
 def test_lua_env_smoke(mcp, _unlua_available):
-    r = mcp.call_capability("get_runtime_lua_env", limit=5)
+    r = mcp.call_capability("GetRuntimeLuaEnv", Limit=5)
     assert cap_first(r), r
 
 
 @pytest.mark.lua
 def test_lua_loaded_smoke(mcp, _unlua_available):
-    r = mcp.call_capability("get_runtime_lua_loaded")
+    r = mcp.call_capability("GetRuntimeLuaLoaded")
     assert cap_first(r), r
 
 
 @pytest.mark.lua
 def test_lua_stack_smoke(mcp, _unlua_available):
-    r = mcp.call_capability("get_runtime_lua_stack", maxDepth=3)
+    r = mcp.call_capability("GetRuntimeLuaStack", MaxDepth=3)
     assert cap_first(r), r
 
 
 @pytest.mark.lua
 def test_lua_dofile_invalid_path(mcp, _unlua_available):
     """dofile 非法路径：条目级 error，不抛 MCPError。"""
-    r = mcp.call_capability("dofile_runtime_lua", scriptPath="__nonexistent_mcp_test__.lua")
+    r = mcp.call_capability("DofileRuntimeLua", ScriptPath="__nonexistent_mcp_test__.lua")
     entry = cap_first(r)
-    assert entry.get("error") or entry.get("path") == "__nonexistent_mcp_test__.lua", entry
+    assert entry.get("Error") or entry.get("Path") == "__nonexistent_mcp_test__.lua", entry
 
 
 @pytest.mark.lua
 def test_lua_set_global_smoke(mcp, _unlua_available):
     key = "__McpTestLuaSet__"
-    mcp.call_capability("set_runtime_lua", luaPath=key, value="42")
-    r = mcp.call_capability("get_runtime_lua_value", luaPath=key)
+    mcp.call_capability("SetRuntimeLua", LuaPath=key, Value="42")
+    r = mcp.call_capability("GetRuntimeLuaValue", LuaPath=key)
     entry = cap_first(r)
-    assert str(entry.get("value", "")).strip() in ("42", "42.0"), entry
+    assert str(entry.get("Value", "")).strip() in ("42", "42.0"), entry
 
 
 @pytest.mark.lua
 def test_lua_hotreload_contract(mcp, _unlua_available):
     """UnLua 2.x 成功；1.x 返回条目级 error（文档约定）。"""
-    r = mcp.call_capability("hotreload_runtime_lua")
+    r = mcp.call_capability("HotReloadRuntimeLua")
     entry = cap_first(r)
     assert isinstance(entry, dict), entry
 
@@ -462,87 +462,87 @@ def test_lua_hotreload_contract(mcp, _unlua_available):
 def test_lua_metatable_smoke(mcp, _unlua_available):
     """get_runtime_lua_metatable：非法路径也应返回结构化 results。"""
     r = mcp.call_capability(
-        "get_runtime_lua_metatable",
-        luaPath="__McpNonexistentClass__",
-        limit=5,
+        "GetRuntimeLuaMetatable",
+        LuaPath="__McpNonexistentClass__",
+        Limit=5,
     )
     entry = cap_first(r)
-    assert entry.get("error") or isinstance(entry.get("chain"), list) or entry.get("luaPath"), entry
+    assert entry.get("Error") or isinstance(entry.get("chain"), list) or entry.get("LuaPath"), entry
 
 
 @pytest.mark.lua
 def test_lua_object_smoke(mcp, _unlua_available, spawned_actors):
     """get_runtime_lua_object：对 PIE Actor 探测实例表（无 UnLua 绑定时允许 error）。"""
     r = mcp.call_capability(
-        "get_runtime_lua_object",
-        actorName=spawned_actors[0],
-        limit=5,
+        "GetRuntimeLuaObject",
+        ActorName=spawned_actors[0],
+        Limit=5,
     )
     entry = cap_first(r)
     assert isinstance(entry, dict), entry
-    assert entry.get("keys") is not None or entry.get("error"), entry
+    assert entry.get("Keys") is not None or entry.get("Error"), entry
 
 
 def test_control_pie_pause_resume(mcp, pie):
-    r = mcp.call_capability("control_pie", action="pause")
+    r = mcp.call_capability("ControlPie", Action="Pause")
     entry = cap_first(r)
-    assert not entry.get("error"), r
-    mcp.call_capability("control_pie", action="resume")
+    assert not entry.get("Error"), r
+    mcp.call_capability("ControlPie", Action="Resume")
 
 
 def test_interact_runtime_widget_combobox(mcp, pie, test_ns):
     wbp = ensure_test_hud_widget(mcp, test_ns)
     try:
         mcp.call_capability(
-            "manage_asset_user_widget",
-            assetPath=wbp,
-            operations=[{
-                "action": "add",
-                "widgetClass": "ComboBoxString",
-                "widgetName": "TestCombo",
-                "parentWidget": "RootCanvas",
+            "ManageAssetUserWidget",
+            AssetPath=wbp,
+            Operations=[{
+                "Action": "Add",
+                "WidgetClass": "ComboBoxString",
+                "WidgetName": "TestCombo",
+                "ParentWidget": "RootCanvas",
             }],
         )
-        mcp.call("save_asset", assetPath=wbp)
-        mcp.call("spawn_runtime_widget", assetPath=wbp)
+        mcp.call("SaveAsset", AssetPath=wbp)
+        mcp.call("SpawnRuntimeWidget", AssetPath=wbp)
     except MCPError as e:
         pytest.skip(f"ComboBox 运行时前置失败：{e}")
     read_r = mcp.call_capability(
-        "interact_runtime_widget",
-        widgetName="TestCombo",
-        action="read",
+        "InteractRuntimeWidget",
+        WidgetName="TestCombo",
+        Action="Read",
     )
     entry = cap_first(read_r)
-    if entry.get("error"):
+    if entry.get("Error"):
         pytest.skip(f"ComboBox 运行时不可用：{entry}")
-    assert "optionCount" in entry or "selected" in entry, entry
+    assert "OptionCount" in entry or "Selected" in entry, entry
 
 
 def test_interact_runtime_actor_audio(mcp, pie):
     from _framework.capability_probe import is_capability_available
     from _framework.asset_helpers import first_asset_path
-    if not is_capability_available(mcp, "interact_runtime_actor_audio"):
+    if not is_capability_available(mcp, "InteractRuntimeActorAudio"):
         pytest.skip("interact_runtime_actor_audio 未编入")
     path = first_asset_path(mcp, "SoundWave") or first_asset_path(mcp, "SoundCue")
     if not path:
         pytest.skip("无音效样本")
     r = mcp.call_capability(
-        "interact_runtime_actor_audio",
-        action="play_sound",
-        assetPath=path,
+        "InteractRuntimeActorAudio",
+        Action="PlaySound",
+        AssetPath=path,
     )
     entry = cap_first(r)
-    assert not entry.get("error"), r
+    assert not entry.get("Error"), r
 
 
 def test_interact_runtime_actor_niagara(mcp, pie, spawned_actors):
     from _framework.capability_probe import is_capability_available
-    if not is_capability_available(mcp, "interact_runtime_actor_niagara"):
+    if not is_capability_available(mcp, "InteractRuntimeActorNiagara"):
         pytest.skip("interact_runtime_actor_niagara 未编入")
     r = mcp.call_capability(
-        "interact_runtime_actor_niagara",
-        action="deactivate",
-        actorName=spawned_actors[0],
+        "InteractRuntimeActorNiagara",
+        Action="Deactivate",
+        ActorName=spawned_actors[0],
     )
     entry = cap_first(r)
     assert isinstance(entry, dict), r
@@ -550,46 +550,46 @@ def test_interact_runtime_actor_niagara(mcp, pie, spawned_actors):
 
 def test_interact_runtime_actor_ai_no_controller(mcp, pie, spawned_actors):
     from _framework.capability_probe import is_capability_available
-    if not is_capability_available(mcp, "interact_runtime_actor_ai"):
+    if not is_capability_available(mcp, "InteractRuntimeActorAI"):
         pytest.skip("interact_runtime_actor_ai 未编入")
     r = mcp.call_capability(
-        "interact_runtime_actor_ai",
-        action="move_to",
-        actorName=spawned_actors[0],
+        "InteractRuntimeActorAI",
+        Action="MoveTo",
+        ActorName=spawned_actors[0],
         x=0, y=0, z=0,
     )
     entry = cap_first(r)
-    assert entry.get("error"), r
+    assert entry.get("Error"), r
 
 
 def test_interact_runtime_actor_behavior_tree(mcp, pie, spawned_actors):
     from _framework.capability_probe import is_capability_available
-    if not is_capability_available(mcp, "interact_runtime_actor_behavior_tree"):
+    if not is_capability_available(mcp, "InteractRuntimeActorBehaviorTree"):
         pytest.skip("interact_runtime_actor_behavior_tree 未编入")
     actor = spawned_actors[0]
     try:
         stop_r = mcp.call_capability(
-            "interact_runtime_actor_behavior_tree",
-            action="stop_tree",
-            actorName=actor,
+            "InteractRuntimeActorBehaviorTree",
+            Action="StopTree",
+            ActorName=actor,
         )
     except MCPError as e:
         pytest.skip(f"无运行中 BT / AIController: {e}")
     stop_e = cap_first(stop_r)
-    if stop_e.get("error") or stop_r.get("error"):
+    if stop_e.get("Error") or stop_r.get("Error"):
         pytest.skip(f"无运行中 BT / AIController: {stop_e or stop_r}")
     try:
         mcp.call_capability(
-            "interact_runtime_actor_behavior_tree",
-            action="set_blackboard",
-            actorName=actor,
-            keyName="Target",
-            value="None",
+            "InteractRuntimeActorBehaviorTree",
+            Action="SetBlackboard",
+            ActorName=actor,
+            KeyName="Target",
+            Value="None",
         )
         restart = mcp.call_capability(
-            "interact_runtime_actor_behavior_tree",
-            action="restart_tree",
-            actorName=actor,
+            "InteractRuntimeActorBehaviorTree",
+            Action="RestartTree",
+            ActorName=actor,
         )
     except MCPError as e:
         pytest.skip(f"无运行中 BT / AIController: {e}")

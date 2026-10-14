@@ -3,7 +3,7 @@
 
 Capability 响应形状：
   - 单条 Entries：字段已提升到顶层（无 results 信封）
-  - 多条 Entries：{ "results": [ {...}, ... ] }
+  - 多条 Entries：{ "Results": [ {...}, ... ] }
   - 部分 manage：提升后顶层仍有内嵌 results[]（操作子结果）
 
 测试通过 cap_entries / cap_first 兼容两种形状。
@@ -22,42 +22,42 @@ def assert_batch_success(result: Dict[str, Any], expected_count: Optional[int] =
     ctx = f" ({context})" if context else ""
     results = cap_entries(result)
     assert results, f"missing capability entries{ctx}: {result!r}"
-    errors = [r for r in results if isinstance(r, dict) and r.get("error")]
+    errors = [r for r in results if isinstance(r, dict) and r.get("Error")]
     assert not errors, f"batch had failures{ctx}: {errors!r}"
     if expected_count is not None:
         assert len(results) == expected_count, (
             f"expected {expected_count} results{ctx}, got {len(results)}: {results!r}"
         )
-    sc = result.get("successCount")
+    sc = result.get("SuccessCount")
     if sc is not None and expected_count is not None:
         assert sc == expected_count, (
-            f"successCount={sc}, expected {expected_count}{ctx}: {result!r}"
+            f"SuccessCount={sc}, expected {expected_count}{ctx}: {result!r}"
         )
 
 
 def assert_success_count(result: Dict[str, Any], expected: int, *, context: str = "") -> None:
     ctx = f" ({context})" if context else ""
-    sc = result.get("successCount")
+    sc = result.get("SuccessCount")
     if sc is None:
         # 新版批量 API 不再返回 successCount，回退到统计 entry 中无 error 且未显式 success:false
         results = cap_entries(result)
         sc = sum(
             1
             for r in results
-            if isinstance(r, dict) and not r.get("error") and r.get("success") is not False
+            if isinstance(r, dict) and not r.get("Error") and r.get("bSuccess") is not False
         )
-    assert sc == expected, f"successCount={sc}, expected {expected}{ctx}: {result!r}"
+    assert sc == expected, f"SuccessCount={sc}, expected {expected}{ctx}: {result!r}"
 
 
 def pluck_errors(result: Dict[str, Any]) -> List[str]:
     out: List[str] = []
     for r in cap_entries(result):
-        if isinstance(r, dict) and r.get("error"):
-            out.append(str(r["error"]))
+        if isinstance(r, dict) and r.get("Error"):
+            out.append(str(r["Error"]))
     return out
 
 
-def ids_of(result: Dict[str, Any], key: str = "nodeId") -> List[str]:
+def ids_of(result: Dict[str, Any], key: str = "NodeId") -> List[str]:
     """Collect an id field from each capability entry (missing → skipped)."""
     out: List[str] = []
     for r in cap_entries(result):
@@ -126,6 +126,6 @@ def assert_respecting_defaults(
             missing = [f for f in required_fields if f not in entry]
             assert not missing, (
                 f"{list_key}[{i}] missing fields {missing!r} after merge{ctx}: "
-                f"entry={items[i]!r} defaults={defaults!r}"
+                f"entry={items[i]!r} Defaults={defaults!r}"
             )
     return merged

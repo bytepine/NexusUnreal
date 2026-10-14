@@ -13,32 +13,32 @@ pytestmark = [pytest.mark.l3_asset, pytest.mark.skipif_ue_below("5.0")]
 
 @pytest.fixture(scope="module", autouse=True)
 def require_gc(mcp):
-    if not is_capability_available(mcp, "create_asset_geometry_collection"):
+    if not is_capability_available(mcp, "CreateAssetGeometryCollection"):
         pytest.skip("GeometryCollection capability 未编入（需 WITH_GEOMETRY_COLLECTION）")
 
 
 def test_geometry_collection_create_get(test_ns, mcp):
     path = f"{test_ns}/GC_Created"
-    cr = mcp.call_capability("create_asset_geometry_collection", assetPath=path)
+    cr = mcp.call_capability("CreateAssetGeometryCollection", AssetPath=path)
     entry = cap_first(cr)
-    if entry.get("error") and "already exists" not in str(entry.get("error")).lower():
+    if entry.get("Error") and "already exists" not in str(entry.get("Error")).lower():
         pytest.fail(f"create_asset_geometry_collection 失败: {entry}")
-    got = cap_first(mcp.call_capability("get_asset_geometry_collection", assetPath=path))
-    assert not got.get("error"), got
+    got = cap_first(mcp.call_capability("GetAssetGeometryCollection", AssetPath=path))
+    assert not got.get("Error"), got
     man = cap_first(
         mcp.call_capability(
-            "manage_asset_geometry_collection",
-            assetPath=path,
-            operations=[{"action": "set_damage_threshold", "index": 0, "value": 1.5}],
+            "ManageAssetGeometryCollection",
+            AssetPath=path,
+            Operations=[{"Action": "SetDamageThreshold", "Index": 0, "Value": 1.5}],
         )
     )
     assert isinstance(man, dict), man
     extra = cap_first(
         mcp.call_capability(
-            "manage_asset_geometry_collection",
-            assetPath=path,
-            operations=[{"action": "set_property", "propertyPath": "EnableClustering", "value": "true"}],
+            "ManageAssetGeometryCollection",
+            AssetPath=path,
+            Operations=[{"Action": "SetProperty", "PropertyPath": "EnableClustering", "Value": "true"}],
         )
     )
-    if extra.get("error"):
+    if extra.get("Error"):
         pytest.skip(f"geometry_collection set_property 跳过: {extra}")

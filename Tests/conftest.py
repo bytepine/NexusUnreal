@@ -206,8 +206,8 @@ def mcp(_ue_url: str) -> Generator[MCPClient, None, None]:
 def log_start_sequence(mcp: MCPClient) -> int:
     """会话开始时的日志游标；log_health 只看本轮增量，避免复用 Editor 吃到旧 Ensure。"""
     try:
-        r = mcp.call("get_output_log", limit=1)
-        return int(r.get("latestSequence") or 0)
+        r = mcp.call("GetOutputLog", Limit=1)
+        return int(r.get("LatestSequence") or 0)
     except Exception:
         return 0
 
@@ -221,11 +221,11 @@ def tool_names(mcp: MCPClient) -> List[str]:
 def _cache_ue_engine_version(mcp: MCPClient, pytestconfig: pytest.Config) -> None:
     """session 启动时查询 get_editor_info 缓存 UE 版本元组，供 skipif_ue_below 使用。"""
     try:
-        info_list = mcp.call("get_editor_info")
+        info_list = mcp.call("GetEditorInfo")
         entries = info_list if isinstance(info_list, list) else [info_list]
         for entry in entries:
             if isinstance(entry, dict):
-                ver_str = entry.get("engineVersion", "")
+                ver_str = entry.get("EngineVersion", "")
                 if ver_str:
                     parts = ver_str.split(".")
                     if len(parts) >= 2:
@@ -251,7 +251,7 @@ def _require_tools(mcp: MCPClient, required: List[str]) -> None:
 
 @pytest.fixture(scope="session")
 def require_tools(mcp: MCPClient):
-    """Callable fixture: require_tools(['search_asset', 'get_asset'])."""
+    """Callable fixture: require_tools(['SearchAsset', 'GetAsset'])."""
 
     def _f(*required: str) -> None:
         _require_tools(mcp, list(required))
@@ -283,12 +283,12 @@ def pie(mcp: MCPClient) -> Generator[None, None, None]:
     on teardown.
     """
     with contextlib.suppress(MCPError):
-        status = mcp.call("control_pie", action="status")
+        status = mcp.call("ControlPie", Action="Status")
         if not pie_is_running(status):
-            mcp.call("control_pie", action="start")
+            mcp.call("ControlPie", Action="Start")
             time.sleep(2.0)
     try:
         yield
     finally:
         with contextlib.suppress(MCPError):
-            mcp.call("control_pie", action="stop")
+            mcp.call("ControlPie", Action="Stop")

@@ -19,7 +19,7 @@ _KNOWN_PATHS: dict[str, str] = {
     "WidgetBlueprint": "/Game/Input/Touch/UI_Thumbstick",
     "Material": "/Game/LevelPrototyping/Materials/M_PrototypeGrid",
     "World": "/Game/ThirdPerson/Lvl_ThirdPerson",
-    "level": "/Game/ThirdPerson/Lvl_ThirdPerson",
+    "Level": "/Game/ThirdPerson/Lvl_ThirdPerson",
     "map": "/Game/ThirdPerson/Lvl_ThirdPerson",
 }
 
@@ -34,26 +34,26 @@ def first_asset_path(
     """search_asset 取第一条路径；兼容 results[0] 批量包装。"""
     try:
         listing = mcp.call_capability(
-            "search_asset",
-            assetType=asset_type,
-            pathFilter=path_filter,
-            limit=limit,
+            "SearchAsset",
+            AssetType=asset_type,
+            PathFilter=path_filter,
+            Limit=limit,
         )
     except MCPError:
         listing = None
     if listing:
         payload = cap_first(listing)
-        assets = payload.get("assets") or []
+        assets = payload.get("Assets") or []
         if assets:
             row = assets[0]
-            path = row.get("assetPath") or row.get("path")
+            path = row.get("AssetPath") or row.get("Path")
             if path:
                 return path
     return _KNOWN_PATHS.get(asset_type)
 
 
 def first_level_path(mcp: MCPClient) -> Optional[str]:
-    for asset_type in ("World", "level", "map"):
+    for asset_type in ("World", "Level", "map"):
         path = first_asset_path(mcp, asset_type)
         if path:
             return path
@@ -69,7 +69,7 @@ def ensure_blueprint(mcp: MCPClient, test_ns: str, name: str = "BP_TestSample") 
     path = f"{test_ns}/{name}"
     _create_ignore_exists(
         mcp,
-        lambda: mcp.call("create_blueprint", assetPath=path, parentClass="Actor"),
+        lambda: mcp.call("create_blueprint", AssetPath=path, ParentClass="Actor"),
     )
     return path
 
@@ -78,7 +78,7 @@ def ensure_struct(mcp: MCPClient, test_ns: str, name: str = "S_TestProbe") -> st
     path = f"{test_ns}/{name}"
     _create_ignore_exists(
         mcp,
-        lambda: mcp.call("create_struct", assetPath=path),
+        lambda: mcp.call("create_struct", AssetPath=path),
     )
     return path
 
@@ -87,7 +87,7 @@ def ensure_material(mcp: MCPClient, test_ns: str, name: str = "M_TestProbe") -> 
     path = f"{test_ns}/{name}"
     _create_ignore_exists(
         mcp,
-        lambda: mcp.call("create_material", assetPath=path),
+        lambda: mcp.call("create_material", AssetPath=path),
     )
     return path
 
@@ -96,7 +96,7 @@ def ensure_widget(mcp: MCPClient, test_ns: str, name: str = "WBP_TestProbe") -> 
     path = f"{test_ns}/{name}"
     _create_ignore_exists(
         mcp,
-        lambda: mcp.call("create_widget", assetPath=path),
+        lambda: mcp.call("create_widget", AssetPath=path),
     )
     return path
 
@@ -106,9 +106,9 @@ def ensure_test_hud_widget(mcp: MCPClient, test_ns: str) -> str:
     path = ensure_widget(mcp, test_ns, "WBP_TestHUD")
     try:
         probe = mcp.call_capability(
-            "get_asset_user_widget",
-            assetPath=path,
-            nameFilter="TitleText",
+            "GetAssetUserWidget",
+            AssetPath=path,
+            NameFilter="TitleText",
         )
         if "TitleText" in str(probe):
             return path
@@ -116,19 +116,19 @@ def ensure_test_hud_widget(mcp: MCPClient, test_ns: str) -> str:
         pass
     mcp.call(
         "manage_widget",
-        assetPath=path,
-        operations=[
-            {"action": "add", "widgetClass": "CanvasPanel", "widgetName": "RootCanvas"},
-            {"action": "add", "widgetClass": "TextBlock", "widgetName": "TitleText", "parentWidget": "RootCanvas"},
-            {"action": "add", "widgetClass": "Button", "widgetName": "ClickBtn", "parentWidget": "RootCanvas"},
-            {"action": "add", "widgetClass": "CheckBox", "widgetName": "TestCheck", "parentWidget": "RootCanvas"},
-            {"action": "add", "widgetClass": "Slider", "widgetName": "TestSlider", "parentWidget": "RootCanvas"},
-            {"action": "add", "widgetClass": "EditableTextBox", "widgetName": "TestInput", "parentWidget": "RootCanvas"},
-            {"action": "add", "widgetClass": "ProgressBar", "widgetName": "RemoveMe", "parentWidget": "RootCanvas"},
+        AssetPath=path,
+        Operations=[
+            {"Action": "Add", "WidgetClass": "CanvasPanel", "WidgetName": "RootCanvas"},
+            {"Action": "Add", "WidgetClass": "TextBlock", "WidgetName": "TitleText", "ParentWidget": "RootCanvas"},
+            {"Action": "Add", "WidgetClass": "Button", "WidgetName": "ClickBtn", "ParentWidget": "RootCanvas"},
+            {"Action": "Add", "WidgetClass": "CheckBox", "WidgetName": "TestCheck", "ParentWidget": "RootCanvas"},
+            {"Action": "Add", "WidgetClass": "Slider", "WidgetName": "TestSlider", "ParentWidget": "RootCanvas"},
+            {"Action": "Add", "WidgetClass": "EditableTextBox", "WidgetName": "TestInput", "ParentWidget": "RootCanvas"},
+            {"Action": "Add", "WidgetClass": "ProgressBar", "WidgetName": "RemoveMe", "ParentWidget": "RootCanvas"},
         ],
     )
     with contextlib.suppress(MCPError):
-        mcp.call("save_asset", assetPath=path)
+        mcp.call("SaveAsset", AssetPath=path)
     return path
 
 
@@ -139,8 +139,8 @@ def ensure_behavior_tree(mcp: MCPClient, test_ns: str) -> str:
         mcp,
         lambda: mcp.call(
             "create_behavior_tree",
-            assetPath=bt,
-            blackboardPath=bb,
+            AssetPath=bt,
+            BlackboardPath=bb,
         ),
     )
     return bt
@@ -167,8 +167,8 @@ def probe_asset_readable(
 ) -> bool:
     """调用只读 get_asset_* 验证路径有效。"""
     try:
-        r = mcp.call_capability(capability, assetPath=asset_path, **kwargs)
+        r = mcp.call_capability(capability, AssetPath=asset_path, **kwargs)
     except MCPError:
         return False
-    entry = (r.get("results") or [r])[0]
-    return isinstance(entry, dict) and not entry.get("error")
+    entry = (r.get("Results") or [r])[0]
+    return isinstance(entry, dict) and not entry.get("Error")

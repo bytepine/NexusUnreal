@@ -14,70 +14,70 @@ pytestmark = pytest.mark.l3_asset
 @pytest.fixture(scope="module")
 def bp_path(test_ns, mcp):
     path = f"{test_ns}/BP_TestActor"
-    mcp.call("create_asset_blueprint", assetPath=path, parentClass="Actor")
+    mcp.call("CreateAssetBlueprint", AssetPath=path, ParentClass="Actor")
     yield path
 
 
 def test_bp_variable_batch_add(mcp, bp_path):
     """4.2：新增两个变量。MyActorLabel 避开与 AActor::ActorLabel 冲突。
-    新版 manage_asset_blueprint 用 operations=[{action=add_variable,...}]。"""
+    新版 manage_asset_blueprint 用 Operations=[{Action=add_variable,...}]。"""
     for var in [
-        {"action": "add_variable", "variableName": "Health",
-         "variableType": "float", "defaultValue": "100"},
-        {"action": "add_variable", "variableName": "MyActorLabel",
-         "variableType": "string"},
+        {"Action": "AddVariable", "VariableName": "Health",
+         "VariableType": "float", "DefaultValue": "100"},
+        {"Action": "AddVariable", "VariableName": "MyActorLabel",
+         "VariableType": "string"},
     ]:
         r = mcp.call_capability(
-            "manage_asset_blueprint", assetPath=bp_path, operations=[var],
+            "ManageAssetBlueprint", AssetPath=bp_path, Operations=[var],
         )
-        assert isinstance(r, dict), f"add_variable {var['variableName']}: {r!r}"
+        assert isinstance(r, dict), f"add_variable {var['VariableName']}: {r!r}"
 
 
 def test_bp_set_and_get_defaults(mcp, bp_path):
-    """4.5–4.6：通过 manage_asset_blueprint(set_defaults) 写 CDO 字段，再从 sections=["defaults"]
+    """4.5–4.6：通过 manage_asset_blueprint(set_defaults) 写 CDO 字段，再从 Sections=["Defaults"]
     读回。合并原 test_bp_get_defaults_section——对同一资产重复查 defaults 会触发 redundant_call 保护，
     故在 all 查询之前一次性完成写读验证。"""
     set_result = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=bp_path,
-        operations=[{
-            "action": "set_defaults",
-            "propertyPath": "Health",
-            "value": "200",
+        "ManageAssetBlueprint",
+        AssetPath=bp_path,
+        Operations=[{
+            "Action": "SetDefaults",
+            "PropertyPath": "Health",
+            "Value": "200",
         }],
     )
     assert isinstance(set_result, dict), f"set_defaults returned unexpected: {set_result!r}"
 
     get_result = mcp.call_capability(
-        "get_asset_blueprint",
-        assetPath=bp_path,
-        sections=["defaults"],
+        "GetAssetBlueprint",
+        AssetPath=bp_path,
+        Sections=["Defaults"],
     )
     payload = cap_first(get_result)
     # defaults section 仅含 inherited CDO 属性，BP 变量 Health 不在其中；
     # 此处验证 set/get 链路通畅，get 返回合法 defaults 结构。
-    assert isinstance(payload.get("defaults"), list), f"defaults not a list: {payload!r}"
+    assert isinstance(payload.get("Defaults"), list), f"defaults not a list: {payload!r}"
 
 
 def test_bp_component_add_remove(mcp, bp_path):
     """4.7：add_component + remove_component（Actor BP 专用，两次单动作调用）。"""
     r_add = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=bp_path,
-        operations=[{
-            "action": "add_component",
-            "componentName": "Mesh",
-            "componentClass": "StaticMeshComponent",
+        "ManageAssetBlueprint",
+        AssetPath=bp_path,
+        Operations=[{
+            "Action": "AddComponent",
+            "ComponentName": "Mesh",
+            "ComponentClass": "StaticMeshComponent",
         }],
     )
     assert isinstance(r_add, dict), f"add_component unexpected: {r_add!r}"
 
     r_remove = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=bp_path,
-        operations=[{
-            "action": "remove_component",
-            "componentName": "Mesh",
+        "ManageAssetBlueprint",
+        AssetPath=bp_path,
+        Operations=[{
+            "Action": "RemoveComponent",
+            "ComponentName": "Mesh",
         }],
     )
     assert isinstance(r_remove, dict), f"remove_component unexpected: {r_remove!r}"
@@ -85,109 +85,109 @@ def test_bp_component_add_remove(mcp, bp_path):
 
 def test_bp_component_section_owned_inherited_native(mcp, test_ns):
     """component section 应合并 owned/inherited/native 三类来源并正确标注：
-    父 BP（parentClass=Character）新增持久组件 ParentMesh；子 BP 派生自父 BP 并新增自己的 ChildMesh；
+    父 BP（ParentClass=Character）新增持久组件 ParentMesh；子 BP 派生自父 BP 并新增自己的 ChildMesh；
     Character 作为原生祖先贡献 CapsuleComponent 等 native 组件。使用独立资产路径，不影响 bp_path 相关测试。"""
     parent_path = f"{test_ns}/BP_CompParent"
-    parent_create = mcp.call_capability("create_asset_blueprint", assetPath=parent_path, parentClass="Character")
+    parent_create = mcp.call_capability("CreateAssetBlueprint", AssetPath=parent_path, ParentClass="Character")
     assert isinstance(parent_create, dict), f"create parent bp: {parent_create!r}"
 
     add_parent = mcp.call_capability(
-        "manage_asset_blueprint", assetPath=parent_path,
-        operations=[{
-            "action": "add_component",
-            "componentName": "ParentMesh",
-            "componentClass": "StaticMeshComponent",
+        "ManageAssetBlueprint", AssetPath=parent_path,
+        Operations=[{
+            "Action": "AddComponent",
+            "ComponentName": "ParentMesh",
+            "ComponentClass": "StaticMeshComponent",
         }],
     )
     assert isinstance(add_parent, dict), f"add_component parent: {add_parent!r}"
-    mcp.call("save_asset", assetPath=parent_path)
+    mcp.call("SaveAsset", AssetPath=parent_path)
 
     parent_class_path = f"{parent_path}.BP_CompParent_C"
     child_path = f"{test_ns}/BP_CompChild"
-    child_create = mcp.call_capability("create_asset_blueprint", assetPath=child_path, parentClass=parent_class_path)
-    assert isinstance(child_create, dict), f"create child bp (parentClass={parent_class_path}): {child_create!r}"
+    child_create = mcp.call_capability("CreateAssetBlueprint", AssetPath=child_path, ParentClass=parent_class_path)
+    assert isinstance(child_create, dict), f"create child bp (ParentClass={parent_class_path}): {child_create!r}"
 
     add_child = mcp.call_capability(
-        "manage_asset_blueprint", assetPath=child_path,
-        operations=[{
-            "action": "add_component",
-            "componentName": "ChildMesh",
-            "componentClass": "StaticMeshComponent",
+        "ManageAssetBlueprint", AssetPath=child_path,
+        Operations=[{
+            "Action": "AddComponent",
+            "ComponentName": "ChildMesh",
+            "ComponentClass": "StaticMeshComponent",
         }],
     )
     assert isinstance(add_child, dict), f"add_component child: {add_child!r}"
 
-    r = mcp.call_capability("get_asset_blueprint", assetPath=child_path, sections=["component"])
+    r = mcp.call_capability("GetAssetBlueprint", AssetPath=child_path, Sections=["Component"])
     payload = cap_first(r)
     components = merge_with_defaults(
-        payload.get("components") or [],
+        payload.get("Components") or [],
         payload.get("components_defaults") or {},
     )
-    by_name = {c.get("variableName"): c for c in components}
+    by_name = {c.get("VariableName"): c for c in components}
 
     child_mesh = by_name.get("ChildMesh")
-    assert child_mesh and child_mesh.get("source") == "owned", f"ChildMesh not owned: {components!r}"
-    assert child_mesh.get("inherited") is False, f"owned 组件 inherited 应为 false: {child_mesh!r}"
+    assert child_mesh and child_mesh.get("Source") == "owned", f"ChildMesh not owned: {components!r}"
+    assert child_mesh.get("bInherited") is False, f"owned 组件 inherited 应为 false: {child_mesh!r}"
 
     parent_mesh = by_name.get("ParentMesh")
     assert parent_mesh, f"ParentMesh (父 BP SCS) 未出现在子 BP 组件列表中: {components!r}"
-    assert parent_mesh.get("source") == "inherited", f"ParentMesh source 应为 inherited: {parent_mesh!r}"
-    assert parent_mesh.get("inherited") is True, f"ParentMesh 缺 inherited 标记: {parent_mesh!r}"
-    assert parent_mesh.get("ownerBlueprint") == "BP_CompParent", f"ParentMesh ownerBlueprint: {parent_mesh!r}"
+    assert parent_mesh.get("Source") == "bInherited", f"ParentMesh source 应为 inherited: {parent_mesh!r}"
+    assert parent_mesh.get("bInherited") is True, f"ParentMesh 缺 inherited 标记: {parent_mesh!r}"
+    assert parent_mesh.get("OwnerBlueprint") == "BP_CompParent", f"ParentMesh ownerBlueprint: {parent_mesh!r}"
 
-    native_entries = [c for c in components if c.get("source") == "native"]
+    native_entries = [c for c in components if c.get("Source") == "native"]
     assert native_entries, f"Character 原生祖先组件（如 CapsuleComponent）未出现: {components!r}"
     for entry in native_entries:
-        assert entry.get("inherited") is True, f"native 组件缺 inherited 标记: {entry!r}"
+        assert entry.get("bInherited") is True, f"native 组件缺 inherited 标记: {entry!r}"
 
-    hierarchy = payload.get("hierarchy") or []
+    hierarchy = payload.get("Hierarchy") or []
     assert hierarchy, f"hierarchy 为空: {payload!r}"
 
-    mcp.call("save_asset", assetPath=child_path)
+    mcp.call("SaveAsset", AssetPath=child_path)
 
 
 def test_bp_graph_roundtrip(mcp, bp_path):
     """4.8–4.12：get graph → add_node → set_node → remove_node。
-    在 all 查询之前独立查 sections=["graph"]，避免 redundant_call。"""
-    graph = mcp.call_capability("get_asset_blueprint", assetPath=bp_path,
-                                sections=["graph"], graphName="EventGraph")
+    在 all 查询之前独立查 Sections=["graph"]，避免 redundant_call。"""
+    graph = mcp.call_capability("GetAssetBlueprint", AssetPath=bp_path,
+                                Sections=["graph"], GraphName="EventGraph")
     payload = cap_first(graph)
     dump = str(payload)
-    assert "enabledNodeCount" in dump or "nodes" in dump, f"graph overview shape: {payload!r}"
+    assert "EnabledNodeCount" in dump or "Nodes" in dump, f"graph overview shape: {payload!r}"
 
     add = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=bp_path,
-        operations=[{
-            "action": "add_node",
-            "graphName": "EventGraph",
-            "nodeClass": "K2Node_CallFunction",
-            "functionName": "PrintString",
-            "posX": 200, "posY": 100,
+        "ManageAssetBlueprint",
+        AssetPath=bp_path,
+        Operations=[{
+            "Action": "AddNode",
+            "GraphName": "EventGraph",
+            "NodeClass": "K2Node_CallFunction",
+            "FunctionName": "PrintString",
+            "PosX": 200, "PosY": 100,
         }],
     )
-    pn_id = cap_first(add).get("nodeId")
+    pn_id = cap_first(add).get("NodeId")
     assert pn_id, f"add_node did not return nodeId: {add!r}"
 
     move = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=bp_path,
-        operations=[{
-            "action": "set_node",
-            "graphName": "EventGraph",
-            "nodeId": pn_id,
-            "posX": 300, "posY": 150,
+        "ManageAssetBlueprint",
+        AssetPath=bp_path,
+        Operations=[{
+            "Action": "SetNode",
+            "GraphName": "EventGraph",
+            "NodeId": pn_id,
+            "PosX": 300, "PosY": 150,
         }],
     )
     assert isinstance(move, dict), f"set_node unexpected: {move!r}"
 
     remove = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=bp_path,
-        operations=[{
-            "action": "remove_node",
-            "graphName": "EventGraph",
-            "nodeId": pn_id,
+        "ManageAssetBlueprint",
+        AssetPath=bp_path,
+        Operations=[{
+            "Action": "RemoveNode",
+            "GraphName": "EventGraph",
+            "NodeId": pn_id,
         }],
     )
     assert isinstance(remove, dict), f"remove_node unexpected: {remove!r}"
@@ -197,110 +197,110 @@ def test_bp_graph_connect_exec(mcp, bp_path):
     """4.x：EventGraph 内 BeginPlay → PrintString exec 连线。"""
     # 直接 ensure BeginPlay（不依赖 create 是否生成；避免 nameFilter 二次 get 误判）
     ensure = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=bp_path,
-        operations=[{
-            "action": "add_node",
-            "graphName": "EventGraph",
-            "nodeClass": "K2Node_Event",
-            "functionName": "ReceiveBeginPlay",
-            "posX": 0, "posY": 0,
+        "ManageAssetBlueprint",
+        AssetPath=bp_path,
+        Operations=[{
+            "Action": "AddNode",
+            "GraphName": "EventGraph",
+            "NodeClass": "K2Node_Event",
+            "FunctionName": "ReceiveBeginPlay",
+            "PosX": 0, "PosY": 0,
         }],
     )
     ensure_entry = cap_first(ensure)
-    begin_id = ensure_entry.get("nodeId")
+    begin_id = ensure_entry.get("NodeId")
     assert begin_id, f"ensure BeginPlay: {ensure!r}"
 
     # 无 nameFilter 拉全图，再按 nodeId / 标题定位（nameFilter 对 Event 标题偶发不匹配）
     graph = mcp.call_capability(
-        "get_asset_blueprint",
-        assetPath=bp_path,
-        sections=["graph"],
-        graphName="EventGraph",
+        "GetAssetBlueprint",
+        AssetPath=bp_path,
+        Sections=["graph"],
+        GraphName="EventGraph",
     )
     payload = cap_first(graph)
-    nodes = payload.get("nodes") or []
-    begin_node = next((n for n in nodes if n.get("nodeId") == begin_id), None)
+    nodes = payload.get("Nodes") or []
+    begin_node = next((n for n in nodes if n.get("NodeId") == begin_id), None)
     if begin_node is None:
         begin_node = next(
-            (n for n in nodes if "BeginPlay" in (n.get("nodeTitle") or "")
-             or "ReceiveBeginPlay" in (n.get("nodeTitle") or "")
-             or n.get("nodeClass") == "K2Node_Event"),
+            (n for n in nodes if "BeginPlay" in (n.get("NodeTitle") or "")
+             or "ReceiveBeginPlay" in (n.get("NodeTitle") or "")
+             or n.get("NodeClass") == "K2Node_Event"),
             None,
         )
     assert begin_node, f"BeginPlay node missing after ensure: {payload!r} ensure={ensure_entry!r}"
-    begin_id = begin_node.get("nodeId") or begin_id
+    begin_id = begin_node.get("NodeId") or begin_id
     begin_then = None
-    for pin in begin_node.get("pins") or []:
-        if pin.get("direction") == "output" and pin.get("pinCategory") == "exec":
-            begin_then = pin.get("pinName")
+    for pin in begin_node.get("Pins") or []:
+        if pin.get("Direction") == "Output" and pin.get("PinCategory") == "exec":
+            begin_then = pin.get("PinName")
             break
     assert begin_id and begin_then, f"BeginPlay exec pin missing: {begin_node!r}"
 
     add = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=bp_path,
-        operations=[{
-            "action": "add_node",
-            "graphName": "EventGraph",
-            "nodeClass": "K2Node_CallFunction",
-            "functionName": "PrintString",
-            "posX": 400, "posY": 0,
+        "ManageAssetBlueprint",
+        AssetPath=bp_path,
+        Operations=[{
+            "Action": "AddNode",
+            "GraphName": "EventGraph",
+            "NodeClass": "K2Node_CallFunction",
+            "FunctionName": "PrintString",
+            "PosX": 400, "PosY": 0,
         }],
     )
-    print_id = cap_first(add).get("nodeId")
+    print_id = cap_first(add).get("NodeId")
     assert print_id, f"add_node PrintString: {add!r}"
 
     graph_after = mcp.call_capability(
-        "get_asset_blueprint",
-        assetPath=bp_path,
-        sections=["graph"],
-        graphName="EventGraph",
+        "GetAssetBlueprint",
+        AssetPath=bp_path,
+        Sections=["graph"],
+        GraphName="EventGraph",
     )
-    all_nodes = cap_first(graph_after).get("nodes") or []
-    print_node = [n for n in all_nodes if n.get("nodeId") == print_id]
+    all_nodes = cap_first(graph_after).get("Nodes") or []
+    print_node = [n for n in all_nodes if n.get("NodeId") == print_id]
     if not print_node:
-        print_node = [n for n in all_nodes if "Print" in (n.get("nodeTitle") or "")]
-    assert print_node, f"PrintString node missing: {graph_after!r} add={add!r}"
+        print_node = [n for n in all_nodes if "Print" in (n.get("NodeTitle") or "")]
+    assert print_node, f"PrintString node missing: {graph_after!r} Add={add!r}"
     print_exec = None
-    for pin in print_node[0].get("pins") or []:
-        if pin.get("direction") == "input" and pin.get("pinCategory") == "exec":
-            print_exec = pin.get("pinName")
+    for pin in print_node[0].get("Pins") or []:
+        if pin.get("Direction") == "input" and pin.get("PinCategory") == "exec":
+            print_exec = pin.get("PinName")
             break
     assert print_exec, f"PrintString exec input missing: {print_node[0]!r}"
 
     wire = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=bp_path,
-        operations=[{
-            "action": "connect",
-            "graphName": "EventGraph",
-            "sourceNodeId": begin_id,
-            "sourcePinName": begin_then,
-            "targetNodeId": print_id,
-            "targetPinName": print_exec,
+        "ManageAssetBlueprint",
+        AssetPath=bp_path,
+        Operations=[{
+            "Action": "Connect",
+            "GraphName": "EventGraph",
+            "SourceNodeId": begin_id,
+            "SourcePinName": begin_then,
+            "TargetNodeId": print_id,
+            "TargetPinName": print_exec,
         }],
     )
-    assert isinstance(wire, dict) and not wire.get("error") and not cap_first(wire).get("error"), (
+    assert isinstance(wire, dict) and not wire.get("Error") and not cap_first(wire).get("Error"), (
         f"connect failed: {wire!r}"
     )
 
     verify = mcp.call_capability(
-        "get_asset_blueprint",
-        assetPath=bp_path,
-        sections=["graph"],
-        graphName="EventGraph",
+        "GetAssetBlueprint",
+        AssetPath=bp_path,
+        Sections=["graph"],
+        GraphName="EventGraph",
     )
-    verify_nodes = cap_first(verify).get("nodes") or []
-    begin_after = next((n for n in verify_nodes if n.get("nodeId") == begin_id), None)
+    verify_nodes = cap_first(verify).get("Nodes") or []
+    begin_after = next((n for n in verify_nodes if n.get("NodeId") == begin_id), None)
     assert begin_after, f"BeginPlay missing after connect: {verify!r}"
-    begin_pins = begin_after.get("pins") or []
+    begin_pins = begin_after.get("Pins") or []
     linked = False
     for pin in begin_pins:
-        if pin.get("pinName") != begin_then:
+        if pin.get("PinName") != begin_then:
             continue
-        for link in pin.get("linkedTo") or []:
-            if link.get("nodeId") == print_id:
+        for link in pin.get("LinkedTo") or []:
+            if link.get("NodeId") == print_id:
                 linked = True
     assert linked, f"wire not visible after connect: {begin_pins!r}"
 
@@ -308,340 +308,340 @@ def test_bp_graph_connect_exec(mcp, bp_path):
 def test_bp_promote_pin(mcp, bp_path):
     """promote_pin：PrintString.InString → 成员变量 + VariableGet 并自动连线。"""
     add = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=bp_path,
-        operations=[{
-            "action": "add_node",
-            "graphName": "EventGraph",
-            "nodeClass": "K2Node_CallFunction",
-            "functionName": "PrintString",
-            "posX": 600, "posY": 200,
+        "ManageAssetBlueprint",
+        AssetPath=bp_path,
+        Operations=[{
+            "Action": "AddNode",
+            "GraphName": "EventGraph",
+            "NodeClass": "K2Node_CallFunction",
+            "FunctionName": "PrintString",
+            "PosX": 600, "PosY": 200,
         }],
     )
-    print_id = cap_first(add).get("nodeId")
+    print_id = cap_first(add).get("NodeId")
     assert print_id, f"add_node PrintString: {add!r}"
 
     graph = mcp.call_capability(
-        "get_asset_blueprint",
-        assetPath=bp_path,
-        sections=["graph"],
-        graphName="EventGraph",
+        "GetAssetBlueprint",
+        AssetPath=bp_path,
+        Sections=["graph"],
+        GraphName="EventGraph",
     )
-    nodes = cap_first(graph).get("nodes") or []
-    print_node = next((n for n in nodes if n.get("nodeId") == print_id), None)
+    nodes = cap_first(graph).get("Nodes") or []
+    print_node = next((n for n in nodes if n.get("NodeId") == print_id), None)
     assert print_node, f"PrintString missing: {graph!r}"
     in_string = None
-    for pin in print_node.get("pins") or []:
-        if pin.get("direction") == "input" and pin.get("pinCategory") != "exec":
-            name = pin.get("pinName") or ""
+    for pin in print_node.get("Pins") or []:
+        if pin.get("Direction") == "input" and pin.get("PinCategory") != "Exec":
+            name = pin.get("PinName") or ""
             if "string" in name.lower() or name in ("InString", "In String"):
                 in_string = name
                 break
     if not in_string:
-        for pin in print_node.get("pins") or []:
-            if pin.get("direction") == "input" and pin.get("pinCategory") == "string":
-                in_string = pin.get("pinName")
+        for pin in print_node.get("Pins") or []:
+            if pin.get("Direction") == "input" and pin.get("PinCategory") == "string":
+                in_string = pin.get("PinName")
                 break
     assert in_string, f"PrintString string input pin missing: {print_node!r}"
 
     promote = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=bp_path,
-        operations=[{
-            "action": "promote_pin",
-            "graphName": "EventGraph",
-            "nodeId": print_id,
-            "pinName": in_string,
-            "variableName": "PromotedMsg",
+        "ManageAssetBlueprint",
+        AssetPath=bp_path,
+        Operations=[{
+            "Action": "PromotePin",
+            "GraphName": "EventGraph",
+            "NodeId": print_id,
+            "PinName": in_string,
+            "VariableName": "PromotedMsg",
         }],
     )
     entry = cap_first(promote)
-    assert not entry.get("error"), f"promote_pin failed: {promote!r}"
-    promoted = entry.get("variableName") or ""
+    assert not entry.get("Error"), f"promote_pin failed: {promote!r}"
+    promoted = entry.get("VariableName") or ""
     assert str(promoted).startswith("PromotedMsg"), entry
-    var_node_id = entry.get("nodeId")
+    var_node_id = entry.get("NodeId")
     assert var_node_id, f"promote_pin missing Get nodeId: {entry!r}"
-    assert entry.get("isLocal") is False, entry
+    assert entry.get("bIsLocal") is False, entry
 
     vars_r = mcp.call_capability(
-        "get_asset_blueprint", assetPath=bp_path, sections=["variable"],
+        "GetAssetBlueprint", AssetPath=bp_path, Sections=["variable"],
     )
     vars_payload = cap_first(vars_r)
     var_names = [
-        (v.get("name") or v.get("variableName") or "")
-        for v in (vars_payload.get("variables") or vars_payload.get("variable") or [])
+        (v.get("name") or v.get("VariableName") or "")
+        for v in (vars_payload.get("Variables") or vars_payload.get("variable") or [])
     ]
     assert any(str(n).startswith("PromotedMsg") for n in var_names), f"PromotedMsg not in variables: {vars_payload!r}"
 
 
 def test_bp_get_asset_all_section(mcp, bp_path):
-    """4.3：sections=["all"] 应覆盖 variables/components/functions/graphOverview/defaults。
+    """4.3：Sections=["All"] 应覆盖 variables/components/functions/graphOverview/defaults。
     全成功时不再回显 sections[]；置于末尾以免触发 redundant_call。"""
-    r = mcp.call_capability("get_asset_blueprint", assetPath=bp_path, sections=["all"])
+    r = mcp.call_capability("GetAssetBlueprint", AssetPath=bp_path, Sections=["All"])
     first = cap_first(r)
-    assert first and not first.get("error"), r
+    assert first and not first.get("Error"), r
     # 全成功省略 sections 回显；以实际数据段存在为准
-    assert "variables" in first or "variable" in str(first), first
-    assert "components" in first or "component" in str(first), first
-    assert isinstance(first.get("defaults"), list), f"defaults list missing: {first!r}"
+    assert "Variables" in first or "variable" in str(first), first
+    assert "Components" in first or "Component" in str(first), first
+    assert isinstance(first.get("Defaults"), list), f"defaults list missing: {first!r}"
 
 
 def test_bp_save(mcp, bp_path):
-    r = mcp.call("save_asset", assetPath=bp_path)
-    assert (r.get("saved") or 0) == 1, f"save_asset bp: {r!r}"
+    r = mcp.call("SaveAsset", AssetPath=bp_path)
+    assert (r.get("bSaved") or 0) == 1, f"save_asset bp: {r!r}"
 
 
 def test_bp_interface_create_function_and_implement(mcp, test_ns):
-    """BPI：parentClass=Interface 创建；add_function 声明方法；普通 BP add_interface 实现。"""
+    """BPI：ParentClass=Interface 创建；add_function 声明方法；普通 BP add_interface 实现。"""
     iface_path = f"{test_ns}/BPI_Test"
     created = mcp.call_capability(
-        "create_asset_blueprint", assetPath=iface_path, parentClass="Interface",
+        "CreateAssetBlueprint", AssetPath=iface_path, ParentClass="Interface",
     )
     created_first = cap_first(created)
-    assert created_first.get("blueprintType") == "interface", created
+    assert created_first.get("BlueprintType") == "interface", created
 
     add_fn = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=iface_path,
-        operations=[{"action": "add_function", "functionName": "DoThing"}],
+        "ManageAssetBlueprint",
+        AssetPath=iface_path,
+        Operations=[{"Action": "AddFunction", "FunctionName": "DoThing"}],
     )
     add_fn_first = cap_first(add_fn)
-    assert not add_fn_first.get("error"), add_fn
+    assert not add_fn_first.get("Error"), add_fn
 
     fn_get = mcp.call_capability(
-        "get_asset_blueprint", assetPath=iface_path, sections=["function"],
+        "GetAssetBlueprint", AssetPath=iface_path, Sections=["Function"],
     )
     fn_first = cap_first(fn_get)
-    assert fn_first.get("blueprintType") == "interface", fn_get
+    assert fn_first.get("BlueprintType") == "interface", fn_get
     fn_names = [f.get("name") for f in (fn_first.get("functions") or [])]
     assert "DoThing" in fn_names, fn_get
 
     actor_path = f"{test_ns}/BP_IfaceUser"
-    mcp.call_capability("create_asset_blueprint", assetPath=actor_path, parentClass="Actor")
+    mcp.call_capability("CreateAssetBlueprint", AssetPath=actor_path, ParentClass="Actor")
     add_iface = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=actor_path,
-        operations=[{"action": "add_interface", "interfaceName": iface_path}],
+        "ManageAssetBlueprint",
+        AssetPath=actor_path,
+        Operations=[{"Action": "AddInterface", "InterfaceName": iface_path}],
     )
     add_iface_first = cap_first(add_iface)
-    assert not add_iface_first.get("error"), add_iface
+    assert not add_iface_first.get("Error"), add_iface
 
     actor_get = mcp.call_capability(
-        "get_asset_blueprint", assetPath=actor_path, sections=["function"],
+        "GetAssetBlueprint", AssetPath=actor_path, Sections=["Function"],
     )
     actor_first = cap_first(actor_get)
-    ifaces = actor_first.get("implementedInterfaces") or []
+    ifaces = actor_first.get("ImplementedInterfaces") or []
     assert any("BPI_Test" in str(x) for x in ifaces), actor_get
 
 
 def test_bp_add_macro_timeline_dispatcher(mcp, bp_path):
     r = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=bp_path,
-        operations=[
-            {"action": "add_macro", "functionName": "NxMacro"},
-            {"action": "add_timeline", "functionName": "NxTimeline"},
-            {"action": "add_dispatcher", "variableName": "NxDisp"},
-            {"action": "add_local_variable", "functionName": "NxMacro", "variableName": "NxLocal"},
+        "ManageAssetBlueprint",
+        AssetPath=bp_path,
+        Operations=[
+            {"Action": "AddMacro", "FunctionName": "NxMacro"},
+            {"Action": "AddTimeline", "FunctionName": "NxTimeline"},
+            {"Action": "AddDispatcher", "VariableName": "NxDisp"},
+            {"Action": "AddLocalVariable", "FunctionName": "NxMacro", "VariableName": "NxLocal"},
         ],
     )
     entry = cap_first(r)
     assert isinstance(entry, dict), r
-    assert not entry.get("error"), r
+    assert not entry.get("Error"), r
 
 
 def test_bp_compile_status(mcp, bp_path):
-    r = mcp.call_capability("get_asset_blueprint", assetPath=bp_path)
+    r = mcp.call_capability("GetAssetBlueprint", AssetPath=bp_path)
     payload = cap_first(r)
-    assert payload.get("compileStatus"), payload
-    assert "hasCompilerErrors" in payload, payload
+    assert payload.get("CompileStatus"), payload
+    assert "bHasCompilerErrors" in payload, payload
 
 
 def test_bp_orphaned_pins(test_ns, mcp):
     path = f"{test_ns}/BP_OrphanPins"
-    mcp.call_capability("create_asset_blueprint", assetPath=path, parentClass="Actor")
+    mcp.call_capability("CreateAssetBlueprint", AssetPath=path, ParentClass="Actor")
     add = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=path,
-        operations=[{
-            "action": "add_variable",
-            "variableName": "OrphanProbe",
-            "variableType": "float",
+        "ManageAssetBlueprint",
+        AssetPath=path,
+        Operations=[{
+            "Action": "AddVariable",
+            "VariableName": "OrphanProbe",
+            "VariableType": "float",
         }],
     )
-    assert not cap_first(add).get("error"), add
+    assert not cap_first(add).get("Error"), add
     get_node = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=path,
-        operations=[{
-            "action": "add_node",
-            "graphName": "EventGraph",
-            "nodeClass": "K2Node_VariableGet",
-            "variableName": "OrphanProbe",
-            "posX": 800, "posY": 400,
+        "ManageAssetBlueprint",
+        AssetPath=path,
+        Operations=[{
+            "Action": "AddNode",
+            "GraphName": "EventGraph",
+            "NodeClass": "K2Node_VariableGet",
+            "VariableName": "OrphanProbe",
+            "PosX": 800, "PosY": 400,
         }],
     )
-    assert cap_first(get_node).get("nodeId"), get_node
+    assert cap_first(get_node).get("NodeId"), get_node
     rm = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=path,
-        operations=[{"action": "remove_variable", "variableName": "OrphanProbe"}],
-        compile=True,
+        "ManageAssetBlueprint",
+        AssetPath=path,
+        Operations=[{"Action": "RemoveVariable", "VariableName": "OrphanProbe"}],
+        bCompile=True,
     )
-    assert not cap_first(rm).get("error"), rm
+    assert not cap_first(rm).get("Error"), rm
     got = mcp.call_capability(
-        "get_asset_blueprint", assetPath=path, sections=["orphaned"],
+        "GetAssetBlueprint", AssetPath=path, Sections=["orphaned"],
     )
     payload = cap_first(got)
-    pins = payload.get("orphanedPins")
+    pins = payload.get("OrphanedPins")
     assert isinstance(pins, list), payload
     if pins:
-        assert pins[0].get("nodeId") and pins[0].get("pinName"), pins[0]
+        assert pins[0].get("NodeId") and pins[0].get("PinName"), pins[0]
 
 
 def test_bp_exec_paths(test_ns, mcp):
     path = f"{test_ns}/BP_ExecPaths"
-    mcp.call_capability("create_asset_blueprint", assetPath=path, parentClass="Actor")
+    mcp.call_capability("CreateAssetBlueprint", AssetPath=path, ParentClass="Actor")
     ensure = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=path,
-        operations=[{
-            "action": "add_node",
-            "graphName": "EventGraph",
-            "nodeClass": "K2Node_Event",
-            "functionName": "ReceiveBeginPlay",
-            "posX": 0, "posY": 0,
+        "ManageAssetBlueprint",
+        AssetPath=path,
+        Operations=[{
+            "Action": "AddNode",
+            "GraphName": "EventGraph",
+            "NodeClass": "K2Node_Event",
+            "FunctionName": "ReceiveBeginPlay",
+            "PosX": 0, "PosY": 0,
         }],
     )
-    begin_id = cap_first(ensure).get("nodeId")
+    begin_id = cap_first(ensure).get("NodeId")
     assert begin_id, ensure
     add = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=path,
-        operations=[{
-            "action": "add_node",
-            "graphName": "EventGraph",
-            "nodeClass": "K2Node_CallFunction",
-            "functionName": "PrintString",
-            "posX": 420, "posY": 80,
+        "ManageAssetBlueprint",
+        AssetPath=path,
+        Operations=[{
+            "Action": "AddNode",
+            "GraphName": "EventGraph",
+            "NodeClass": "K2Node_CallFunction",
+            "FunctionName": "PrintString",
+            "PosX": 420, "PosY": 80,
         }],
     )
-    print_id = cap_first(add).get("nodeId")
+    print_id = cap_first(add).get("NodeId")
     assert print_id, add
     graph = mcp.call_capability(
-        "get_asset_blueprint",
-        assetPath=path,
-        sections=["graph"],
-        graphName="EventGraph",
+        "GetAssetBlueprint",
+        AssetPath=path,
+        Sections=["graph"],
+        GraphName="EventGraph",
     )
-    nodes = cap_first(graph).get("nodes") or []
-    begin_node = next((n for n in nodes if n.get("nodeId") == begin_id), None)
-    print_node = next((n for n in nodes if n.get("nodeId") == print_id), None)
+    nodes = cap_first(graph).get("Nodes") or []
+    begin_node = next((n for n in nodes if n.get("NodeId") == begin_id), None)
+    print_node = next((n for n in nodes if n.get("NodeId") == print_id), None)
     assert begin_node and print_node, graph
     begin_then = next(
-        (p.get("pinName") for p in (begin_node.get("pins") or [])
-         if p.get("direction") == "output" and p.get("pinCategory") == "exec"),
+        (p.get("PinName") for p in (begin_node.get("Pins") or [])
+         if p.get("Direction") == "Output" and p.get("PinCategory") == "exec"),
         None,
     )
     print_exec = next(
-        (p.get("pinName") for p in (print_node.get("pins") or [])
-         if p.get("direction") == "input" and p.get("pinCategory") == "exec"),
+        (p.get("PinName") for p in (print_node.get("Pins") or [])
+         if p.get("Direction") == "input" and p.get("PinCategory") == "exec"),
         None,
     )
     assert begin_then and print_exec, (begin_node, print_node)
     wire = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=path,
-        operations=[{
-            "action": "connect",
-            "graphName": "EventGraph",
-            "sourceNodeId": begin_id,
-            "sourcePinName": begin_then,
-            "targetNodeId": print_id,
-            "targetPinName": print_exec,
+        "ManageAssetBlueprint",
+        AssetPath=path,
+        Operations=[{
+            "Action": "Connect",
+            "GraphName": "EventGraph",
+            "SourceNodeId": begin_id,
+            "SourcePinName": begin_then,
+            "TargetNodeId": print_id,
+            "TargetPinName": print_exec,
         }],
     )
-    assert not cap_first(wire).get("error"), wire
+    assert not cap_first(wire).get("Error"), wire
     paths = mcp.call_capability(
-        "get_asset_blueprint",
-        assetPath=path,
-        sections=["execPaths"],
-        graphName="EventGraph",
+        "GetAssetBlueprint",
+        AssetPath=path,
+        Sections=["ExecPaths"],
+        GraphName="EventGraph",
     )
     payload = cap_first(paths)
-    chain = payload.get("execPaths") or []
+    chain = payload.get("ExecPaths") or []
     assert chain, payload
-    assert any(len(p.get("nodes") or []) >= 2 for p in chain if isinstance(p, dict)), payload
+    assert any(len(p.get("Nodes") or []) >= 2 for p in chain if isinstance(p, dict)), payload
 
 
 def test_bp_exec_paths_all_needs_graph_name(test_ns, mcp):
     path = f"{test_ns}/BP_ExecAllNote"
-    mcp.call_capability("create_asset_blueprint", assetPath=path, parentClass="Actor")
-    r = mcp.call_capability("get_asset_blueprint", assetPath=path, sections=["all"])
+    mcp.call_capability("CreateAssetBlueprint", AssetPath=path, ParentClass="Actor")
+    r = mcp.call_capability("GetAssetBlueprint", AssetPath=path, Sections=["All"])
     payload = cap_first(r)
-    assert payload.get("compileStatus"), payload
-    assert "graphName required" in str(payload.get("note") or ""), payload
+    assert payload.get("CompileStatus"), payload
+    assert "GraphName required" in str(payload.get("Note") or ""), payload
 
 
 def test_calls_batch_memory_rollback(test_ns, mcp):
     path = f"{test_ns}/BP_UndoBatch"
-    mcp.call_capability("create_asset_blueprint", assetPath=path, parentClass="Actor")
-    batch = mcp._tool_call_raw("call_capability", {
-        "calls": [
+    mcp.call_capability("CreateAssetBlueprint", AssetPath=path, ParentClass="Actor")
+    batch = mcp._tool_call_raw("CallCapability", {
+        "Calls": [
             {
-                "capability": "manage_asset_blueprint",
-                "arguments": {
-                    "assetPath": path,
-                    "operations": [{
-                        "action": "add_variable",
-                        "variableName": "UndoMe",
-                        "variableType": "float",
+                "Capability": "ManageAssetBlueprint",
+                "Arguments": {
+                    "AssetPath": path,
+                    "Operations": [{
+                        "Action": "AddVariable",
+                        "VariableName": "UndoMe",
+                        "VariableType": "float",
                     }],
                 },
             },
             {
-                "capability": "manage_asset_blueprint",
-                "arguments": {"assetPath": path},
+                "Capability": "ManageAssetBlueprint",
+                "Arguments": {"AssetPath": path},
             },
         ],
     })
-    assert batch.get("failureCount", 0) > 0, batch
-    got = mcp.call_capability("get_asset_blueprint", assetPath=path, sections=["variable"])
-    names = [v.get("name") for v in (cap_first(got).get("variables") or [])]
+    assert batch.get("FailureCount", 0) > 0, batch
+    got = mcp.call_capability("GetAssetBlueprint", AssetPath=path, Sections=["variable"])
+    names = [v.get("name") for v in (cap_first(got).get("Variables") or [])]
     assert "UndoMe" not in names, got
 
 
 def test_bp_remaining_manage_actions(mcp, test_ns):
     path = f"{test_ns}/BP_RemainingOps"
-    mcp.call_capability("create_asset_blueprint", assetPath=path, parentClass="Actor")
+    mcp.call_capability("CreateAssetBlueprint", AssetPath=path, ParentClass="Actor")
     iface = f"{test_ns}/BPI_Remaining"
-    mcp.call_capability("create_asset_blueprint", assetPath=iface, parentClass="Interface")
+    mcp.call_capability("CreateAssetBlueprint", AssetPath=iface, ParentClass="Interface")
     mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=path,
-        operations=[
-            {"action": "add_function", "functionName": "TempFn"},
-            {"action": "add_interface", "interfaceName": iface},
-            {"action": "add_component", "componentName": "NxMesh", "componentClass": "StaticMeshComponent"},
+        "ManageAssetBlueprint",
+        AssetPath=path,
+        Operations=[
+            {"Action": "AddFunction", "FunctionName": "TempFn"},
+            {"Action": "AddInterface", "InterfaceName": iface},
+            {"Action": "AddComponent", "ComponentName": "NxMesh", "ComponentClass": "StaticMeshComponent"},
         ],
     )
     add_n = mcp.call_capability(
-        "manage_asset_blueprint",
-        assetPath=path,
-        operations=[{"action": "add_node", "graphName": "EventGraph", "nodeClass": "K2Node_CallFunction", "functionName": "PrintString"}],
+        "ManageAssetBlueprint",
+        AssetPath=path,
+        Operations=[{"Action": "AddNode", "GraphName": "EventGraph", "NodeClass": "K2Node_CallFunction", "FunctionName": "PrintString"}],
     )
-    nid = cap_first(add_n).get("nodeId")
+    nid = cap_first(add_n).get("NodeId")
     ops = [
-        {"action": "set_component_property", "componentName": "NxMesh", "propertyPath": "RelativeLocation.Z", "value": "10"},
-        {"action": "remove_function", "functionName": "TempFn"},
-        {"action": "remove_interface", "interfaceName": iface},
+        {"Action": "SetComponentProperty", "ComponentName": "NxMesh", "PropertyPath": "RelativeLocation.Z", "Value": "10"},
+        {"Action": "RemoveFunction", "FunctionName": "TempFn"},
+        {"Action": "RemoveInterface", "InterfaceName": iface},
     ]
     if nid:
         ops.extend([
-            {"action": "disconnect_all", "sourceNodeId": nid},
-            {"action": "disconnect", "sourceNodeId": nid, "targetNodeId": nid},
+            {"Action": "DisconnectAll", "SourceNodeId": nid},
+            {"Action": "Disconnect", "SourceNodeId": nid, "TargetNodeId": nid},
         ])
-    r = mcp.call_capability("manage_asset_blueprint", assetPath=path, operations=ops)
-    for e in (r.get("results") or [cap_first(r)]):
-        if isinstance(e, dict) and e.get("error"):
+    r = mcp.call_capability("ManageAssetBlueprint", AssetPath=path, Operations=ops)
+    for e in (r.get("Results") or [cap_first(r)]):
+        if isinstance(e, dict) and e.get("Error"):
             pytest.skip(f"blueprint remaining 跳过: {e}")

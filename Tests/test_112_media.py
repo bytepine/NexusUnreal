@@ -12,41 +12,41 @@ pytestmark = pytest.mark.l3_asset
 
 def test_media_source_roundtrip(test_ns, mcp):
     path = f"{test_ns}/MS_Created"
-    cr = mcp.call_capability("create_asset_media_source", assetPath=path)
+    cr = mcp.call_capability("CreateAssetMediaSource", AssetPath=path)
     entry = cap_first(cr)
-    if entry.get("error") and "already exists" not in str(entry.get("error")).lower():
+    if entry.get("Error") and "already exists" not in str(entry.get("Error")).lower():
         pytest.fail(f"create_asset_media_source 失败: {entry}")
 
     man = cap_first(
         mcp.call_capability(
-            "manage_asset_media_source",
-            assetPath=path,
-            operations=[{"action": "set_file_path", "mediaPath": "C:/tmp/nx_dummy.mp4"}],
+            "ManageAssetMediaSource",
+            AssetPath=path,
+            Operations=[{"Action": "SetFilePath", "MediaPath": "C:/tmp/nx_dummy.mp4"}],
         )
     )
-    assert not man.get("error"), man
+    assert not man.get("Error"), man
     loop = cap_first(
         mcp.call_capability(
-            "manage_asset_media_source",
-            assetPath=path,
-            operations=[{"action": "set_loop", "loop": True}],
+            "ManageAssetMediaSource",
+            AssetPath=path,
+            Operations=[{"Action": "SetLoop", "bLoop": True}],
         )
     )
-    if loop.get("error"):
+    if loop.get("Error"):
         pytest.skip(f"media set_loop 跳过: {loop}")
 
-    got = cap_first(mcp.call_capability("get_asset_media_source", assetPath=path))
-    assert not got.get("error"), got
-    assert "mediaPath" in got, got
+    got = cap_first(mcp.call_capability("GetAssetMediaSource", AssetPath=path))
+    assert not got.get("Error"), got
+    assert "MediaPath" in got, got
 
     try:
         bad = cap_first(
             mcp.call_capability(
-                "manage_asset_media_source",
-                assetPath=path,
-                operations=[{"action": "not_real"}],
+                "ManageAssetMediaSource",
+                AssetPath=path,
+                Operations=[{"Action": "not_real"}],
             )
         )
     except MCPError as exc:
-        bad = {"error": str(exc)}
-    assert bad.get("error"), bad
+        bad = {"Error": str(exc)}
+    assert bad.get("Error"), bad

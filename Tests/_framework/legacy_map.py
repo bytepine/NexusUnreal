@@ -26,9 +26,9 @@ def _legacy_json_path() -> Path:
 LEGACY_CAP_NAMES: Dict[str, str] = json.loads(_legacy_json_path().read_text(encoding="utf-8"))
 
 META_TOOLS = frozenset({
-    "search_capabilities",
-    "call_capability",
-    "submit_feedback",
+    "SearchCapabilities",
+    "CallCapability",
+    "SubmitFeedback",
     "list_unreal_instances",
     "connect_unreal_instance",
 })

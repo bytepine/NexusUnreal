@@ -46,7 +46,7 @@ def collect_cpp() -> tuple[dict[str, list[str]], dict[str, list[str]]]:
         if not names:
             continue
         cap = names[0]
-        if cap.startswith("manage_"):
+        if cap.startswith("Manage"):
             actions = HANDLER_RE.findall(txt)
             if not actions:
                 # pose_search 等无 Enum / 仅 handler 名写在 HandlePS_*
@@ -62,10 +62,10 @@ def collect_cpp() -> tuple[dict[str, list[str]], dict[str, list[str]]]:
                     uniq.append(a)
             if uniq:
                 manage[cap] = uniq
-        if cap.startswith("get_") or cap == "get_editor_context" or cap == "get_gameplay_tags":
+        if cap.startswith("Get") or cap == "GetEditorContext" or cap == "GetGameplayTags":
             m = SECTION_RE.search(txt)
             if m:
-                secs = [s for s in TEXT_RE.findall(m.group(1)) if s and s != "all"]
+                secs = [s for s in TEXT_RE.findall(m.group(1)) if s and s != "All"]
                 if secs:
                     sections[cap] = secs
     return manage, sections
@@ -85,7 +85,7 @@ def collect_tests() -> tuple[dict[str, set[str]], dict[str, set[str]], set[str]]
         for blk in SECTIONS_IN_TEST_RE.findall(txt):
             for s in re.findall(r'["\']([^"\']+)["\']', blk):
                 for cap in file_caps:
-                    if cap.startswith("get_"):
+                    if cap.startswith("Get"):
                         file_sections[cap].add(s)
     return file_actions, file_sections, mentioned_caps
 
@@ -105,7 +105,7 @@ def main() -> int:
     for cap, secs in sorted(sections.items()):
         tested = file_sections.get(cap, set())
         for s in secs:
-            if s not in tested and "all" not in tested:
+            if s not in tested and "All" not in tested:
                 missing_sections.append(f"{cap}  {s}")
 
     print(f"manage caps: {len(manage)}  actions: {sum(len(v) for v in manage.values())}")

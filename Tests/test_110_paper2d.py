@@ -13,120 +13,120 @@ pytestmark = pytest.mark.l3_asset
 
 @pytest.fixture(scope="module", autouse=True)
 def require_paper2d(mcp):
-    if not is_capability_available(mcp, "create_asset_paper_sprite"):
+    if not is_capability_available(mcp, "CreateAssetPaperSprite"):
         pytest.skip("Paper2D capability 未编入（需 WITH_PAPER2D）")
 
 
 def test_paper_sprite_flipbook(test_ns, mcp):
     sp = f"{test_ns}/PS_Created"
-    cr = mcp.call_capability("create_asset_paper_sprite", assetPath=sp)
+    cr = mcp.call_capability("CreateAssetPaperSprite", AssetPath=sp)
     entry = cap_first(cr)
-    if entry.get("error") and "already exists" not in str(entry.get("error")).lower():
+    if entry.get("Error") and "already exists" not in str(entry.get("Error")).lower():
         pytest.fail(f"create_asset_paper_sprite 失败: {entry}")
-    got = cap_first(mcp.call_capability("get_asset_paper_sprite", assetPath=sp))
-    assert not got.get("error"), got
+    got = cap_first(mcp.call_capability("GetAssetPaperSprite", AssetPath=sp))
+    assert not got.get("Error"), got
 
     fb = f"{test_ns}/PF_Created"
-    cr2 = mcp.call_capability("create_asset_paper_flipbook", assetPath=fb)
+    cr2 = mcp.call_capability("CreateAssetPaperFlipbook", AssetPath=fb)
     e2 = cap_first(cr2)
-    if e2.get("error") and "already exists" not in str(e2.get("error")).lower():
+    if e2.get("Error") and "already exists" not in str(e2.get("Error")).lower():
         pytest.fail(f"create_asset_paper_flipbook 失败: {e2}")
     man = cap_first(
         mcp.call_capability(
-            "manage_asset_paper_flipbook",
-            assetPath=fb,
-            operations=[
-                {"action": "add_key", "spritePath": sp, "frameRun": 1},
-                {"action": "set_frames_per_second", "framesPerSecond": 12},
+            "ManageAssetPaperFlipbook",
+            AssetPath=fb,
+            Operations=[
+                {"Action": "AddKey", "SpritePath": sp, "FrameRun": 1},
+                {"Action": "SetFramesPerSecond", "FramesPerSecond": 12},
             ],
         )
     )
-    assert not man.get("error"), man
-    got_fb = cap_first(mcp.call_capability("get_asset_paper_flipbook", assetPath=fb))
-    assert not got_fb.get("error"), got_fb
+    assert not man.get("Error"), man
+    got_fb = cap_first(mcp.call_capability("GetAssetPaperFlipbook", AssetPath=fb))
+    assert not got_fb.get("Error"), got_fb
     rm_key = cap_first(
         mcp.call_capability(
-            "manage_asset_paper_flipbook",
-            assetPath=fb,
-            operations=[{"action": "remove_key", "keyIndex": 0}],
+            "ManageAssetPaperFlipbook",
+            AssetPath=fb,
+            Operations=[{"Action": "RemoveKey", "KeyIndex": 0}],
         )
     )
-    assert not rm_key.get("error"), rm_key
+    assert not rm_key.get("Error"), rm_key
 
 
 def test_paper_sprite_manage_source_pivot(test_ns, mcp):
     sp = f"{test_ns}/PS_Manage"
-    cr = mcp.call_capability("create_asset_paper_sprite", assetPath=sp)
+    cr = mcp.call_capability("CreateAssetPaperSprite", AssetPath=sp)
     entry = cap_first(cr)
-    if entry.get("error") and "already exists" not in str(entry.get("error")).lower():
+    if entry.get("Error") and "already exists" not in str(entry.get("Error")).lower():
         pytest.fail(f"create_asset_paper_sprite 失败: {entry}")
     tex = None
     listing = mcp.call_capability(
-        "search_asset", assetType="Texture2D", pathFilter="/Game/", limit=5
+        "SearchAsset", AssetType="Texture2D", PathFilter="/Game/", Limit=5
     )
     payload = cap_first(listing)
-    for row in payload.get("assets") or []:
-        tex = row.get("assetPath") or row.get("path")
+    for row in payload.get("Assets") or []:
+        tex = row.get("AssetPath") or row.get("Path")
         if tex:
             break
-    ops = [{"action": "set_pivot", "pivotX": 0.5, "pivotY": 0.5}]
+    ops = [{"Action": "SetPivot", "PivotX": 0.5, "PivotY": 0.5}]
     if tex:
-        ops.insert(0, {"action": "set_source", "sourceTexturePath": tex})
-    r = mcp.call_capability("manage_asset_paper_sprite", assetPath=sp, operations=ops)
-    for e in (r.get("results") or [cap_first(r)]):
+        ops.insert(0, {"Action": "SetSource", "SourceTexturePath": tex})
+    r = mcp.call_capability("ManageAssetPaperSprite", AssetPath=sp, Operations=ops)
+    for e in (r.get("Results") or [cap_first(r)]):
         if isinstance(e, dict):
-            assert not e.get("error"), r
+            assert not e.get("Error"), r
 
 
 def test_paper_tile_map_create_get_manage(test_ns, mcp):
-    if not is_capability_available(mcp, "create_asset_paper_tile_map"):
+    if not is_capability_available(mcp, "CreateAssetPaperTileMap"):
         pytest.skip("create_asset_paper_tile_map 未编入")
     path = f"{test_ns}/PTM_Created"
     cr = mcp.call_capability(
-        "create_asset_paper_tile_map",
-        assetPath=path,
-        mapWidth=8,
-        mapHeight=8,
-        tileWidth=32,
-        tileHeight=32,
+        "CreateAssetPaperTileMap",
+        AssetPath=path,
+        MapWidth=8,
+        MapHeight=8,
+        TileWidth=32,
+        TileHeight=32,
     )
     entry = cap_first(cr)
-    if entry.get("error") and "already exists" not in str(entry.get("error")).lower():
+    if entry.get("Error") and "already exists" not in str(entry.get("Error")).lower():
         pytest.fail(f"create_asset_paper_tile_map 失败: {entry}")
-    got = cap_first(mcp.call_capability("get_asset_paper_tile_map", assetPath=path))
-    assert not got.get("error"), got
+    got = cap_first(mcp.call_capability("GetAssetPaperTileMap", AssetPath=path))
+    assert not got.get("Error"), got
 
     tile_set = None
     listing = mcp.call_capability(
-        "search_asset", assetType="PaperTileSet", pathFilter="/Game/", limit=3
+        "SearchAsset", AssetType="PaperTileSet", PathFilter="/Game/", Limit=3
     )
-    for row in (cap_first(listing).get("assets") or []):
-        tile_set = row.get("assetPath") or row.get("path")
+    for row in (cap_first(listing).get("Assets") or []):
+        tile_set = row.get("AssetPath") or row.get("Path")
         if tile_set:
             break
     ops = [
-        {"action": "set_map_size", "mapWidth": 4, "mapHeight": 4},
-        {"action": "set_tile_size", "tileWidth": 16, "tileHeight": 16},
-        {"action": "add_layer", "layerName": "NxLayer"},
-        {"action": "set_layer_name", "layerIndex": 0, "layerName": "NxBase"},
+        {"Action": "SetMapSize", "MapWidth": 4, "MapHeight": 4},
+        {"Action": "SetTileSize", "TileWidth": 16, "TileHeight": 16},
+        {"Action": "AddLayer", "LayerName": "NxLayer"},
+        {"Action": "SetLayerName", "LayerIndex": 0, "LayerName": "NxBase"},
     ]
     if tile_set:
-        ops.insert(2, {"action": "set_tileset", "tileSetPath": tile_set})
+        ops.insert(2, {"Action": "SetTileset", "TileSetPath": tile_set})
         ops.extend(
             [
-                {"action": "set_cell", "layerIndex": 0, "x": 0, "y": 0, "tileIndex": 0},
-                {"action": "clear_cell", "layerIndex": 0, "x": 0, "y": 0},
+                {"Action": "SetCell", "LayerIndex": 0, "x": 0, "y": 0, "TileIndex": 0},
+                {"Action": "ClearCell", "LayerIndex": 0, "x": 0, "y": 0},
             ]
         )
-    r = mcp.call_capability("manage_asset_paper_tile_map", assetPath=path, operations=ops)
-    for e in (r.get("results") or [cap_first(r)]):
+    r = mcp.call_capability("ManageAssetPaperTileMap", AssetPath=path, Operations=ops)
+    for e in (r.get("Results") or [cap_first(r)]):
         if isinstance(e, dict):
-            assert not e.get("error"), r
+            assert not e.get("Error"), r
     rm = mcp.call_capability(
-        "manage_asset_paper_tile_map",
-        assetPath=path,
-        operations=[{"action": "remove_layer", "layerIndex": 1}],
+        "ManageAssetPaperTileMap",
+        AssetPath=path,
+        Operations=[{"Action": "RemoveLayer", "LayerIndex": 1}],
     )
     rm_e = cap_first(rm)
-    if rm_e.get("error"):
+    if rm_e.get("Error"):
         pytest.skip(f"remove_layer 跳过: {rm_e}")

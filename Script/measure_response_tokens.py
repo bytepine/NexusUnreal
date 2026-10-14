@@ -87,20 +87,20 @@ def _expand_diff_baseline(container: Dict[str, Any]) -> Dict[str, Any]:
     """把 baseline.values 回填到每条 diff 的 valueA 字段，反演 P2 压缩。"""
     dup = copy.deepcopy(container)
     baseline = dup.get("baseline") or {}
-    values = baseline.get("values") if isinstance(baseline, dict) else None
+    values = baseline.get("Values") if isinstance(baseline, dict) else None
     if not isinstance(values, dict) or not values:
         return dup
 
     for comp in dup.get("comparisons") or []:
         if not isinstance(comp, dict):
             continue
-        for d in comp.get("diffs") or []:
+        for d in comp.get("Diffs") or []:
             if not isinstance(d, dict):
                 continue
-            path = d.get("path")
-            if isinstance(path, str) and path in values and "valueA" not in d:
-                d["valueA"] = values[path]
-    baseline.pop("values", None)
+            path = d.get("Path")
+            if isinstance(path, str) and path in values and "ValueA" not in d:
+                d["ValueA"] = values[path]
+    baseline.pop("Values", None)
     return dup
 
 
@@ -133,24 +133,24 @@ def _load_tiktoken():
 
 def _probe_asset_path(mcp: MCPClient) -> Optional[str]:
     try:
-        r = mcp.call("search_asset", assetType="Blueprint", limit=1)
+        r = mcp.call("SearchAsset", AssetType="Blueprint", Limit=1)
     except MCPError:
         return None
-    assets = r.get("assets") or []
+    assets = r.get("Assets") or []
     if not assets:
         return None
     first = assets[0]
-    return first.get("path") or first.get("assetPath")
+    return first.get("Path") or first.get("AssetPath")
 
 
 def _probe_actor_names(mcp: MCPClient, max_count: int = 5) -> List[str]:
     try:
-        r = mcp.call("list_actors", limit=50)
+        r = mcp.call("list_actors", Limit=50)
     except MCPError:
         return []
     out: List[str] = []
     defaults = r.get("actors_defaults") or {}
-    for a in r.get("actors") or []:
+    for a in r.get("Actors") or []:
         if not isinstance(a, dict):
             continue
         name = a.get("name") or defaults.get("name")
@@ -169,238 +169,238 @@ def _scenarios(mcp: MCPClient) -> List[Tuple[str, Dict[str, Any], List[Tuple[str
 
     # list_actors
     try:
-        r = mcp.call("list_actors", limit=200)
-        out.append(("list_actors", r, [("actors", "actors")]))
+        r = mcp.call("list_actors", Limit=200)
+        out.append(("list_actors", r, [("Actors", "Actors")]))
     except MCPError as e:
-        print(f"[skip] list_actors: {e}", file=sys.stderr)
+        print(f"[skip] list_actors: {e}", File=sys.stderr)
 
     # search_asset (Blueprint-only 扎堆)
     try:
-        r = mcp.call("search_asset", assetType="Blueprint", limit=200)
-        out.append(("search_asset(assetType=Blueprint)", r, [("assets", "assets")]))
+        r = mcp.call("SearchAsset", AssetType="Blueprint", Limit=200)
+        out.append(("search_asset(AssetType=Blueprint)", r, [("Assets", "Assets")]))
     except MCPError as e:
-        print(f"[skip] search_asset Blueprint: {e}", file=sys.stderr)
+        print(f"[skip] search_asset Blueprint: {e}", File=sys.stderr)
 
     # search_asset all
     try:
-        r = mcp.call("search_asset", assetType="all", limit=200)
-        out.append(("search_asset(assetType=all)", r, [("assets", "assets")]))
+        r = mcp.call("SearchAsset", AssetType="All", Limit=200)
+        out.append(("search_asset(AssetType=all)", r, [("Assets", "Assets")]))
     except MCPError as e:
-        print(f"[skip] search_asset all: {e}", file=sys.stderr)
+        print(f"[skip] search_asset all: {e}", File=sys.stderr)
 
-    # get_asset section=all（单个 BP）
+    # get_asset Section=all（单个 BP）
     bp = _probe_asset_path(mcp)
     if bp:
         try:
-            r = mcp.call("get_asset", assetPaths=[bp], section="all")
+            r = mcp.call("GetAsset", assetPaths=[bp], Section="All")
             # get_asset 是批量返回 results[]，每项一个 BP；取第一个做度量
-            first = (r.get("results") or [{}])[0]
-            if isinstance(first, dict) and not first.get("error"):
+            first = (r.get("Results") or [{}])[0]
+            if isinstance(first, dict) and not first.get("Error"):
                 out.append((
-                    f"get_asset({bp}, section=all)", first,
-                    [("properties", "properties"), ("graphs", "graphs")],
+                    f"get_asset({bp}, Section=all)", first,
+                    [("properties", "properties"), ("Graphs", "Graphs")],
                 ))
         except MCPError as e:
-            print(f"[skip] get_asset: {e}", file=sys.stderr)
+            print(f"[skip] get_asset: {e}", File=sys.stderr)
 
-    # get_asset BP section=defaults（inherited:true 占主导）
+    # get_asset BP Section=defaults（inherited:true 占主导）
     if bp:
         try:
-            r = mcp.call("get_asset", assetPaths=[bp], section="defaults", limit=200)
-            first = (r.get("results") or [{}])[0]
-            if isinstance(first, dict) and not first.get("error") and isinstance(first.get("defaults"), list):
+            r = mcp.call("GetAsset", assetPaths=[bp], Section="Defaults", Limit=200)
+            first = (r.get("Results") or [{}])[0]
+            if isinstance(first, dict) and not first.get("Error") and isinstance(first.get("Defaults"), list):
                 out.append((
-                    f"get_asset({bp.rsplit('/', 1)[-1]}, section=defaults)",
-                    first, [("defaults", "defaults")],
+                    f"get_asset({bp.rsplit('/', 1)[-1]}, Section=defaults)",
+                    first, [("Defaults", "Defaults")],
                 ))
         except MCPError as e:
-            print(f"[skip] get_asset defaults: {e}", file=sys.stderr)
+            print(f"[skip] get_asset defaults: {e}", File=sys.stderr)
 
-    # get_asset BP section=graph（指定 graphName，单图内节点 nodeClass 扎堆最高）
+    # get_asset BP Section=graph（指定 graphName，单图内节点 nodeClass 扎堆最高）
     if bp:
         try:
-            overview = mcp.call("get_asset", assetPaths=[bp], section="graph")
-            entries = overview.get("results") or []
+            overview = mcp.call("GetAsset", assetPaths=[bp], Section="graph")
+            entries = overview.get("Results") or []
             first = entries[0] if entries else {}
-            graphs_list = first.get("graphs") or []
+            graphs_list = first.get("Graphs") or []
             graphs_defaults = first.get("graphs_defaults") or {}
             target_graph = None
             for g in graphs_list:
                 if not isinstance(g, dict):
                     continue
-                node_count = g.get("nodeCount", graphs_defaults.get("nodeCount", 0))
-                if node_count and node_count > 0 and g.get("graphName"):
-                    target_graph = g["graphName"]
+                node_count = g.get("NodeCount", graphs_defaults.get("NodeCount", 0))
+                if node_count and node_count > 0 and g.get("GraphName"):
+                    target_graph = g["GraphName"]
                     break
             if target_graph:
-                gr = mcp.call("get_asset", assetPaths=[bp], section="graph", graphName=target_graph)
-                gfirst = (gr.get("results") or [{}])[0]
-                if isinstance(gfirst, dict) and not gfirst.get("error"):
+                gr = mcp.call("GetAsset", assetPaths=[bp], Section="graph", GraphName=target_graph)
+                gfirst = (gr.get("Results") or [{}])[0]
+                if isinstance(gfirst, dict) and not gfirst.get("Error"):
                     out.append((
                         f"get_asset(graph={target_graph}, BP={bp.rsplit('/', 1)[-1]})",
-                        gfirst, [("nodes", "nodes")],
+                        gfirst, [("Nodes", "Nodes")],
                     ))
         except MCPError as e:
-            print(f"[skip] get_asset graph: {e}", file=sys.stderr)
+            print(f"[skip] get_asset graph: {e}", File=sys.stderr)
 
-    # get_asset Material section=params
+    # get_asset Material Section=params
     mat = None
     try:
-        lr = mcp.call("search_asset", assetType="Material", limit=1)
-        la = lr.get("assets") or []
+        lr = mcp.call("SearchAsset", AssetType="Material", Limit=1)
+        la = lr.get("Assets") or []
         if la:
             mat_defaults = lr.get("assets_defaults") or {}
             combined = dict(mat_defaults); combined.update(la[0])
-            mat = combined.get("path") or combined.get("assetPath")
+            mat = combined.get("Path") or combined.get("AssetPath")
     except MCPError:
         pass
     if mat:
         try:
-            r = mcp.call("get_asset", assetPaths=[mat], section="params")
-            first = (r.get("results") or [{}])[0]
-            if isinstance(first, dict) and not first.get("error") and isinstance(first.get("parameters"), list):
+            r = mcp.call("GetAsset", assetPaths=[mat], Section="Params")
+            first = (r.get("Results") or [{}])[0]
+            if isinstance(first, dict) and not first.get("Error") and isinstance(first.get("Parameters"), list):
                 out.append((
                     f"get_asset(Material params)", first,
-                    [("parameters", "parameters")],
+                    [("Parameters", "Parameters")],
                 ))
         except MCPError as e:
-            print(f"[skip] get_asset Material params: {e}", file=sys.stderr)
+            print(f"[skip] get_asset Material params: {e}", File=sys.stderr)
 
     # get_asset UserDefinedStruct
     uds = None
     try:
-        lr = mcp.call("search_asset", assetType="UserDefinedStruct", limit=1)
-        la = lr.get("assets") or []
+        lr = mcp.call("SearchAsset", AssetType="UserDefinedStruct", Limit=1)
+        la = lr.get("Assets") or []
         if la:
             uds_defaults = lr.get("assets_defaults") or {}
             combined = dict(uds_defaults); combined.update(la[0])
-            uds = combined.get("path") or combined.get("assetPath")
+            uds = combined.get("Path") or combined.get("AssetPath")
     except MCPError:
         pass
     if uds:
         try:
-            r = mcp.call("get_asset", assetPaths=[uds])
-            first = (r.get("results") or [{}])[0]
-            if isinstance(first, dict) and not first.get("error") and isinstance(first.get("fields"), list):
+            r = mcp.call("GetAsset", assetPaths=[uds])
+            first = (r.get("Results") or [{}])[0]
+            if isinstance(first, dict) and not first.get("Error") and isinstance(first.get("Fields"), list):
                 out.append((
                     f"get_asset(Struct fields)", first,
-                    [("fields", "fields")],
+                    [("Fields", "Fields")],
                 ))
         except MCPError as e:
-            print(f"[skip] get_asset Struct: {e}", file=sys.stderr)
+            print(f"[skip] get_asset Struct: {e}", File=sys.stderr)
 
     # get_asset_user_widget
     wbp = None
     try:
-        lr = mcp.call("search_asset", assetType="WidgetBlueprint", limit=1)
-        la = lr.get("assets") or []
+        lr = mcp.call("SearchAsset", AssetType="WidgetBlueprint", Limit=1)
+        la = lr.get("Assets") or []
         if la:
             wbp_defaults = lr.get("assets_defaults") or {}
             combined = dict(wbp_defaults); combined.update(la[0])
-            wbp = combined.get("path") or combined.get("assetPath")
+            wbp = combined.get("Path") or combined.get("AssetPath")
     except MCPError:
         pass
     if wbp:
         try:
-            r = mcp.call("get_asset_user_widget", assetPath=wbp, limit=500)
+            r = mcp.call("GetAssetUserWidget", AssetPath=wbp, Limit=500)
             out.append((
                 f"get_asset_user_widget({wbp.rsplit('/', 1)[-1]})", r,
-                [("widgets", "widgets")],
+                [("Widgets", "Widgets")],
             ))
         except MCPError as e:
-            print(f"[skip] get_asset_user_widget: {e}", file=sys.stderr)
+            print(f"[skip] get_asset_user_widget: {e}", File=sys.stderr)
 
     # list_runtime_widgets（PIE 中才有数据；无数据自动无场景）
     try:
-        r = mcp.call("list_runtime_widgets", limit=500)
-        if r.get("widgets"):
-            out.append(("list_runtime_widgets", r, [("widgets", "widgets")]))
+        r = mcp.call("ListRuntimeWidgets", Limit=500)
+        if r.get("Widgets"):
+            out.append(("ListRuntimeWidgets", r, [("Widgets", "Widgets")]))
     except MCPError as e:
-        print(f"[skip] list_runtime_widgets: {e}", file=sys.stderr)
+        print(f"[skip] list_runtime_widgets: {e}", File=sys.stderr)
 
     # get_output_log（无 categoryFilter，统计路径）
     try:
-        r = mcp.call("get_output_log", limit=500, verbosity="log")
-        if r.get("entries"):
-            out.append(("get_output_log(limit=500)", r, [("entries", "entries")]))
+        r = mcp.call("GetOutputLog", Limit=500, Verbosity="Log")
+        if r.get("Entries"):
+            out.append(("get_output_log(Limit=500)", r, [("Entries", "Entries")]))
     except MCPError as e:
-        print(f"[skip] get_output_log: {e}", file=sys.stderr)
+        print(f"[skip] get_output_log: {e}", File=sys.stderr)
 
     # get_output_log（categoryFilter 强制默认路径，P0 优化）
     try:
-        r = mcp.call("get_output_log", categoryFilter="LogTemp", limit=200, verbosity="all")
-        if r.get("entries"):
-            out.append(("get_output_log(categoryFilter=LogTemp)", r, [("entries", "entries")]))
+        r = mcp.call("GetOutputLog", CategoryFilter="LogTemp", Limit=200, Verbosity="All")
+        if r.get("Entries"):
+            out.append(("get_output_log(CategoryFilter=LogTemp)", r, [("Entries", "Entries")]))
     except MCPError as e:
-        print(f"[skip] get_output_log categoryFilter: {e}", file=sys.stderr)
+        print(f"[skip] get_output_log categoryFilter: {e}", File=sys.stderr)
 
     # get_gameplay_tags hierarchy（树 children 或扁平 tags）
     try:
-        r = mcp.call("get_gameplay_tags", section="hierarchy", limit=500)
-        if r.get("tags"):
-            out.append(("get_gameplay_tags(hierarchy)", r, [("tags", "tags")]))
+        r = mcp.call("GetGameplayTags", Section="Hierarchy", Limit=500)
+        if r.get("Tags"):
+            out.append(("get_gameplay_tags(hierarchy)", r, [("Tags", "Tags")]))
     except MCPError as e:
-        print(f"[skip] get_gameplay_tags: {e}", file=sys.stderr)
+        print(f"[skip] get_gameplay_tags: {e}", File=sys.stderr)
 
-    # get_actor_animation section=variables（type + value 字段扎堆）
+    # get_actor_animation Section=variables（type + value 字段扎堆）
     try:
-        actors_r = mcp.call("list_actors", limit=50)
-        actors = actors_r.get("actors") or []
+        actors_r = mcp.call("list_actors", Limit=50)
+        actors = actors_r.get("Actors") or []
         act_def = actors_r.get("actors_defaults") or {}
         anim_target = None
         for a in actors:
             combined = dict(act_def); combined.update(a)
-            cls = combined.get("class", "")
+            cls = combined.get("Class", "")
             if "Character" in cls or "Pawn" in cls:
                 anim_target = combined.get("name")
                 break
         if anim_target:
-            r = mcp.call("get_actor_animation", actorName=anim_target, section="variables")
-            results = r.get("results") or []
+            r = mcp.call("get_actor_animation", ActorName=anim_target, Section="Variables")
+            results = r.get("Results") or []
             first = results[0] if results else {}
-            if isinstance(first.get("variables"), list):
+            if isinstance(first.get("Variables"), list):
                 out.append((
                     f"get_actor_animation(variables,{anim_target})",
-                    first, [("variables", "variables")],
+                    first, [("Variables", "Variables")],
                 ))
     except MCPError as e:
-        print(f"[skip] get_actor_animation variables: {e}", file=sys.stderr)
+        print(f"[skip] get_actor_animation variables: {e}", File=sys.stderr)
 
     # get_behavior_tree blackboard（P2：type 字段扎堆）
     bt_asset = None
     try:
-        lr = mcp.call("search_asset", assetType="BehaviorTree", limit=1)
-        la = lr.get("assets") or []
+        lr = mcp.call("SearchAsset", AssetType="BehaviorTree", Limit=1)
+        la = lr.get("Assets") or []
         if la:
             bt_defaults = lr.get("assets_defaults") or {}
             combined = dict(bt_defaults); combined.update(la[0])
-            bt_asset = combined.get("path") or combined.get("assetPath")
+            bt_asset = combined.get("Path") or combined.get("AssetPath")
     except MCPError:
         pass
     if bt_asset:
         try:
-            r = mcp.call("get_behavior_tree", section="blackboard", assetPath=bt_asset)
-            if r.get("keys"):
+            r = mcp.call("get_behavior_tree", Section="Blackboard", AssetPath=bt_asset)
+            if r.get("Keys"):
                 out.append((
                     f"get_behavior_tree(blackboard,{bt_asset.rsplit('/', 1)[-1]})",
-                    r, [("keys", "keys")],
+                    r, [("Keys", "Keys")],
                 ))
         except MCPError as e:
-            print(f"[skip] get_behavior_tree blackboard: {e}", file=sys.stderr)
+            print(f"[skip] get_behavior_tree blackboard: {e}", File=sys.stderr)
 
-    # get_property section=all（Actor 组件树；components_defaults / hierarchy_defaults 压缩）
+    # get_property Section=all（Actor 组件树；components_defaults / hierarchy_defaults 压缩）
     actor_names = _probe_actor_names(mcp, max_count=1)
     if actor_names:
         try:
-            r = mcp.call("get_property", actorName=actor_names[0], section="all")
-            if r.get("components") or r.get("hierarchy"):
+            r = mcp.call("get_property", ActorName=actor_names[0], Section="All")
+            if r.get("Components") or r.get("Hierarchy"):
                 out.append((
-                    f"get_property({actor_names[0][:20]},section=all)",
+                    f"get_property({actor_names[0][:20]},Section=all)",
                     r,
-                    [("components", "components"), ("hierarchy", "hierarchy")],
+                    [("Components", "Components"), ("Hierarchy", "Hierarchy")],
                 ))
         except MCPError as e:
-            print(f"[skip] get_property section=all: {e}", file=sys.stderr)
+            print(f"[skip] get_property Section=all: {e}", File=sys.stderr)
 
     return out
 
@@ -411,11 +411,11 @@ def _measure_asset_refs(mcp: MCPClient) -> Optional[Tuple[str, Dict[str, Any]]]:
     if not bp:
         return None
     try:
-        r = mcp.call("get_asset_refs", assetPaths=[bp], direction="dependencies", limit=500)
+        r = mcp.call("GetAssetRefs", assetPaths=[bp], Direction="Dependencies", Limit=500)
     except MCPError as e:
-        print(f"[skip] get_asset_refs: {e}", file=sys.stderr)
+        print(f"[skip] get_asset_refs: {e}", File=sys.stderr)
         return None
-    if not r.get("results"):
+    if not r.get("Results"):
         return None
     return (f"get_asset_refs({bp.rsplit('/', 1)[-1]})", r)
 
@@ -427,7 +427,7 @@ def _measure_diff_actors(mcp: MCPClient) -> Optional[Tuple[str, Dict[str, Any]]]
     try:
         r = mcp.call("diff_actors", actorNames=names)
     except MCPError as e:
-        print(f"[skip] diff_actors: {e}", file=sys.stderr)
+        print(f"[skip] diff_actors: {e}", File=sys.stderr)
         return None
     return (f"diff_actors(N={len(names)})", r)
 
@@ -444,13 +444,13 @@ def main() -> int:
 
     encoder = _load_tiktoken()
     if encoder is None:
-        print("[info] tiktoken not installed — token count is a 4-char heuristic", file=sys.stderr)
+        print("[info] tiktoken not installed — token count is a 4-char heuristic", File=sys.stderr)
 
     mcp = MCPClient(args.ue_url)
     try:
         mcp.initialize()
     except Exception as e:
-        print(f"[fatal] initialize failed: {e}", file=sys.stderr)
+        print(f"[fatal] initialize failed: {e}", File=sys.stderr)
         return 2
 
     rows: List[Tuple[str, int, int, int, int]] = []  # (name, after_bytes, before_bytes, after_tokens, before_tokens)
@@ -468,7 +468,7 @@ def main() -> int:
     refs = _measure_asset_refs(mcp)
     if refs:
         name, body = refs
-        expanded = _expand_nested_defaults(body, "results", "refs", "refs")
+        expanded = _expand_nested_defaults(body, "Results", "Refs", "Refs")
         after_b = _json_bytes(body)
         before_b = _json_bytes(expanded)
         after_t = _token_count(body, encoder)
@@ -508,7 +508,7 @@ def main() -> int:
             f"{total_after_t:>12}{total_before_t:>14}{tst*100:>9.1f}%"
         )
     else:
-        print("[warn] no scenarios were measured", file=sys.stderr)
+        print("[warn] no scenarios were measured", File=sys.stderr)
         return 1
 
     return 0

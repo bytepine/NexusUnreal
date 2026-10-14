@@ -13,117 +13,117 @@ pytestmark = pytest.mark.l3_asset
 
 def test_compile_blueprint_test_actor(test_ns, mcp, require_tools):
     """compile_blueprint：编译 test_ns 中 BP_TestActor。"""
-    require_tools("compile_blueprint")
+    require_tools("CompileBlueprint")
     bp = ensure_blueprint(mcp, test_ns, "BP_TestActor")
-    r = mcp.call_capability("compile_blueprint", assetPath=bp)
+    r = mcp.call_capability("CompileBlueprint", AssetPath=bp)
     entry = cap_first(r)
-    assert not entry.get("error"), entry
+    assert not entry.get("Error"), entry
     # compile 成功时可能仍带 compilerWarnings；无 error 且无显式 success:false 即可
-    assert entry.get("success") is not False, entry
+    assert entry.get("bSuccess") is not False, entry
 
 
 @pytest.mark.requires_gui
 def test_get_asset_texture_project_sample(mcp, require_tools):
     """get_asset_texture：项目内找一张 Texture2D 做只读快照。"""
-    require_tools("get_asset_texture")
+    require_tools("GetAssetTexture")
     listing = mcp.call_capability(
-        "search_asset",
-        assetType="Texture2D",
-        pathFilter="/Game/Characters/Mannequins/Textures",
-        limit=10,
+        "SearchAsset",
+        AssetType="Texture2D",
+        PathFilter="/Game/Characters/Mannequins/Textures",
+        Limit=10,
     )
     payload = cap_first(listing)
     path = None
-    for row in payload.get("assets") or []:
-        candidate = row.get("assetPath") or row.get("path")
+    for row in payload.get("Assets") or []:
+        candidate = row.get("AssetPath") or row.get("Path")
         if not candidate:
             continue
-        probe = mcp.call_capability("get_asset_texture", assetPath=candidate)
+        probe = mcp.call_capability("GetAssetTexture", AssetPath=candidate)
         entry = cap_first(probe)
-        if not entry.get("error") and entry.get("width") and entry.get("height"):
+        if not entry.get("Error") and entry.get("Width") and entry.get("Height"):
             path = candidate
             break
     if not path:
         path = "/Game/Characters/Mannequins/Textures/Quinn/T_Quinn_01_N"
     assert path, "无法定位有效 Texture2D 样本"
-    r = mcp.call_capability("get_asset_texture", assetPath=path)
+    r = mcp.call_capability("GetAssetTexture", AssetPath=path)
     entry = cap_first(r)
-    assert not entry.get("error"), entry
-    assert entry.get("width") and entry.get("height"), entry
+    assert not entry.get("Error"), entry
+    assert entry.get("Width") and entry.get("Height"), entry
 
 
 def test_get_asset_static_mesh_project_sample(mcp, require_tools):
     """get_asset_static_mesh：项目内找 StaticMesh 做只读快照。"""
-    require_tools("get_asset_static_mesh")
+    require_tools("GetAssetStaticMesh")
     path = first_asset_path(mcp, "StaticMesh")
     assert path, "无法定位 StaticMesh 样本"
-    r = mcp.call_capability("get_asset_static_mesh", assetPath=path)
+    r = mcp.call_capability("GetAssetStaticMesh", AssetPath=path)
     entry = cap_first(r)
-    assert not entry.get("error"), entry
-    assert "lodCount" in entry or "materialSlots" in entry, entry
+    assert not entry.get("Error"), entry
+    assert "LODCount" in entry or "MaterialSlots" in entry, entry
 
 
 def test_manage_static_mesh_collision_and_socket(mcp, require_tools):
     """P1：StaticMesh 碰撞复杂度 + Box + Socket + LOD ScreenSize。"""
-    require_tools("manage_asset_static_mesh", "get_asset_static_mesh")
+    require_tools("ManageAssetStaticMesh", "GetAssetStaticMesh")
     path = first_asset_path(mcp, "StaticMesh")
     assert path, "无法定位 StaticMesh 样本"
     sock = "NxTestSocket"
     ops = [
-        {"action": "set_collision_trace_flag", "collisionTraceFlag": "UseSimpleAsComplex"},
-        {"action": "clear_simple_collision"},
-        {"action": "add_box_collision", "extentX": 20, "extentY": 20, "extentZ": 20},
-        {"action": "add_socket", "socketName": sock, "locX": 1, "locY": 2, "locZ": 3},
-        {"action": "set_lod_screen_size", "lodIndex": 0, "screenSize": 0.9},
+        {"Action": "SetCollisionTraceFlag", "CollisionTraceFlag": "UseSimpleAsComplex"},
+        {"Action": "ClearSimpleCollision"},
+        {"Action": "AddBoxCollision", "ExtentX": 20, "ExtentY": 20, "ExtentZ": 20},
+        {"Action": "AddSocket", "SocketName": sock, "LocX": 1, "LocY": 2, "LocZ": 3},
+        {"Action": "SetLODScreenSize", "LODIndex": 0, "ScreenSize": 0.9},
     ]
-    r = mcp.call_capability("manage_asset_static_mesh", assetPath=path, operations=ops)
-    for e in (r.get("results") or [cap_first(r)]):
+    r = mcp.call_capability("ManageAssetStaticMesh", AssetPath=path, Operations=ops)
+    for e in (r.get("Results") or [cap_first(r)]):
         if isinstance(e, dict):
-            assert not e.get("error"), r
-    got = cap_first(mcp.call_capability("get_asset_static_mesh", assetPath=path))
-    assert not got.get("error"), got
-    col = got.get("collision") or {}
-    assert col.get("boxElemCount", 0) >= 1, got
-    names = [s.get("name") for s in (got.get("sockets") or []) if isinstance(s, dict)]
+            assert not e.get("Error"), r
+    got = cap_first(mcp.call_capability("GetAssetStaticMesh", AssetPath=path))
+    assert not got.get("Error"), got
+    col = got.get("Collision") or {}
+    assert col.get("BoxElemCount", 0) >= 1, got
+    names = [s.get("name") for s in (got.get("Sockets") or []) if isinstance(s, dict)]
     assert sock in names, got
     rm = mcp.call_capability(
-        "manage_asset_static_mesh",
-        assetPath=path,
-        operations=[{"action": "remove_socket", "socketName": sock}],
+        "ManageAssetStaticMesh",
+        AssetPath=path,
+        Operations=[{"Action": "RemoveSocket", "SocketName": sock}],
     )
-    assert not cap_first(rm).get("error"), rm
+    assert not cap_first(rm).get("Error"), rm
 
 
 def test_manage_static_mesh_remaining_actions(mcp, require_tools):
-    require_tools("manage_asset_static_mesh")
+    require_tools("ManageAssetStaticMesh")
     path = first_asset_path(mcp, "StaticMesh")
     assert path, "无法定位 StaticMesh 样本"
     sock = "NxSmSetSock"
     ops = [
-        {"action": "add_sphere_collision", "radius": 10},
-        {"action": "add_socket", "socketName": sock, "locX": 0, "locY": 0, "locZ": 0},
-        {"action": "set_socket", "socketName": sock, "locX": 2, "locY": 3, "locZ": 4},
-        {"action": "remove_socket", "socketName": sock},
-        {"action": "set_property", "propertyPath": "LightMapResolution", "value": "64"},
+        {"Action": "AddSphereCollision", "Radius": 10},
+        {"Action": "AddSocket", "SocketName": sock, "LocX": 0, "LocY": 0, "LocZ": 0},
+        {"Action": "SetSocket", "SocketName": sock, "LocX": 2, "LocY": 3, "LocZ": 4},
+        {"Action": "RemoveSocket", "SocketName": sock},
+        {"Action": "SetProperty", "PropertyPath": "LightMapResolution", "Value": "64"},
     ]
     mat = first_asset_path(mcp, "Material")
     if mat:
-        ops.insert(0, {"action": "set_material_slot", "slotIndex": 0, "materialPath": mat})
-    r = mcp.call_capability("manage_asset_static_mesh", assetPath=path, operations=ops)
-    for e in (r.get("results") or [cap_first(r)]):
-        if isinstance(e, dict) and e.get("error"):
+        ops.insert(0, {"Action": "SetMaterialSlot", "SlotIndex": 0, "MaterialPath": mat})
+    r = mcp.call_capability("ManageAssetStaticMesh", AssetPath=path, Operations=ops)
+    for e in (r.get("Results") or [cap_first(r)]):
+        if isinstance(e, dict) and e.get("Error"):
             pytest.skip(f"manage_asset_static_mesh 剩余 action 跳过: {e}")
 
 
 def test_manage_asset_texture_set_property(mcp, require_tools):
-    require_tools("manage_asset_texture")
+    require_tools("ManageAssetTexture")
     path = first_asset_path(mcp, "Texture2D")
     assert path, "无法定位 Texture2D 样本"
     r = mcp.call_capability(
-        "manage_asset_texture",
-        assetPath=path,
-        operations=[{"action": "set_property", "propertyPath": "sRGB", "value": "true"}],
+        "ManageAssetTexture",
+        AssetPath=path,
+        Operations=[{"Action": "SetProperty", "PropertyPath": "bSRGB", "Value": "true"}],
     )
     entry = cap_first(r)
-    if entry.get("error"):
+    if entry.get("Error"):
         pytest.skip(f"manage_asset_texture 跳过: {entry}")
