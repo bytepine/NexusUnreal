@@ -15,7 +15,7 @@
 | **全量回归 / 全覆盖验证** | **必须 GUI**：`py Script/run_e2e.py --gui` 或 `--full`（含 PIE、UnLua、视口/RHI 等） |
 | **发版验证（NexusLink）** | **按本次变更选**（不改日常默认）：仅编辑器资产 / manage-get / schema → headless；含 PIE / UnLua / 视口 / `l4_runtime`/`lua`/`requires_gui` / `interact_runtime_*` → `--gui`；混合或不清 → `--gui` |
 
-覆盖审计使用 Python AST 静态关联每次调用的 `Operations[].Action` 与 `Sections`，支持局部列表、append/extend/insert/`+=`、循环和参数化用例。多列参数按行保持配对，循环追加的操作保留当次迭代值。未传入调用的字面量不计入覆盖；它只证明源码中存在调用，不证明该分支执行、没有 skip 或断言通过，运行覆盖仍须执行 E2E。审计器自身的回归无需 UE：`py -m unittest discover -s Script/tests -p test_audit_e2e_coverage.py`。
+覆盖审计使用 Python AST 静态关联每次调用的 `Operations[].Action` 与 `Sections`，支持局部列表、append/extend/insert/`+=`、循环和参数化用例（含 `pytest.param`，忽略 `id` / `marks` 元数据）。追加后的参数表保持行配对，容器别名和循环迭代值正确保留，不同用例的变更相互隔离；无法静态展开的参数行仍扫描不依赖参数的固定调用。未传入调用的字面量不计入覆盖；它只证明源码中存在调用，不证明该分支执行、没有 skip 或断言通过，运行覆盖仍须执行 E2E。审计器自身的回归无需 UE：`py -m unittest discover -s Script/tests -p test_audit_e2e_coverage.py`。
 
 ### Marker 选用
 

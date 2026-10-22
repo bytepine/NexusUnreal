@@ -16,6 +16,7 @@ import json
 import re
 import sys
 from collections import defaultdict
+from copy import deepcopy
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -83,9 +84,9 @@ def _expand(node, bindings, seen=frozenset()):
     """只解析源码中的静态值，不导入测试模块或执行测试代码。"""
     if isinstance(node, ast.Name) and node.id in bindings and node.id not in seen:
         yield from _expand(bindings[node.id], bindings, seen | {node.id})
-    elif isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+    elif isinstance(node, (ast.List, ast.Tuple, ast.Set)) and id(node) not in seen:
         for item in node.elts:
-            yield from _expand(item, bindings, seen)
+            yield from _expand(item, bindings, seen | {id(node)})
     else:
         yield node
 
@@ -97,16 +98,16 @@ def _strings(node, bindings):
     }
 
 
-def _freeze(node, bindings, seen=frozenset()):
-    """保存当前静态值，避免后续循环变量变化重写已经追加的操作。"""
-    if isinstance(node, ast.Name) and node.id in bindings and node.id not in seen:
-        return _freeze(bindings[node.id], bindings, seen | {node.id})
+def _freeze(node, bindings):
+    """固定当前变量值；已绑定容器保留引用，新建容器捕获当次迭代值。"""
+    if isinstance(node, ast.Name) and node.id in bindings:
+        return bindings[node.id]
     if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
-        return type(node)(elts=[_freeze(item, bindings, seen) for item in node.elts])
+        return type(node)(elts=[_freeze(item, bindings) for item in node.elts])
     if isinstance(node, ast.Dict):
         return ast.Dict(
-            keys=[_freeze(key, bindings, seen) if key is not None else None for key in node.keys],
-            values=[_freeze(value, bindings, seen) for value in node.values],
+            keys=[_freeze(key, bindings) if key is not None else None for key in node.keys],
+            values=[_freeze(value, bindings) for value in node.values],
         )
     return node
 
@@ -149,7 +150,8 @@ class CoverageVisitor(ast.NodeVisitor):
                     expanded.extend(context | row for row in self._parameter_rows(names, decorator.args[1]))
                 contexts = expanded
         for context in contexts:
-            self.bindings = context
+            # 一次复制保留内部别名，但隔离不同用例及函数的容器变更。
+            self.bindings = deepcopy(context)
             for stmt in node.body:
                 self.visit(stmt)
         self.bindings = previous
@@ -158,15 +160,28 @@ class CoverageVisitor(ast.NodeVisitor):
 
     def _parameter_rows(self, names, values):
         values = _freeze(values, self.bindings)
+        unknown = {name: ast.Name(id=name) for name in names}
         if not names or not isinstance(values, (ast.List, ast.Tuple, ast.Set)):
             # 动态迭代器无法静态展开，仍检查循环体内不依赖迭代值的调用。
-            return [{name: ast.Name(id=name) for name in names}]
+            return [unknown]
         rows = []
         for row in values.elts:
-            if len(names) == 1:
+            if (isinstance(row, ast.Call) and isinstance(row.func, ast.Attribute)
+                    and row.func.attr == "param"):
+                # pytest.param 的 id / marks 是元数据，不属于参数列。
+                items = row.args
+            elif len(names) == 1:
                 rows.append({names[0]: row})
-            elif isinstance(row, (ast.List, ast.Tuple)) and len(row.elts) == len(names):
-                rows.append(dict(zip(names, row.elts)))
+                continue
+            elif isinstance(row, (ast.List, ast.Tuple)):
+                items = row.elts
+            else:
+                rows.append(unknown)
+                continue
+            if len(items) == len(names):
+                rows.append(dict(zip(names, (_freeze(item, self.bindings) for item in items))))
+            else:
+                rows.append(unknown)
         return rows
 
     def visit_Assign(self, node):
@@ -184,8 +199,12 @@ class CoverageVisitor(ast.NodeVisitor):
     def visit_AugAssign(self, node):
         self.visit(node.value)
         if isinstance(node.target, ast.Name) and isinstance(node.op, ast.Add):
-            previous = self.bindings.get(node.target.id, ast.List(elts=[]))
-            self.bindings[node.target.id] = ast.List(elts=[previous, _freeze(node.value, self.bindings)])
+            previous = self.bindings.get(node.target.id)
+            value = _freeze(node.value, self.bindings)
+            if isinstance(previous, ast.List) and isinstance(value, (ast.List, ast.Tuple, ast.Set)):
+                previous.elts.extend(value.elts)
+            elif isinstance(previous, ast.Tuple) and isinstance(value, ast.Tuple):
+                self.bindings[node.target.id] = ast.Tuple(elts=[*previous.elts, *value.elts])
 
     def visit_For(self, node):
         if isinstance(node.target, ast.Name):
@@ -206,8 +225,20 @@ class CoverageVisitor(ast.NodeVisitor):
         if (isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name)
                 and node.func.value.id in self.bindings and node.args
                 and node.func.attr in {"append", "extend", "insert"}):
-            name = node.func.value.id
-            self.bindings[name] = ast.List(elts=[self.bindings[name], _freeze(node.args[-1], self.bindings)])
+            target = self.bindings[node.func.value.id]
+            value = _freeze(node.args[-1], self.bindings)
+            if isinstance(target, ast.List):
+                if node.func.attr == "append":
+                    target.elts.append(value)
+                elif node.func.attr == "extend" and isinstance(value, (ast.List, ast.Tuple, ast.Set)):
+                    target.elts.extend(value.elts)
+                elif node.func.attr == "insert" and len(node.args) == 2:
+                    try:
+                        index = ast.literal_eval(_freeze(node.args[0], self.bindings))
+                    except (ValueError, TypeError):
+                        index = len(target.elts)
+                    if isinstance(index, int):
+                        target.elts.insert(index, value)
         if (isinstance(node.func, ast.Attribute)
                 and node.func.attr in {"call", "call_capability", "try_call"} and node.args):
             params = ast.Dict(

@@ -123,6 +123,94 @@ def test_ops(mcp):
         with patch.object(audit, "collect_cpp", return_value=({}, {})), contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(audit.main(), 1)
 
+    def test_mutated_parameter_tables_preserve_rows(self):
+        for mutation in [
+            'cases.append(("ManageThree", "Update"))',
+            'cases.extend([("ManageThree", "Update")])',
+            'cases.insert(1, ("ManageThree", "Update"))',
+            'cases += [("ManageThree", "Update")]',
+        ]:
+            with self.subTest(mutation=mutation):
+                visitor = self.parse('''
+def test_pairs(mcp):
+    cases = [("ManageOne", "Add"), ("ManageTwo", "Remove")]
+    ''' + mutation + '''
+    for cap, action in cases:
+        mcp.call_capability(cap, Operations=[{"Action": action}])
+''')
+                self.assertEqual(dict(visitor.actions), {
+                    "ManageOne": {"Add"}, "ManageTwo": {"Remove"}, "ManageThree": {"Update"},
+                })
+
+    def test_payload_keeps_mutable_list_aliases_and_rebinding(self):
+        for assignment in ['payload =', 'payload: dict =']:
+            with self.subTest(assignment=assignment):
+                visitor = self.parse('''
+def test_ops(mcp):
+    ops = []
+    alias = ops
+    ''' + assignment + ''' {"Operations": ops}
+    for action in ["Add", "Remove"]:
+        alias.append({"Action": action})
+    ops += [{"Action": "Extra"}]
+    mcp.call_capability("ManageOne", **payload)
+    ops = []
+    ops.append({"Action": "Other"})
+    mcp.call_capability("ManageOld", **payload)
+    mcp.call_capability("ManageNew", Operations=ops)
+''')
+                self.assertEqual(visitor.actions["ManageOne"], {"Add", "Remove", "Extra"})
+                self.assertEqual(visitor.actions["ManageOld"], {"Add", "Remove", "Extra"})
+                self.assertEqual(visitor.actions["ManageNew"], {"Other"})
+
+    def test_tuple_addition_rebinds_without_changing_aliases(self):
+        visitor = self.parse('''
+def test_pairs(mcp):
+    cases = (("ManageOne", "Add"),)
+    alias = cases
+    cases += (("ManageTwo", "Remove"),)
+    for cap, action in cases:
+        mcp.call_capability(cap, Operations=[{"Action": action}])
+    for cap, action in alias:
+        mcp.call_capability("ManageAlias", Operations=[{"Action": action}])
+''')
+        self.assertEqual(dict(visitor.actions), {
+            "ManageOne": {"Add"}, "ManageTwo": {"Remove"}, "ManageAlias": {"Add"},
+        })
+
+    def test_parameter_contexts_isolate_mutable_lists(self):
+        visitor = self.parse('''
+ops = []
+payload = {"Operations": ops}
+@pytest.mark.parametrize("cap, action", [("ManageOne", "Add"), ("ManageTwo", "Remove")])
+def test_ops(mcp, cap, action):
+    ops.append({"Action": action})
+    mcp.call_capability(cap, **payload)
+''')
+        self.assertEqual(dict(visitor.actions), {"ManageOne": {"Add"}, "ManageTwo": {"Remove"}})
+
+    def test_pytest_param_and_unknown_rows_keep_calls(self):
+        visitor = self.parse('''
+@pytest.mark.parametrize("cap, action", [
+    pytest.param("ManageOne", "Add", id="one", marks=pytest.mark.slow),
+    ("ManageTwo", "Remove"),
+])
+def test_pairs(mcp, cap, action):
+    mcp.call_capability(cap, Operations=[{"Action": action}])
+
+@pytest.mark.parametrize("section", [pytest.param("Details", id="details")])
+def test_section(mcp, section):
+    mcp.call_capability("GetOne", Sections=[section])
+
+@pytest.mark.parametrize("mode, value", [build_case()])
+def test_unknown(mcp, mode, value):
+    mcp.call_capability("ManageStatic", Operations=[{"Action": "Fixed"}])
+''')
+        self.assertEqual(dict(visitor.actions), {
+            "ManageOne": {"Add"}, "ManageTwo": {"Remove"}, "ManageStatic": {"Fixed"},
+        })
+        self.assertEqual(visitor.sections["GetOne"], {"Details"})
+
 
 if __name__ == "__main__":
     unittest.main()
