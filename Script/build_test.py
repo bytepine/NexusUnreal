@@ -11,9 +11,9 @@ build_test.py -- NexusUnreal 工程跨版本编译
 不改仓库工程（不写 Intermediate/Binaries，不改 .uproject / .uplugin）。
 每套引擎在系统临时目录建隔离工程：junction Content/Source/Config，
 插件根建真实目录（Intermediate 落在临时树），然后对该副本调 UBT。
-多引擎可并行（默认 --max-workers 3）。workers>1 时给 UBT 加
-`-MaxParallelActions`（总 cl.exe 约 CPU/2），避免 MSVC PCH 打爆
-32-bit 堆（C3859/C1076）；仍出现则该版本自动 workers=1 重试。
+多引擎可并行（默认 --max-workers 3 为上限），所有构建均给 UBT 加
+`-MaxParallelActions`（同时按 CPU 与可用物理/提交内存预算），避免
+MSVC PCH 内存耗尽（C3859/C1076）；仍出现则单引擎、单 action 重试。
 开跑前清残留 UBT / 调用 UBT 的 dotnet / 相关 MSBuild / VBCSCompiler，
 避免上次中断锁住 UnLuaDefaultParamCollectorUbtPlugin.dll 导致临时目录删不掉。
 
@@ -335,13 +335,6 @@ def _cleanup_temp() -> None:
     _rmtree_nofollow(TEMP_BASE)
 
 
-atexit.register(_cleanup_all)
-atexit.register(_cleanup_temp)
-signal.signal(signal.SIGINT, _signal_handler)
-if hasattr(signal, "SIGTERM"):
-    signal.signal(signal.SIGTERM, _signal_handler)
-
-
 _ERROR_INCLUDE = re.compile(r"\berror\b", re.IGNORECASE)
 _ERROR_EXCLUDE = re.compile(
     r"(^\s*0\s+error|error\(s\)\s*=\s*0|errors\s*:\s*0|^\s*Running\s|\[Adaptive Build\])",
@@ -357,7 +350,7 @@ _WARN_SKIP = re.compile(
     r"[/\\]Engine[/\\]|compiler is not a preferred version",
     re.IGNORECASE,
 )
-# 多引擎并行时 cl.exe 共用巨型 PCH，易触发 32-bit 编译器堆耗尽
+# 多引擎并行时，每个 cl.exe 加载大型 PCH，可能耗尽系统提交内存。
 _PCH_OOM_RE = re.compile(
     r"C3859|C1076|未能创建 PCH|internal heap limit|PCH 的虚拟内存",
     re.IGNORECASE,
@@ -513,26 +506,45 @@ def _isolated_uproject(ver: str) -> Path:
     return path
 
 
-def _max_parallel_actions(max_workers: int) -> Optional[int]:
-    """多引擎并行时限制每路 UBT 的 cl.exe 数；单路不限制。"""
-    if max_workers <= 1:
-        return None
-    cpu = os.cpu_count() or 8
-    return max(2, cpu // (max_workers * 2))
+def _compile_action_budget() -> int:
+    """Windows 预留 4 GiB，每个编译任务预算 4 GiB；读不到内存时保守并发。"""
+    cpu_limit = max(1, (os.cpu_count() or 8) // 2)
+    if _SYSTEM != "Windows":
+        return cpu_limit
+    import ctypes
+
+    class MemoryStatus(ctypes.Structure):
+        _fields_ = [
+            ("length", ctypes.c_ulong), ("load", ctypes.c_ulong),
+            ("total_phys", ctypes.c_ulonglong), ("avail_phys", ctypes.c_ulonglong),
+            ("total_commit", ctypes.c_ulonglong), ("avail_commit", ctypes.c_ulonglong),
+            ("total_virtual", ctypes.c_ulonglong), ("avail_virtual", ctypes.c_ulonglong),
+            ("extended", ctypes.c_ulonglong),
+        ]
+
+    memory = MemoryStatus()
+    memory.length = ctypes.sizeof(memory)
+    if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(memory)):
+        return min(cpu_limit, 2)
+    gib = 1024 ** 3
+    available = min(memory.avail_phys, memory.avail_commit)
+    return max(1, min(cpu_limit, (available - 4 * gib) // (4 * gib)))
+
+
+def _parallel_limits(max_workers: int, engine_count: int) -> Tuple[int, int]:
+    budget = _compile_action_budget()
+    workers = min(max_workers, engine_count, budget)
+    return workers, max(1, budget // workers)
 
 
 def _format_workers(editor_n: Optional[int] = None, game_n: Optional[int] = None) -> str:
-    def _one(n: int) -> str:
-        mpa = _max_parallel_actions(n)
-        return f"{n}" + (f" MaxParallelActions={mpa}" if mpa else "")
-
     parts = []
     if editor_n is not None:
-        parts.append(f"Editor={_one(editor_n)}")
+        parts.append(f"Editor<={editor_n}")
     if game_n is not None:
-        parts.append(f"Game={_one(game_n)}")
+        parts.append(f"Game<={game_n}")
     label = "; ".join(parts) if parts else "serial"
-    return f"Workers  : {label}; PCH OOM (C3859/C1076) retries serial"
+    return f"Worker limits: {label}; CPU/memory-budgeted; PCH OOM retries workers=1 MaxParallelActions=1"
 
 
 def _is_pch_oom(result: Dict) -> bool:
@@ -745,12 +757,17 @@ def _build_one(engine: dict, target: str, line_idx: int, total: int,
 
 
 def _run_phase(engines: List[dict], target: str, max_workers: int,
-               vs_version: Optional[str], label: str) -> Tuple[Dict[str, Dict], int, int, int]:
+               vs_version: Optional[str], label: str,
+               pch_retry: bool = False) -> Tuple[Dict[str, Dict], int, int, int]:
     print_lock = Lock()
     is_tty = sys.stdout.isatty()
     total = len(engines)
     ver_index = {e["version"]: i for i, e in enumerate(engines)}
-    mpa = _max_parallel_actions(max_workers)
+    if pch_retry:
+        max_workers, mpa = 1, 1
+    else:
+        max_workers, mpa = _parallel_limits(max_workers, total)
+    print(f"{label}: workers={max_workers} MaxParallelActions={mpa}", flush=True)
 
     for e in engines:
         print(f"[{e['version']}] {label} Pending...", flush=True)
@@ -768,16 +785,16 @@ def _run_phase(engines: List[dict], target: str, max_workers: int,
             r = fut.result()
             results[r["ver"]] = r
 
-    if max_workers > 1:
+    if not pch_retry:
         oom = [e for e in engines if _is_pch_oom(results[e["version"]])]
         if oom:
             names = ", ".join(e["version"] for e in oom)
             print(
                 f"\n{label}: PCH OOM on {names}; retry serial "
-                "(workers=1, no MaxParallelActions)",
+                "(workers=1, MaxParallelActions=1)",
                 flush=True,
             )
-            retry, _, _, _ = _run_phase(oom, target, 1, vs_version, label)
+            retry, _, _, _ = _run_phase(oom, target, 1, vs_version, label, pch_retry=True)
             for e in oom:
                 rr = dict(retry[e["version"]])
                 if rr["exit_code"] == 0:
@@ -968,8 +985,8 @@ def main() -> int:
         type=int,
         default=3,
         metavar="N",
-        help="Max concurrent Editor-phase builds (default 3). workers>1 时限制每路 "
-             "-MaxParallelActions；C3859/C1076 自动单路重试。",
+        help="Max concurrent Editor-phase builds (default 3). 按 CPU 与可用物理/提交内存 "
+             "限制引擎及 action 并发；C3859/C1076 自动单引擎、单 action 重试。",
     )
     parser.add_argument(
         "--versions",
@@ -1003,7 +1020,7 @@ def main() -> int:
         default=None,
         metavar="N",
         help="Max concurrent Game-phase workers (default: same as --max-workers). "
-             "同样限制 MaxParallelActions，PCH OOM 同样单路重试。",
+             "同样按内存预算限制并发，PCH OOM 同样单引擎、单 action 重试。",
     )
     args = parser.parse_args()
 
@@ -1070,6 +1087,13 @@ def main() -> int:
     if game_workers < 1:
         print("[ERROR] --game-max-workers must be >= 1", file=sys.stderr)
         return 1
+    # 仅实际执行时注册；导入脚本不能清理其他编译进程的隔离目录。
+    # atexit 按反序执行，先结束子进程，再删除临时目录。
+    atexit.register(_cleanup_temp)
+    atexit.register(_cleanup_all)
+    signal.signal(signal.SIGINT, _signal_handler)
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, _signal_handler)
     if args.game_only:
         fail_count = run_build_test_game(
             engines,
