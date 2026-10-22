@@ -97,6 +97,20 @@ def _strings(node, bindings):
     }
 
 
+def _freeze(node, bindings, seen=frozenset()):
+    """保存当前静态值，避免后续循环变量变化重写已经追加的操作。"""
+    if isinstance(node, ast.Name) and node.id in bindings and node.id not in seen:
+        return _freeze(bindings[node.id], bindings, seen | {node.id})
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        return type(node)(elts=[_freeze(item, bindings, seen) for item in node.elts])
+    if isinstance(node, ast.Dict):
+        return ast.Dict(
+            keys=[_freeze(key, bindings, seen) if key is not None else None for key in node.keys],
+            values=[_freeze(value, bindings, seen) for value in node.values],
+        )
+    return node
+
+
 def _fields(node, key, bindings):
     for value in _expand(node, bindings):
         if isinstance(value, ast.Dict):
@@ -117,59 +131,75 @@ class CoverageVisitor(ast.NodeVisitor):
 
     def visit_FunctionDef(self, node):
         previous = self.bindings
-        self.bindings = dict(previous)
+        contexts = [dict(previous)]
         for decorator in node.decorator_list:
             if (isinstance(decorator, ast.Call) and isinstance(decorator.func, ast.Attribute)
                     and decorator.func.attr == "parametrize" and len(decorator.args) >= 2):
-                names = _strings(decorator.args[0], self.bindings)
-                if len(names) == 1:
-                    self._bind_parameters(next(iter(names)).split(","), decorator.args[1])
-        for stmt in node.body:
-            self.visit(stmt)
+                names_node = _freeze(decorator.args[0], previous)
+                if isinstance(names_node, ast.Constant) and isinstance(names_node.value, str):
+                    names = [name.strip() for name in names_node.value.split(",")]
+                elif isinstance(names_node, (ast.List, ast.Tuple)) and all(
+                        isinstance(name, ast.Constant) and isinstance(name.value, str) for name in names_node.elts):
+                    names = [name.value for name in names_node.elts]
+                else:
+                    continue
+                expanded = []
+                for context in contexts:
+                    self.bindings = context
+                    expanded.extend(context | row for row in self._parameter_rows(names, decorator.args[1]))
+                contexts = expanded
+        for context in contexts:
+            self.bindings = context
+            for stmt in node.body:
+                self.visit(stmt)
         self.bindings = previous
 
     visit_AsyncFunctionDef = visit_FunctionDef
 
-    def _bind_parameters(self, names, values):
-        rows = list(_expand(values, self.bindings))
-        if len(names) == 1:
-            self.bindings[names[0].strip()] = ast.List(elts=rows)
-        else:
-            # 多列 parametrize / for：各参数只绑定自己的那一列。
-            raw = values.elts if isinstance(values, (ast.List, ast.Tuple)) else []
-            for index, name in enumerate(names):
-                self.bindings[name.strip()] = ast.List(elts=[
-                    row.elts[index] for row in raw
-                    if isinstance(row, (ast.List, ast.Tuple)) and len(row.elts) > index
-                ])
+    def _parameter_rows(self, names, values):
+        values = _freeze(values, self.bindings)
+        if not names or not isinstance(values, (ast.List, ast.Tuple, ast.Set)):
+            # 动态迭代器无法静态展开，仍检查循环体内不依赖迭代值的调用。
+            return [{name: ast.Name(id=name) for name in names}]
+        rows = []
+        for row in values.elts:
+            if len(names) == 1:
+                rows.append({names[0]: row})
+            elif isinstance(row, (ast.List, ast.Tuple)) and len(row.elts) == len(names):
+                rows.append(dict(zip(names, row.elts)))
+        return rows
 
     def visit_Assign(self, node):
         self.visit(node.value)
         for target in node.targets:
             if isinstance(target, ast.Name):
-                self.bindings[target.id] = node.value
+                self.bindings[target.id] = _freeze(node.value, self.bindings)
 
     def visit_AnnAssign(self, node):
         if node.value is not None:
             self.visit(node.value)
             if isinstance(node.target, ast.Name):
-                self.bindings[node.target.id] = node.value
+                self.bindings[node.target.id] = _freeze(node.value, self.bindings)
 
     def visit_AugAssign(self, node):
         self.visit(node.value)
         if isinstance(node.target, ast.Name) and isinstance(node.op, ast.Add):
             previous = self.bindings.get(node.target.id, ast.List(elts=[]))
-            self.bindings[node.target.id] = ast.List(elts=[previous, node.value])
+            self.bindings[node.target.id] = ast.List(elts=[previous, _freeze(node.value, self.bindings)])
 
     def visit_For(self, node):
-        previous = dict(self.bindings)
         if isinstance(node.target, ast.Name):
-            self.bindings[node.target.id] = node.iter
+            names = [node.target.id]
         elif isinstance(node.target, (ast.Tuple, ast.List)) and all(isinstance(n, ast.Name) for n in node.target.elts):
-            self._bind_parameters([n.id for n in node.target.elts], node.iter)
-        for stmt in node.body + node.orelse:
+            names = [n.id for n in node.target.elts]
+        else:
+            names = []
+        for row in self._parameter_rows(names, node.iter):
+            self.bindings.update(row)
+            for stmt in node.body:
+                self.visit(stmt)
+        for stmt in node.orelse:
             self.visit(stmt)
-        self.bindings = previous
 
     def visit_Call(self, node):
         # Operations 常先建列表，再按可用资产 append / extend / insert。
@@ -177,7 +207,7 @@ class CoverageVisitor(ast.NodeVisitor):
                 and node.func.value.id in self.bindings and node.args
                 and node.func.attr in {"append", "extend", "insert"}):
             name = node.func.value.id
-            self.bindings[name] = ast.List(elts=[self.bindings[name], node.args[-1]])
+            self.bindings[name] = ast.List(elts=[self.bindings[name], _freeze(node.args[-1], self.bindings)])
         if (isinstance(node.func, ast.Attribute)
                 and node.func.attr in {"call", "call_capability", "try_call"} and node.args):
             params = ast.Dict(

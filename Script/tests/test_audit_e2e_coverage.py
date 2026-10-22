@@ -84,6 +84,41 @@ def test_ops(mcp):
         _, sections, _ = audit.collect_tests()
         self.assertTrue({"Abilities", "Effects", "Attributes"} <= sections["GetRuntimeActorAbilitySystem"])
 
+    def test_capability_action_pairs_keep_row_correlation(self):
+        for declaration in [
+            '''def test_pairs(mcp):
+    for cap, action in [("ManageOne", "Add"), ("ManageTwo", "Remove")]:
+        mcp.call_capability(cap, Operations=[{"Action": action}])
+''',
+            '''@pytest.mark.parametrize("cap, action", [("ManageOne", "Add"), ("ManageTwo", "Remove")])
+def test_pairs(mcp, cap, action):
+    mcp.call_capability(cap, Operations=[{"Action": action}])
+''',
+            '''@pytest.mark.parametrize(("cap", "action"), [("ManageOne", "Add"), ("ManageTwo", "Remove")])
+def test_pairs(mcp, cap, action):
+    mcp.call_capability(cap, Operations=[{"Action": action}])
+''',
+        ]:
+            with self.subTest(source=declaration):
+                visitor = self.parse(declaration)
+                self.assertEqual(dict(visitor.actions), {"ManageOne": {"Add"}, "ManageTwo": {"Remove"}})
+
+    def test_loop_mutations_survive_and_freeze_iteration_values(self):
+        visitor = self.parse('''
+def test_ops(mcp):
+    ops = [{"Action": "Before"}]
+    for action in ["Add", "Remove"]:
+        ops.append({"Action": action})
+    for action in ["First"]:
+        ops.insert(0, {"Action": action})
+    for action in ["Last"]:
+        ops.extend([{"Action": action}])
+    for action in ["Extra"]:
+        ops += [{"Action": action}]
+    mcp.call_capability("ManageOne", Operations=ops)
+''')
+        self.assertEqual(visitor.actions["ManageOne"], {"Before", "Add", "Remove", "First", "Last", "Extra"})
+
     def test_empty_discovery_fails(self):
         with patch.object(audit, "collect_cpp", return_value=({}, {})), contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(audit.main(), 1)
