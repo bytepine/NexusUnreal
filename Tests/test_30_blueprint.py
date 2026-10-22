@@ -586,7 +586,7 @@ def test_bp_exec_paths_all_needs_graph_name(test_ns, mcp):
 def test_calls_batch_memory_rollback(test_ns, mcp):
     path = f"{test_ns}/BP_UndoBatch"
     mcp.call_capability("CreateAssetBlueprint", AssetPath=path, ParentClass="Actor")
-    batch = mcp._tool_call_raw("CallCapability", {
+    response = mcp.try_call("CallCapability", **{
         "Calls": [
             {
                 "Capability": "ManageAssetBlueprint",
@@ -605,6 +605,8 @@ def test_calls_batch_memory_rollback(test_ns, mcp):
             },
         ],
     })
+    assert response.get("isError"), response
+    batch = response["structuredContent"]
     assert batch.get("FailureCount", 0) > 0, batch
     got = mcp.call_capability("GetAssetBlueprint", AssetPath=path, Sections=["variable"])
     names = [v.get("name") for v in (cap_first(got).get("Variables") or [])]

@@ -21,6 +21,9 @@
 - test(plugin): 新增 `NexusMcpActivationTests`，覆盖 NexusLink MCP 启停统一管理（`FNexusMcpActivation`）——控制台/启动参数/Preferences 三层优先级、控制台三态覆盖对 Preferences 改动的稳定压制、角色门控（`-game`/`-server` 子进程与 cook/commandlet 不读 Preferences）；`Script/package.py` 运行时提示同步为 `NexusLink.Mcp on` / `status` / `restart` / `panel`
 - test(plugin): 新增 `NexusCapabilitySessionOverrideTests`，覆盖游戏内 MCP 调试面板的 Capability 会话级临时启停——会话禁用压制持久启用、会话启用抬起持久禁用（均不写 `DisabledCapabilities`）、危险 cap 在「全部禁用」模式下仍可单条会话强制启用且不影响其他危险 cap、`ClearSessionCapabilityOverrides` 一键恢复；示例工程 README MCP 接入补 `NexusLink.Mcp on` / `panel`
 - test(e2e): `test_95` 补 Runtime 迁入后的 `GetOutputLog` 与 `CaptureViewport target=pie bValidateOnly`；`test_10` 补 `CaptureEditorPanel` 的 `target=list` 面板枚举、`ViewAngle` 缺 `ActorName` 的拒绝路径与 `target=viewport bValidateOnly`
+- test(plugin): L1 `NexusLink.Utils.Runtime.RequirePlayWorld`（未开 PIE 时拒绝 Editor World）与 `NexusLink.Host.RegistryScope.All`（全表宿主可见性）
+- test(plugin): `NexusLink.Trace.GetTrace` 覆盖文件不存在与已停录短 trace 回读。
+- test(plugin): 增加 `NexusLink.Reliability` 回归，覆盖 MCP 标准字段、section 枚举、业务错误聚合、批量回滚与延迟保存、DataTable 字段及临时行析构、重复读取不阻断；L2 回滚用例检查错误信封与结构化失败详情。
 
 ### Changed
 

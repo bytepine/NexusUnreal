@@ -2,6 +2,8 @@
 
 本目录为 **NexusUnreal 示例工程**内的 NexusLink L2 回归测试实现。
 
+批量调用中只要有失败就返回 `isError=true`；预期失败用 `mcp.try_call(...)`，从 `structuredContent` 检查 `FailureCount`、`bRolledBack` 与逐项结果。不要以请求未抛异常代替验证回滚状态。
+
 通用说明（工具模型、过滤）见 [NexusLink docs/testing.md](https://github.com/bytepine/NexusLink/blob/master/docs/testing.md)。
 
 ## 测试策略（必遵）
