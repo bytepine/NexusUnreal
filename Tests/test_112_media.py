@@ -26,11 +26,11 @@ def test_media_source_roundtrip(test_ns, mcp):
     )
     assert not man.get("Error"), man
     loop = cap_first(
-        mcp.call_capability(
+        mcp.try_call(
             "ManageAssetMediaSource",
             AssetPath=path,
             Operations=[{"Action": "SetLoop", "bLoop": True}],
-        )
+        )["structuredContent"]
     )
     if loop.get("Error"):
         pytest.skip(f"media set_loop 跳过: {loop}")

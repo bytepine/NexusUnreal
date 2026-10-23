@@ -76,7 +76,7 @@ def test_create_ik_retargeter(test_ns, mcp):
         ce = cap_first(cr)
         if ce.get("Error") and "already exists" not in str(ce.get("Error")).lower() and "已存在" not in str(ce.get("Error")):
             pytest.skip(f"create_asset_ik_rig 失败: {ce}")
-    man = mcp.call_capability(
+    man = mcp.try_call(
         "ManageAssetIKRetargeter",
         AssetPath=path,
         Operations=[
@@ -84,7 +84,7 @@ def test_create_ik_retargeter(test_ns, mcp):
             {"Action": "SetTargetRig", "RigPath": tgt},
             {"Action": "SetChainSource", "TargetChain": "Root", "SourceChain": "Root"},
         ],
-    )
+    )["structuredContent"]
     for e in (man.get("Results") or [cap_first(man)]):
         if isinstance(e, dict) and e.get("Error") and "SetChainSource" in str(e):
             continue
@@ -102,7 +102,7 @@ def test_manage_ik_rig_remaining_actions(test_ns, mcp):
     ]
     if mesh:
         ops.insert(0, {"Action": "SetPreviewMesh", "MeshPath": mesh})
-    r = mcp.call_capability("ManageAssetIKRig", AssetPath=path, Operations=ops)
+    r = mcp.try_call("ManageAssetIKRig", AssetPath=path, Operations=ops)["structuredContent"]
     for e in (r.get("Results") or [cap_first(r)]):
         if isinstance(e, dict) and e.get("Error"):
             pytest.skip(f"manage_asset_ik_rig 剩余 action 跳过: {e}")

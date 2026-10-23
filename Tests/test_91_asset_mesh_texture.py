@@ -63,11 +63,14 @@ def test_get_asset_static_mesh_project_sample(mcp, require_tools):
     assert "LODCount" in entry or "MaterialSlots" in entry, entry
 
 
-def test_manage_static_mesh_collision_and_socket(mcp, require_tools):
+def test_manage_static_mesh_collision_and_socket(mcp, require_tools, test_ns):
     """P1：StaticMesh 碰撞复杂度 + Box + Socket + LOD ScreenSize。"""
     require_tools("ManageAssetStaticMesh", "GetAssetStaticMesh")
     path = first_asset_path(mcp, "StaticMesh")
     assert path, "无法定位 StaticMesh 样本"
+    copy = f"{test_ns}/SM_test_manage_static_mesh_collision_and_socket"
+    mcp.call("DuplicateAsset", AssetPath=path, DestAssetPath=copy)
+    path = copy
     sock = "NxTestSocket"
     ops = [
         {"Action": "SetCollisionTraceFlag", "CollisionTraceFlag": "UseSimpleAsComplex"},
@@ -94,10 +97,13 @@ def test_manage_static_mesh_collision_and_socket(mcp, require_tools):
     assert not cap_first(rm).get("Error"), rm
 
 
-def test_manage_static_mesh_remaining_actions(mcp, require_tools):
+def test_manage_static_mesh_remaining_actions(mcp, require_tools, test_ns):
     require_tools("ManageAssetStaticMesh")
     path = first_asset_path(mcp, "StaticMesh")
     assert path, "无法定位 StaticMesh 样本"
+    copy = f"{test_ns}/SM_test_manage_static_mesh_remaining_actions"
+    mcp.call("DuplicateAsset", AssetPath=path, DestAssetPath=copy)
+    path = copy
     sock = "NxSmSetSock"
     ops = [
         {"Action": "AddSphereCollision", "Radius": 10},
@@ -115,14 +121,17 @@ def test_manage_static_mesh_remaining_actions(mcp, require_tools):
             pytest.skip(f"manage_asset_static_mesh 剩余 action 跳过: {e}")
 
 
-def test_manage_asset_texture_set_property(mcp, require_tools):
+def test_manage_asset_texture_set_property(mcp, require_tools, test_ns):
     require_tools("ManageAssetTexture")
     path = first_asset_path(mcp, "Texture2D")
     assert path, "无法定位 Texture2D 样本"
+    copy = f"{test_ns}/T_PropertyProbe"
+    mcp.call("DuplicateAsset", AssetPath=path, DestAssetPath=copy)
+    path = copy
     r = mcp.call_capability(
         "ManageAssetTexture",
         AssetPath=path,
-        Operations=[{"Action": "SetProperty", "PropertyPath": "bSRGB", "Value": "true"}],
+        Operations=[{"Action": "SetProperty", "PropertyPath": "SRGB", "Value": "true"}],
     )
     entry = cap_first(r)
     if entry.get("Error"):

@@ -72,7 +72,7 @@ def test_manage_state_tree_add_task_transition(st_path, mcp):
         Operations=[{
             "Action": "AddTask",
             "StateName": "NxTestState_Renamed",
-            "NodeType": "StateTreeTask_Delay",
+            "NodeType": "StateTreeDelayTask",
         }],
     )
     te = cap_first(add_task)
@@ -128,7 +128,7 @@ def test_manage_state_tree_task_condition_remove_transition(st_path, mcp):
         Operations=[{
             "Action": "AddTask",
             "StateName": "NxCondSrc",
-            "NodeType": "StateTreeTask_Delay",
+            "NodeType": "StateTreeDelayTask",
         }],
     )
     cond = mcp.call_capability(
@@ -137,7 +137,7 @@ def test_manage_state_tree_task_condition_remove_transition(st_path, mcp):
         Operations=[{
             "Action": "AddEnterCondition",
             "StateName": "NxCondSrc",
-            "NodeType": "StateTreeCondition_CompareInt",
+            "NodeType": "StateTreeCompareIntCondition",
         }],
     )
     assert isinstance(cap_first(cond), dict), cond

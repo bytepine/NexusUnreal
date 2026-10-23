@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pytest
 
+from _framework.assertions import assert_tool_error
 from _framework.assertions import assert_success_count, ids_of
 from _framework.mcp_client import cap_first
 
@@ -137,7 +138,7 @@ def test_material_function_add_connect(test_ns, mcp):
     assert node_ids, f"MF add_node missing nodeId: {add!r}"
     nid = node_ids[0]
 
-    bad = mcp.call_capability(
+    bad = assert_tool_error(mcp.try_call(
         "ManageAssetMaterial",
         AssetPath=path,
         Operations=[{
@@ -146,7 +147,7 @@ def test_material_function_add_connect(test_ns, mcp):
             "TargetNodeId": "Material",
             "TargetInputName": "BaseColor",
         }],
-    )
+    ))
     assert cap_first(bad).get("Error"), f"MF connect to Material should fail: {bad!r}"
 
     connect = mcp.call_capability(
@@ -163,11 +164,11 @@ def test_material_function_add_connect(test_ns, mcp):
 
 
 def test_material_set_param(mcp, mat_path):
-    r = mcp.call_capability(
+    r = mcp.try_call(
         "ManageAssetMaterial",
         AssetPath=mat_path,
         Operations=[{"Action": "SetParam", "ParamName": "BaseColor", "Value": "(R=1,G=0,B=0,A=1)"}],
-    )
+    )["structuredContent"]
     entry = cap_first(r)
     if entry.get("Error"):
         pytest.skip(f"set_param 跳过: {entry}")

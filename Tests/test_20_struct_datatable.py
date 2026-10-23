@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pytest
 
+from _framework.assertions import assert_tool_error
 from _framework.mcp_client import MCPError, cap_first
 
 from _framework.assertions import assert_batch_success, assert_success_count
@@ -111,19 +112,16 @@ def test_datatable_row_mode_requires_rownames_or_namefilter(mcp, datatable_path)
 
 
 def test_datatable_set_row_error_path(mcp, datatable_path, require_tools):
-    """覆盖 `manage_asset_data_table` set 执行链 —— DataTable 底层字段名是 UE 内部序列化名
-    (`FieldName_N_GUID`)，显示名 `ItemName` 不会命中；这里显式打一个不存在的
-    rowName + 不存在的 fieldName，验证批量契约：totalCount / failCount / per-result
-    error 三要素齐全而不是 top-level 抛出。"""
+    """不存在的行与字段须返回 isError，同时保留条目级错误详情。"""
     require_tools("ManageAssetDataTable")
-    r = mcp.call(
+    r = assert_tool_error(mcp.try_call(
         "ManageAssetDataTable",
         AssetPath=datatable_path,
         Operations=[
             {"Action": "Set", "RowName": "__NoSuchRow__",
              "FieldName": "__NoSuchField__", "Value": "x"},
         ],
-    )
+    ))
     assert isinstance(r, dict), r
     entry = cap_first(r)
     assert entry.get("Error"), f"expected per-result error: {entry!r}"

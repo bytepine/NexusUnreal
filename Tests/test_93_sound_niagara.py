@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pytest
 
+from _framework.assertions import assert_tool_error
 from _framework.asset_helpers import first_asset_path
 from _framework.mcp_client import MCPError, cap_first
 from _framework.capability_probe import is_capability_available
@@ -156,7 +157,7 @@ def test_niagara_add_remove_module(test_ns, mcp):
         Operations=[{"Action": "AddEmitter", "EmitterName": "ModEmitter"}],
     )
     assert not cap_first(add_em).get("Error"), add_em
-    add_mod = mcp.call_capability(
+    add_mod = mcp.try_call(
         "ManageAssetNiagaraSystem",
         AssetPath=path,
         Operations=[{
@@ -165,7 +166,7 @@ def test_niagara_add_remove_module(test_ns, mcp):
             "ModulePath": module,
             "Usage": "EmitterUpdate",
         }],
-    )
+    )["structuredContent"]
     mod_entry = cap_first(add_mod)
     if mod_entry.get("Error") and ("未找到" in str(mod_entry.get("Error")) or "not found" in str(mod_entry.get("Error")).lower()):
         pytest.skip(f"无 Niagara 模块资产: {module}")
@@ -205,7 +206,7 @@ def test_niagara_set_module_parameter_roundtrip(test_ns, mcp):
         Operations=[{"Action": "AddEmitter", "EmitterName": "ParamEmitter"}],
     )
     assert not cap_first(add_em).get("Error"), add_em
-    add_mod = mcp.call_capability(
+    add_mod = mcp.try_call(
         "ManageAssetNiagaraSystem",
         AssetPath=path,
         Operations=[{
@@ -214,7 +215,7 @@ def test_niagara_set_module_parameter_roundtrip(test_ns, mcp):
             "ModulePath": module,
             "Usage": "EmitterUpdate",
         }],
-    )
+    )["structuredContent"]
     mod_entry = cap_first(add_mod)
     if mod_entry.get("Error") and ("未找到" in str(mod_entry.get("Error")) or "not found" in str(mod_entry.get("Error")).lower()):
         pytest.skip(f"无 Niagara 模块资产: {module}")
@@ -266,7 +267,7 @@ def test_niagara_set_module_parameter_unknown(test_ns, mcp):
         Operations=[{"Action": "AddEmitter", "EmitterName": "BadEmitter"}],
     )
     assert not cap_first(add_em).get("Error"), add_em
-    bad_mod = mcp.call_capability(
+    bad_mod = assert_tool_error(mcp.try_call(
         "ManageAssetNiagaraSystem",
         AssetPath=path,
         Operations=[{
@@ -276,9 +277,9 @@ def test_niagara_set_module_parameter_unknown(test_ns, mcp):
             "ParameterName": "SpawnRate",
             "Value": "1",
         }],
-    )
+    ))
     assert cap_first(bad_mod).get("Error"), bad_mod
-    bad_em = mcp.call_capability(
+    bad_em = assert_tool_error(mcp.try_call(
         "ManageAssetNiagaraSystem",
         AssetPath=path,
         Operations=[{
@@ -288,7 +289,7 @@ def test_niagara_set_module_parameter_unknown(test_ns, mcp):
             "ParameterName": "SpawnRate",
             "Value": "1",
         }],
-    )
+    ))
     assert cap_first(bad_em).get("Error"), bad_em
 
 

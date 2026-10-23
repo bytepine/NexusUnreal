@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 
+from _framework.assertions import assert_tool_error
 from _framework.capability_probe import is_capability_available
 from _framework.mcp_client import MCPError, cap_first
 
@@ -107,12 +108,12 @@ def test_ga_manage_blueprint_set_defaults_non_actor(test_ns, mcp):
 def test_ga_manage_blueprint_add_component_still_actor_only(test_ns, mcp):
     """回归：GameplayAbility 仍不是 Actor 子类，add_component 应继续被拒绝（Actor 门未被误删）。"""
     path = f"{test_ns}/GA_TestAbility"
-    r = mcp.call_capability(
+    r = assert_tool_error(mcp.try_call(
         "ManageAssetBlueprint",
         AssetPath=path,
         Operations=[{"Action": "AddComponent", "ComponentClass": "SceneComponent",
                      "ComponentName": "ShouldFail"}],
-    )
+    ))
     entry = cap_first(r)
     assert entry.get("Error"), f"add_component on GA (non-Actor) BP should still fail: {entry!r}"
     assert "Actor" in entry.get("Error", ""), entry
@@ -230,7 +231,7 @@ def test_as_manage_set(test_ns, mcp):
 
 
 def test_as_create(test_ns, mcp):
-    path = f"{test_ns}/AS_TestStats"
+    path = f"{test_ns}/AS_CreateProbe"
     r = mcp.call("CreateAssetAttributeSet", AssetPath=path)
     err = str(cap_first(r).get("Error") or "")
     if err and "already exists" not in err.lower() and "已存在" not in err:

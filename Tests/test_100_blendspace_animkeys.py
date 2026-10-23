@@ -108,7 +108,7 @@ def test_manage_blend_space_samples(test_ns, skel_path, mcp):
 # ── AnimSequence 曲线关键帧 ────────────────────────────────────────────────────
 
 @pytest.fixture(scope="module")
-def anim_seq_path(mcp):
+def anim_seq_path(mcp, test_ns):
     r = mcp.call_capability(
         "SearchAsset",
         Query="",
@@ -119,7 +119,10 @@ def anim_seq_path(mcp):
     assets = (r.get("Assets") or []) if isinstance(r, dict) else []
     if not assets:
         pytest.skip("项目中无 AnimSequence，跳过曲线测试")
-    return assets[0].get("Path") or assets[0].get("AssetPath")
+    source = assets[0].get("Path") or assets[0].get("AssetPath")
+    path = f"{test_ns}/AS_CurveProbe"
+    mcp.call("DuplicateAsset", AssetPath=source, DestAssetPath=path)
+    return path
 
 
 def _curve_suffix(test_ns: str) -> str:

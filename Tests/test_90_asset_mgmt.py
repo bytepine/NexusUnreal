@@ -107,7 +107,7 @@ def _first_editable_property_name(entry: dict) -> str | None:
         if not isinstance(row, dict):
             continue
         name = row.get("name") or row.get("PropertyName")
-        if name:
+        if name and row.get("type") == "bool":
             return str(name)
     return None
 

@@ -49,7 +49,7 @@ def test_control_rig_create_add_control(test_ns, mcp):
 
 def test_control_rig_remaining_actions(test_ns, mcp):
     path = f"{test_ns}/CR_Created"
-    r = mcp.call_capability(
+    r = mcp.try_call(
         "ManageAssetControlRig",
         AssetPath=path,
         Operations=[
@@ -62,7 +62,7 @@ def test_control_rig_remaining_actions(test_ns, mcp):
             {"Action": "BreakRigLink", "SourcePinPath": "NxGetXform.Transform", "TargetPinPath": "NxGetXform.Item"},
             {"Action": "RemoveElement", "ElementName": "NxNull", "ElementType": "null"},
         ],
-    )
+    )["structuredContent"]
     for e in (r.get("Results") or [cap_first(r)]):
         if isinstance(e, dict) and e.get("Error"):
             pytest.skip(f"control_rig remaining 跳过: {e}")

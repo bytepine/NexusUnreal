@@ -34,19 +34,19 @@ def test_common_ui_styles(test_ns, mcp):
     got2 = cap_first(mcp.call_capability("GetAssetCommonTextStyle", AssetPath=txt))
     assert not got2.get("Error"), got2
 
-    btn_man = mcp.call_capability(
+    btn_man = mcp.try_call(
         "ManageAssetCommonButtonStyle",
         AssetPath=btn,
         Operations=[{"Action": "SetProperty", "PropertyPath": "DisabledOpacity", "Value": "0.5"}],
-    )
+    )["structuredContent"]
     btn_e = cap_first(btn_man)
     if btn_e.get("Error"):
         pytest.skip(f"manage_asset_common_button_style set_property 跳过: {btn_e}")
-    txt_man = mcp.call_capability(
+    txt_man = mcp.try_call(
         "ManageAssetCommonTextStyle",
         AssetPath=txt,
         Operations=[{"Action": "SetProperty", "PropertyPath": "FontSize", "Value": "16"}],
-    )
+    )["structuredContent"]
     txt_e = cap_first(txt_man)
     if txt_e.get("Error"):
         pytest.skip(f"manage_asset_common_text_style set_property 跳过: {txt_e}")

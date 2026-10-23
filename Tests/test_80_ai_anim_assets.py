@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pytest
 
+from _framework.assertions import assert_tool_error
 from _framework.asset_helpers import resolve_skeleton, first_asset_path
 from _framework.mcp_client import MCPError, cap_first
 
@@ -126,7 +127,7 @@ def test_anim_blueprint_animgraph_slot_and_blend(test_ns, mcp, template_skeleton
 
 def test_anim_blueprint_animgraph_ik_and_aimoffset(test_ns, mcp, template_skeleton):
     """TwoBoneIK / LookAt / ModifyBone / AimOffset 可 spawn；IK 可写 boneName。"""
-    path = f"{test_ns}/ABP_TestAnim"
+    path = f"{test_ns}/ABP_IkAimOffset"
     created = mcp.call(
         "CreateAssetAnimBlueprint",
         AssetPath=path,
@@ -248,14 +249,13 @@ def test_get_asset_anim_montage(test_ns, mcp, template_skeleton):
 
 
 def test_get_actor_animation_error_path(mcp, require_tools):
-    """覆盖 `get_runtime_actor_animation` —— 不存在的 Actor：`totalCount/results[].error`，
-    而非 top-level `MCPError`。"""
+    """不存在的 Actor 须返回 isError，同时保留结构化错误详情。"""
     require_tools("GetRuntimeActorAnimation")
-    r = mcp.call(
+    r = assert_tool_error(mcp.try_call(
         "GetRuntimeActorAnimation",
         ActorName="__NonExistentActor_Animation__",
         Sections=["State", "Slots"],
-    )
+    ))
     assert isinstance(r, dict), r
     entry = cap_first(r)
     assert entry.get("Error"), f"expected per-result error: {entry!r}"
@@ -500,7 +500,7 @@ def test_manage_behavior_tree_remaining_actions(test_ns, mcp):
             {"Action": "AddDecorator", "NodeClass": "BTDecorator_Blackboard", "TargetPath": "0"},
             {"Action": "AddService", "NodeClass": "BTService_DefaultFocus", "TargetPath": ""},
             {"Action": "SetBlackboard", "BlackboardPath": bb},
-            {"Action": "SetProperty", "TargetPath": "0", "TargetType": "Node", "PropertyName": "WaitTime", "PropertyValue": "1.0"},
+            {"Action": "SetProperty", "TargetPath": "0", "TargetType": "Node", "PropertyName": "bIgnoreRestartSelf", "PropertyValue": "true"},
             {"Action": "SyncGraph"},
         ],
     )
@@ -572,12 +572,16 @@ def test_manage_anim_blueprint_states_and_wires(test_ns, mcp, template_skeleton)
         ops.append({
             "Action": "Connect",
             "SourceNodeId": id_a,
+            "SourcePinName": "Pose",
             "TargetNodeId": id_b,
+            "TargetPinName": "Source",
         })
         ops.append({
             "Action": "Disconnect",
             "SourceNodeId": id_a,
+            "SourcePinName": "Pose",
             "TargetNodeId": id_b,
+            "TargetPinName": "Source",
         })
         ops.append({"Action": "RemoveNode", "NodeId": id_b})
     ops.extend([

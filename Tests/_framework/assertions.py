@@ -16,6 +16,14 @@ from typing import Any, Dict, Iterable, List, Optional
 from _framework.mcp_client import cap_entries
 
 
+def assert_tool_error(response: Dict[str, Any]) -> Dict[str, Any]:
+    """预期业务失败必须同时保留 MCP 错误标记与结构化详情。"""
+    assert response.get("isError") is True, response
+    payload = response.get("structuredContent")
+    assert isinstance(payload, dict), response
+    return payload
+
+
 def assert_batch_success(result: Dict[str, Any], expected_count: Optional[int] = None,
                          *, context: str = "") -> None:
     """Fail if any capability entry has an error field."""

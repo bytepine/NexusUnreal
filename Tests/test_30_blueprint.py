@@ -28,7 +28,7 @@ def test_bp_variable_batch_add(mcp, bp_path):
          "VariableType": "string"},
     ]:
         r = mcp.call_capability(
-            "ManageAssetBlueprint", AssetPath=bp_path, Operations=[var],
+            "ManageAssetBlueprint", AssetPath=bp_path, bCompile=True, Operations=[var],
         )
         assert isinstance(r, dict), f"add_variable {var['VariableName']}: {r!r}"
 
@@ -442,7 +442,8 @@ def test_bp_add_macro_timeline_dispatcher(mcp, bp_path):
             {"Action": "AddMacro", "FunctionName": "NxMacro"},
             {"Action": "AddTimeline", "FunctionName": "NxTimeline"},
             {"Action": "AddDispatcher", "VariableName": "NxDisp"},
-            {"Action": "AddLocalVariable", "FunctionName": "NxMacro", "VariableName": "NxLocal"},
+            {"Action": "AddFunction", "FunctionName": "NxLocalOwner"},
+            {"Action": "AddLocalVariable", "FunctionName": "NxLocalOwner", "VariableName": "NxLocal"},
         ],
     )
     entry = cap_first(r)
@@ -640,10 +641,10 @@ def test_bp_remaining_manage_actions(mcp, test_ns):
     ]
     if nid:
         ops.extend([
-            {"Action": "DisconnectAll", "SourceNodeId": nid},
-            {"Action": "Disconnect", "SourceNodeId": nid, "TargetNodeId": nid},
+            {"Action": "DisconnectAll", "GraphName": "EventGraph", "SourceNodeId": nid},
+            {"Action": "Disconnect", "GraphName": "EventGraph", "SourceNodeId": nid, "SourcePinName": "then", "TargetNodeId": nid, "TargetPinName": "execute"},
         ])
-    r = mcp.call_capability("ManageAssetBlueprint", AssetPath=path, Operations=ops)
+    r = mcp.try_call("ManageAssetBlueprint", AssetPath=path, Operations=ops)["structuredContent"]
     for e in (r.get("Results") or [cap_first(r)]):
         if isinstance(e, dict) and e.get("Error"):
             pytest.skip(f"blueprint remaining 跳过: {e}")

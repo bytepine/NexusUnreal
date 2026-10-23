@@ -11,6 +11,7 @@ import time
 
 import pytest
 
+from _framework.assertions import assert_tool_error
 from _framework.asset_helpers import ensure_test_hud_widget
 from _framework.assertions import assert_success_count, ids_of
 from _framework.mcp_client import MCPError, cap_first
@@ -260,6 +261,7 @@ def test_interact_runtime_widget_progressbar(mcp, pie, test_ns):
         mcp.call_capability(
             "ManageAssetUserWidget",
             AssetPath=wbp,
+            bCompile=True,
             Operations=[
                 {
                     "Action": "Add",
@@ -435,8 +437,8 @@ def test_lua_stack_smoke(mcp, _unlua_available):
 
 @pytest.mark.lua
 def test_lua_dofile_invalid_path(mcp, _unlua_available):
-    """dofile 非法路径：条目级 error，不抛 MCPError。"""
-    r = mcp.call_capability("DofileRuntimeLua", ScriptPath="__nonexistent_mcp_test__.lua")
+    """dofile 非法路径须返回 isError 与条目级错误。"""
+    r = assert_tool_error(mcp.try_call("DofileRuntimeLua", ScriptPath="__nonexistent_mcp_test__.lua"))
     entry = cap_first(r)
     assert entry.get("Error") or entry.get("Path") == "__nonexistent_mcp_test__.lua", entry
 
@@ -461,11 +463,11 @@ def test_lua_hotreload_contract(mcp, _unlua_available):
 @pytest.mark.lua
 def test_lua_metatable_smoke(mcp, _unlua_available):
     """get_runtime_lua_metatable：非法路径也应返回结构化 results。"""
-    r = mcp.call_capability(
+    r = assert_tool_error(mcp.try_call(
         "GetRuntimeLuaMetatable",
         LuaPath="__McpNonexistentClass__",
         Limit=5,
-    )
+    ))
     entry = cap_first(r)
     assert entry.get("Error") or isinstance(entry.get("chain"), list) or entry.get("LuaPath"), entry
 
@@ -473,11 +475,11 @@ def test_lua_metatable_smoke(mcp, _unlua_available):
 @pytest.mark.lua
 def test_lua_object_smoke(mcp, _unlua_available, spawned_actors):
     """get_runtime_lua_object：对 PIE Actor 探测实例表（无 UnLua 绑定时允许 error）。"""
-    r = mcp.call_capability(
+    r = assert_tool_error(mcp.try_call(
         "GetRuntimeLuaObject",
         ActorName=spawned_actors[0],
         Limit=5,
-    )
+    ))
     entry = cap_first(r)
     assert isinstance(entry, dict), entry
     assert entry.get("Keys") is not None or entry.get("Error"), entry
@@ -496,6 +498,7 @@ def test_interact_runtime_widget_combobox(mcp, pie, test_ns):
         mcp.call_capability(
             "ManageAssetUserWidget",
             AssetPath=wbp,
+            bCompile=True,
             Operations=[{
                 "Action": "Add",
                 "WidgetClass": "ComboBoxString",
@@ -552,12 +555,12 @@ def test_interact_runtime_actor_ai_no_controller(mcp, pie, spawned_actors):
     from _framework.capability_probe import is_capability_available
     if not is_capability_available(mcp, "InteractRuntimeActorAI"):
         pytest.skip("interact_runtime_actor_ai 未编入")
-    r = mcp.call_capability(
+    r = assert_tool_error(mcp.try_call(
         "InteractRuntimeActorAI",
         Action="MoveTo",
         ActorName=spawned_actors[0],
         x=0, y=0, z=0,
-    )
+    ))
     entry = cap_first(r)
     assert entry.get("Error"), r
 

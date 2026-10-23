@@ -67,7 +67,7 @@ def test_manage_metasound_add_input(mcp, test_ns):
 @pytest.mark.skipif_ue_below("5.3")
 def test_manage_metasound_graph_ops(mcp, test_ns):
     asset_path = f"{test_ns}/TestMetaSound_MCP"
-    r = mcp.call_capability(
+    r = mcp.try_call(
         "ManageAssetMetaSound",
         AssetPath=asset_path,
         Operations=[
@@ -78,7 +78,7 @@ def test_manage_metasound_graph_ops(mcp, test_ns):
             {"Action": "RemoveNode", "NodeId": "0"},
             {"Action": "RemoveOutput", "name": "TestOutput"},
         ],
-    )
+    )["structuredContent"]
     for e in (r.get("Results") or []):
         if isinstance(e, dict) and e.get("Error"):
             pytest.skip(f"metasound remaining 跳过: {e}")

@@ -47,6 +47,7 @@
 
 ### Fixed
 
+- fix(test): E2E 预期业务失败同时校验 `isError` 与结构化详情；修正蓝图编译、原生字段、StateTree 类型及测试资产重名，网格、纹理与动画写入使用测试副本。
 - fix(test): E2E 覆盖审计扫描 NexusLink / NexusLinkExt 的 Runtime 与 Editor 模块，按 PascalCase 实际调用参数关联 action / section，支持列表变量、循环与参数化用例（含 `pytest.param`）；追加后的参数表保持行配对，容器别名与循环迭代值正确保留，不同用例的变更相互隔离；未知参数行仍扫描固定调用，不再将未调用的字面量或同文件其他能力误算为覆盖，空扫描直接失败；新增独立脚本回归测试
 - fix(test): `test_list_actors_defaults_shape` 标 `l4_runtime`。`ListRuntimeActors` 需要 PIE/Game，headless 下会报 No PIE/Game World
 - fix(test): GUI e2e 启动加 `-LiveCoding=false`，避免 `SaveAsset` 被 Live Coding 降级为 deferred

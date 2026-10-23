@@ -8,6 +8,7 @@ import contextlib
 import pytest
 
 from _framework.capability_probe import is_capability_available
+from _framework.assertions import assert_tool_error
 from _framework.mcp_client import MCPError, cap_first
 from _framework.runtime_helpers import destroy_runtime_actors, spawn_runtime_actors
 
@@ -41,6 +42,8 @@ def gas_runtime_assets(test_ns, mcp) -> dict:
     mcp.call_capability("CompileBlueprint", AssetPath=bp)
     with contextlib.suppress(MCPError):
         mcp.call("CreateAssetGameplayEffect", AssetPath=ge)
+        mcp.call_capability("CompileBlueprint", AssetPath=ge)
+        mcp.call("SaveAsset", AssetPath=ge)
     return {"bp": bp, "ge": ge}
 
 
@@ -78,7 +81,7 @@ def test_interact_runtime_apply_effect_smoke(mcp, gas_runtime_actor, gas_runtime
             "InteractRuntimeActorAbilitySystem",
             Action="ApplyEffect",
             ActorName=gas_runtime_actor,
-            EffectPath=ge,
+            EffectPath=f"{ge}.GE_GasRuntimeProbe",
         )
     except MCPError as e:
         pytest.skip(f"apply_effect 被拒绝（ASC 未初始化？）：{e}")
@@ -92,26 +95,26 @@ def test_interact_runtime_give_ability_and_tags(mcp, gas_runtime_actor, test_ns)
         mcp.call_capability("CreateAssetGameplayAbility", AssetPath=ga)
     except MCPError as e:
         pytest.skip(f"无法创建 GA：{e}")
+    mcp.call_capability("CompileBlueprint", AssetPath=ga)
+    mcp.call("SaveAsset", AssetPath=ga)
     give = mcp.call_capability(
         "InteractRuntimeActorAbilitySystem",
         Action="GiveAbility",
         ActorName=gas_runtime_actor,
-        AbilityPath=ga,
+        AbilityPath=f"{ga}.GA_RuntimeGive",
     )
     ge = cap_first(give)
     if ge.get("Error"):
         pytest.skip(f"give_ability 被拒绝：{ge}")
-    tag_r = mcp.call_capability(
-        "InteractRuntimeActorAbilitySystem",
-        Action="AddLooseTag",
-        ActorName=gas_runtime_actor,
-        Tag="Ability.Jump",
-    )
-    assert isinstance(cap_first(tag_r), dict), tag_r
-    cue = mcp.call_capability(
-        "InteractRuntimeActorAbilitySystem",
-        Action="ExecuteCue",
-        ActorName=gas_runtime_actor,
-        Tag="GameplayCue.Ability.Activate",
-    )
-    assert isinstance(cap_first(cue), dict), cue
+    tags = cap_first(mcp.call("GetGameplayTags", Sections=["Hierarchy"], Limit=1)).get("Tags") or []
+    tag = tags[0]["Tag"] if tags else None
+    for action in ("AddLooseTag", "ExecuteCue"):
+        args = {"Action": action, "ActorName": gas_runtime_actor,
+                "Tag": tag or "Nexus.McpMissingTag"}
+        if tag:
+            result = mcp.call_capability("InteractRuntimeActorAbilitySystem", **args)
+            assert not cap_first(result).get("Error"), result
+        else:
+            # 空标签工程验证拒绝路径，不依赖某个游戏预先注册的标签。
+            result = assert_tool_error(mcp.try_call("InteractRuntimeActorAbilitySystem", **args))
+            assert "Invalid GameplayTag" in cap_first(result).get("Error", ""), result

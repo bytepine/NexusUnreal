@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pytest
 
+from _framework.assertions import assert_tool_error
 from _framework.asset_helpers import first_asset_path
 from _framework.capability_probe import is_capability_available
 from _framework.mcp_client import MCPError, cap_first
@@ -38,7 +39,7 @@ def test_exec_python_eval(mcp, require_tools):
 def test_exec_python_traceback(mcp, require_tools):
     """语法错误须落到 error 字段（entry 计为失败），而不是静默成功。"""
     require_tools("ExecPython")
-    r = cap_first(mcp.call("ExecPython", Code="raise RuntimeError('nexus mcp probe')"))
+    r = cap_first(assert_tool_error(mcp.try_call("ExecPython", Code="raise RuntimeError('nexus mcp probe')")))
     assert r.get("bExecuted") is False, r
     assert "nexus mcp probe" in (r.get("Error") or ""), r
 
@@ -115,7 +116,7 @@ def test_get_python_api_rejects_unsafe_query(mcp, require_tools):
 def test_get_python_api_missing_attr_reports_version(mcp, require_tools):
     """探测不存在的 API 时同样要带版本 —— AI 正是靠它判断该换哪套 API。"""
     require_tools("GetPythonApi")
-    r = cap_first(mcp.call("GetPythonApi", Target="unreal.NexusNoSuchApi"))
+    r = cap_first(assert_tool_error(mcp.try_call("GetPythonApi", Target="unreal.NexusNoSuchApi")))
     assert r.get("Error"), r
     assert r.get("EngineVersion"), r
     assert r.get("pythonVersion"), r
@@ -224,7 +225,7 @@ def test_capture_editor_panel_list(mcp, require_tools):
 def test_capture_editor_panel_rejects_view_angle_without_actor(mcp, require_tools):
     """viewAngle 必须配 actorName，否则请求本身矛盾。"""
     require_tools("CaptureEditorPanel")
-    entry = cap_first(mcp.call_capability("CaptureEditorPanel", ViewAngle="Top"))
+    entry = cap_first(assert_tool_error(mcp.try_call("CaptureEditorPanel", ViewAngle="Top")))
     assert entry.get("bSuccess") is False, entry
     assert "ActorName" in (entry.get("Error") or ""), entry
 

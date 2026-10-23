@@ -136,7 +136,7 @@ def test_manage_level_properties(mcp, scratch_level):
     r = mcp.call_capability(
         "ManageAssetLevel",
         AssetPath=scratch_level,
-        Operations=[{"Action": "SetProperty", "PropertyPath": "WorldSettings.KillZ", "Value": "-10000"}],
+        Operations=[{"Action": "SetProperty", "PropertyPath": "KillZ", "Value": "-10000"}],
     )
     entry = cap_first(r)
     if entry.get("Error"):
@@ -159,8 +159,8 @@ def test_manage_level_properties(mcp, scratch_level):
         Operations=[{
             "Action": "SetActorProperty",
             "ActorName": name,
-            "PropertyPath": "RelativeLocation.Z",
-            "Value": "0",
+            "PropertyPath": "bHidden",
+            "Value": "false",
         }],
     )
     if cap_first(ap).get("Error"):
