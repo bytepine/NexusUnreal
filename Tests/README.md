@@ -128,3 +128,11 @@ pytest Tests --ue-url http://127.0.0.1:45000/stream
 | IKRig / IKRetargeter | `test_117_ik.py` |
 | MVVM | `test_118_mvvm.py`（UE 5.5+） |
 | PCG Graph | `test_119_pcg.py`（UE 5.4+） |
+
+## Trace L1（UE 4.26+）
+
+过滤前缀为 `NexusLink.Trace.`。Readback 优先使用 `-NexusTraceTestPath` 提供的已关闭录制文件，避免旧版引擎进程内停录时的写线程错误；UE5 未提供文件时仍可自行短录制。先在独立 Editor-Cmd 进程中运行 `NexusLink.Trace.RecordProbe`，启动参数加 `-trace=cpu,frame,bookmark -tracefile=<absolute-path>`，并用 `-TestExit="Automation Test Queue Empty"` 在完成后退出并关闭文件。第二个进程运行 `NexusLink.Trace.`，传 `-NexusTraceTestPath=<absolute-path>`。两次均可用 `-unattended -nullrhi -nosplash -nosound`。
+
+跨版本运行使用隔离测试宿主：低于 UE 5.6 的副本不声明 Target 原本就不编译的 `NexusGameplay` 模板模块，并用 `-ini:EditorPerProjectUserSettings:[/Script/UnrealEd.EditorLoadingSavingSettings]:LoadLevelAtStartup=None` 禁止加载高版本默认关卡；不修改原工程。
+
+UE4 的 Store 用例在独立临时目录启动自动分配端口的 Store，不依赖用户已有的 Insights 会话；检查无路径列表、TraceId 流回读及会话复用。快照流测试覆盖读取上限和提前断流。测试用的 Store 端口仅通过 C++ 内部入口传递，不增加 MCP 参数。

@@ -36,6 +36,8 @@ public class NexusLinkTests : ModuleRules
 				{
 					// NexusLinkEditor：EditorOnly cap 测试
 					"NexusLinkEditor",
+					"TraceServices",
+					"TraceAnalysis",
 					"UnrealEd",
 					"BlueprintGraph",
 					"KismetCompiler",
