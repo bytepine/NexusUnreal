@@ -1,5 +1,7 @@
 ﻿# NexusUnreal
 
+GAS 联机诊断示例与一服两客户端复测脚本见 [测试指南](Tests/README.md#gas-诊断与联机复测)。默认游戏模式不变。
+
 **公开** UE 5.7 **示例工程**：演示如何在 ThirdPerson 模板项目中集成 [NexusLink](https://github.com/bytepine/NexusLink) MCP 插件。含 UnLua 脚本、游戏 C++ 模块，MCP 回归测试放在这个工程里。
 
 > 本仓**不包含** NexusLink、UnLua、NexusLinkExt 插件本体（以 git 子模块挂载）；Fab / 商店用户请单独安装 NexusLink，或克隆时 `--recurse-submodules`。

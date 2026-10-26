@@ -1,5 +1,19 @@
 # NexusUnreal — pytest E2E 测试
 
+## GAS 诊断与联机复测
+
+`test_120_gas_diagnostics.py` 在 PIE 验证诊断只读、已有技能激活、事件捕获与停止；标记 `l4_runtime`，用 `py Script/run_e2e.py --gui -k gas_diagnostics` 执行。测试依赖示例工程原生诊断类和 `Config/DefaultGameplayTags.ini`，不以 skip 代替功能通过。
+
+先编译 UE 5.7 的 NexusEditor，再运行：
+
+```sh
+py Script/gas_network_retest.py --ue-root <UE_5.7-directory> --repeat 10
+```
+
+工具启动隐藏的独立 `-server` / `-game` / `-game` 进程，使用 Engine Entry 地图和显式 `NexusDiagnosticGameMode`，不改默认 GameMode；可用 `--uproject` 指向其他已编译的示例工程副本。结束时只关闭本次创建的进程。日志、生成的用例、证据和 JUnit 默认保存在 `Saved/GasRetest/`。
+
+覆盖：未授予、缺少必需标签、阻止标签、冷却、消耗不足、预测客户端激活但服务器拒绝，以及恢复条件后的 LocalPredicted / ServerOnly 成功。观察客户端检查复制的提交计数，不要求它能看到其他玩家的技能列表。能力文档与 JSON 用例格式见 [GAS replay](../Plugins/NexusLink/docs/gas-retest.md)。
+
 本目录为 **NexusUnreal 示例工程**内的 NexusLink L2 回归测试实现。
 
 批量调用中只要有失败就返回 `isError=true`；预期失败用 `assert_tool_error(mcp.try_call(...))` 同时校验错误标记和 `structuredContent`，再检查 `FailureCount`、`bRolledBack` 与逐项结果。不要以请求未抛异常代替验证回滚状态。蓝图 CDO 或运行时控件依赖编译后的类，写入后先编译；网格、纹理与动画写入使用 `test_ns` 内的副本。

@@ -23,7 +23,7 @@ public class Nexus : ModuleRules
 		PublicDependencyModuleNames.Add("NexusInputStubs");
 #endif
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] { "GameplayAbilities", "GameplayTags", "GameplayTasks" });
 
 		PublicIncludePaths.Add("Nexus");
 	}
