@@ -3,11 +3,27 @@
 
 from __future__ import annotations
 
+import json
+from urllib.request import urlopen
+
 import pytest
 
 from _framework.mcp_client import MCPError, cap_first
 
 pytestmark = pytest.mark.smoke
+
+
+def test_proxy_discovery_status(_ue_url):
+    """真实 HTTP 响应须能被已发布的 Desktop / Rider / VSCode 发现。"""
+    with urlopen(_ue_url.rsplit("/stream", 1)[0] + "/status", timeout=5) as response:
+        status = json.load(response)
+    assert "nexus" in status["server"].lower()
+    for key in ("version", "engineVersion", "projectName", "netRole", "hostKind"):
+        assert isinstance(status[key], str), key
+    assert isinstance(status["wsPort"], int)
+    for key in ("hasPlayWorld", "authRequired"):
+        assert isinstance(status[key], bool), key
+    assert "token" not in status and "authToken" not in status
 
 
 def test_tools_list_contains_meta_tools(mcp, tool_names):

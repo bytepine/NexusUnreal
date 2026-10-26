@@ -91,6 +91,26 @@ bool FNexusProtocolContractTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("错误 message 的实际拼写"), HasExactReliabilityField(Error, TEXT("message")));
 	TestEqual(TEXT("标准错误 code"), Error->GetIntegerField(TEXT("code")), -32602);
 	TestEqual(TEXT("标准错误 message"), Error->GetStringField(TEXT("message")), FString(TEXT("invalid")));
+	Dispatcher.DispatchDirect(TEXT(R"({"jsonrpc":"2.0","id":3,"method":"status"})"),
+		[&Response](const FString& Json) { Response = ParseReliabilityResponse(Json); });
+	if (!TestTrue(TEXT("代理 status 方法可用"), Response.IsValid() && Response->HasField(TEXT("result")))) return false;
+	const TSharedPtr<FJsonObject> Status = Response->GetObjectField(TEXT("result"));
+	for (const TCHAR* Key : { TEXT("server"), TEXT("version"), TEXT("engineVersion"), TEXT("projectName"), TEXT("authRequired") })
+	{
+		TestTrue(FString::Printf(TEXT("代理 status 字段 %s 保持原拼写"), Key), HasExactReliabilityField(Status, Key));
+	}
+	Dispatcher.DispatchDirect(TEXT(R"({"jsonrpc":"2.0","id":4,"method":"nexus/instructions"})"),
+		[&Response](const FString& Json) { Response = ParseReliabilityResponse(Json); });
+	if (!TestTrue(TEXT("代理说明返回成功"), Response.IsValid() && Response->HasField(TEXT("result")))) return false;
+	TestTrue(TEXT("代理 instructions 保持原拼写"), HasExactReliabilityField(Response->GetObjectField(TEXT("result")), TEXT("instructions")));
+	Dispatcher.DispatchDirect(TEXT(R"({"jsonrpc":"2.0","id":5,"method":"nexus/proxy_config"})"),
+		[&Response](const FString& Json) { Response = ParseReliabilityResponse(Json); });
+	if (!TestTrue(TEXT("代理配置返回成功"), Response.IsValid() && Response->HasField(TEXT("result")))) return false;
+	const TSharedPtr<FJsonObject> ProxyConfig = Response->GetObjectField(TEXT("result"));
+	for (const TCHAR* Key : { TEXT("protocolVersion"), TEXT("minProxyVersion"), TEXT("initializePrefix"), TEXT("nexusLinkVersion") })
+	{
+		TestTrue(FString::Printf(TEXT("代理配置字段 %s 保持原拼写"), Key), HasExactReliabilityField(ProxyConfig, Key));
+	}
 	return true;
 }
 

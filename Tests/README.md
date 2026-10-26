@@ -1,5 +1,7 @@
 # NexusUnreal — pytest E2E 测试
 
+`test_00_smoke.py::test_proxy_discovery_status` 检查真实 HTTP `/status` 的既有发现协议字段（含 `server`、`wsPort`、`authRequired`），避免 Capability 命名迁移破坏 Desktop / Rider / VSCode 的实例扫描。
+
 ## GAS 诊断与联机复测
 
 `test_120_gas_diagnostics.py` 在 PIE 验证诊断只读、已有技能激活、事件捕获与停止；标记 `l4_runtime`，用 `py Script/run_e2e.py --gui -k gas_diagnostics` 执行。测试依赖示例工程原生诊断类和 `Config/DefaultGameplayTags.ini`，不以 skip 代替功能通过。

@@ -384,7 +384,7 @@ class UELauncher:
             for port in self.port_range:
                 try:
                     r = client.get(f"http://127.0.0.1:{port}{_STATUS_ENDPOINT}")
-                    if r.status_code == 200 and "WsPort" in r.text:
+                    if r.status_code == 200 and "wsPort" in r.text:
                         found.add(port)
                 except Exception:  # noqa: BLE001
                     continue
@@ -409,7 +409,7 @@ class UELauncher:
                         continue
                     try:
                         r = client.get(f"http://127.0.0.1:{port}{_STATUS_ENDPOINT}")
-                        if r.status_code == 200 and "WsPort" in r.text:
+                        if r.status_code == 200 and "wsPort" in r.text:
                             self._resolved_port = port
                             log.info("UE ready on port %d (%s)", port, r.text.strip())
                             return

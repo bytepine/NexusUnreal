@@ -8,6 +8,8 @@
 
 ### Added
 
+- test(mcp): 代理基础协议回归检查真实 `/status` 字段、WS 状态方法、握手说明与代理配置；启动器继续按 `wsPort` 识别实例。
+
 - feat(gas): 显式诊断 GameMode、复制角色与资源、LocalPredicted / ServerOnly 技能；`Script/gas_network_retest.py` 启动一服两客户端，验证常见激活失败、服务器拒绝预测及修复后复测，保留逐轮 JSON / JUnit；补 PIE GAS 诊断和 section 大小写 L1 回归。
 
 - feat(plugin): `NexusLinkExt` 以子模块挂载 [bytepine/NexusLinkExt](https://github.com/bytepine/NexusLinkExt)；`NexusLinkExt`（Runtime）与 `NexusLinkExtEditor`（Editor）承接从 NexusLink 迁出的 UnLua Capability。L1 拆到工程侧 `Plugins/NexusLinkExtTestSuite`（模块 `NexusLinkExtTests`，过滤前缀 `NexusLinkExt.`）；`NexusLinkTestSuite` 不再依赖 NexusLinkExt
