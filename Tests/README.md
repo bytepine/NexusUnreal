@@ -12,6 +12,8 @@
 py Script/gas_network_retest.py --ue-root <UE_5.7-directory> --repeat 10
 ```
 
+首次体验可加 `--quickstart`（固定一轮 `PredictionRejected` → `Success`）。脚本先只读检查角色绑定及必需技能，再复现拒绝并恢复条件，打开输出目录的 `index.html` 比较两次报告。每个场景包含 `case.json`、`report.html`、`results.json` 与 `junit.xml`；预检报告在 `startup/`。不加此参数时保留原八场景回归。
+
 工具启动隐藏的独立 `-server` / `-game` / `-game` 进程，使用 Engine Entry 地图和显式 `NexusDiagnosticGameMode`，不改默认 GameMode；可用 `--uproject` 指向其他已编译的示例工程副本。结束时只关闭本次创建的进程。日志、生成的用例、证据和 JUnit 默认保存在 `Saved/GasRetest/`。
 
 覆盖：未授予、缺少必需标签、阻止标签、冷却、消耗不足、预测客户端激活但服务器拒绝，以及恢复条件后的 LocalPredicted / ServerOnly 成功。观察客户端检查复制的提交计数，不要求它能看到其他玩家的技能列表。能力文档与 JSON 用例格式见 [GAS replay](../Plugins/NexusLink/docs/gas-retest.md)。

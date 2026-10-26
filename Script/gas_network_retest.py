@@ -17,6 +17,7 @@ import time
 PROJECT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT / "Plugins/NexusLink/tools"))
 from gas_retest.runner import Client, Runner, RunError, write_reports
+from gas_retest.report import write_index
 
 ABILITY = "/Script/Nexus.NexusDiagnosticAbility"
 SERVER_ABILITY = "/Script/Nexus.NexusDiagnosticServerAbility"
@@ -53,6 +54,7 @@ def build_case(endpoints, scenario, ability=ABILITY):
         ability = SERVER_ABILITY
     case = {"SchemaVersion": 1, "Name": scenario, "Endpoints": endpoints,
             "Actors": {"Hero": {"ClassFilter": "NexusDiagnosticCharacter", "OwnerEndpoint": "Owner"}},
+            "RequiredAbilities": [{"Actor": "Hero", "Endpoint": role, "AbilityPath": ability} for role in ("Server", "Owner")],
             "Setup": [], "Steps": [], "Teardown": []}
     setup, steps, cleanup = case["Setup"], case["Steps"], case["Teardown"]
     for role in ("Server", "Owner"):
@@ -136,14 +138,17 @@ def main():
     parser.add_argument("--uproject", type=Path, default=PROJECT / "Nexus.uproject")
     parser.add_argument("--repeat", type=int, default=10)
     parser.add_argument("--output", type=Path, default=PROJECT / "Saved/GasRetest")
+    parser.add_argument("--quickstart", action="store_true", help="One round: prediction rejection, condition restore, successful activation; generates index.html")
     args = parser.parse_args()
     if args.repeat < 1:
         parser.error("--repeat must be positive")
+    if args.quickstart:
+        args.repeat = 1
     binary = args.ue_root / "Engine/Binaries/Win64/UnrealEditor.exe"
     if not binary.exists():
         parser.error("Win64 UnrealEditor.exe not found")
     args.output.mkdir(parents=True, exist_ok=True)
-    processes, logs, endpoints = [], [], {}
+    processes, logs, endpoints, reports = [], [], {}, []
     game_port = free_port(socket.SOCK_DGRAM)
     try:
         for role in ("Server", "Owner", "Observer"):
@@ -169,29 +174,37 @@ def main():
                     time.sleep(0.5)
         # 等待两个客户端完成登录与 ActorInfo 初始化。
         for attempt in range(100):
-            probe = Runner(build_case(endpoints, "NotGranted"))
-            report = probe.run()
+            probe = Runner(build_case(endpoints, "Success"))
+            report = probe.run(preflight=True)
+            report["Name"] = "接入预检"
             if report["ExitCode"] == 0:
                 write_reports(report, args.output / "startup")
+                reports.append(("startup", report))
                 break
             time.sleep(0.2)
         else:
             write_reports(report, args.output / "startup")
             raise RunError("Network actor binding did not become ready")
+        scenarios = ("PredictionRejected", "Success") if args.quickstart else ("NotGranted", "MissingRequired", "Blocked", "Cost", "Cooldown", "PredictionRejected", "Success", "ServerOnly")
         for iteration in range(args.repeat):
-            for scenario in ("NotGranted", "MissingRequired", "Blocked", "Cost", "Cooldown", "PredictionRejected", "Success", "ServerOnly"):
+            for scenario in scenarios:
                 case = build_case(endpoints, scenario, SERVER_ABILITY if scenario == "ServerOnly" else ABILITY)
                 directory = args.output / f"{iteration + 1:02d}-{scenario}"
                 directory.mkdir(parents=True, exist_ok=True)
                 (directory / "case.json").write_text(json.dumps(case, indent=2), encoding="utf-8")
                 report = Runner(case).run()
                 write_reports(report, directory)
+                reports.append((directory.name, report))
                 print(f"round={iteration + 1} {scenario}: exit={report['ExitCode']}", flush=True)
                 if report["ExitCode"]:
                     return report["ExitCode"]
         return 0
     except RunError as exc:
         print(str(exc), file=sys.stderr)
+        report = {"SchemaVersion": 1, "Name": "Startup", "Mode": "Preflight", "ExitCode": 2,
+                  "Records": [{"Id": "Startup", "Stage": "Preflight", "Status": "Error", "Message": str(exc)}]}
+        write_reports(report, args.output / "startup")
+        reports = [(name, item) for name, item in reports if name != "startup"] + [("startup", report)]
         return 2
     finally:
         for process in processes:
@@ -203,6 +216,9 @@ def main():
                     process.kill(); process.wait()
         for log in logs:
             log.close()
+        if reports:
+            write_index(reports, args.output)
+            print(f"Report: {args.output / 'index.html'}", flush=True)
 
 
 if __name__ == "__main__":
