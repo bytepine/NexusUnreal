@@ -40,13 +40,7 @@ py Script/gas_regression.py --ue-root <UE_5.7-directory>
 
 基线更新须人工审查：先用插件工具的 `--save-baseline` 保存到一个新文件，检查断言、权威端事件和用例签名，再替换对应受版本控制的文件，与用例变更一起提交。汇总报告不能替代单个场景基线。无需 UE 的门禁/归档回归：`py -m unittest discover -s Script/tests -p 'test_gas*.py'`。
 
-[GAS Regression 工作流](../.github/workflows/gas-regression.yml) 在相关 push、PR 和手动运行时执行工具检查；真实 UE 联机任务只接收可信 push / 手动运行，要求：
-
-1. Windows x64 自托管 Runner，额外标签 `nexus-ue`；安装 UE 5.7、C++ 编译工具链和 Git LFS。
-2. 仓库变量 `UE_ROOT` 指向引擎目录，`GAS_REGRESSION_ENABLED=true` 启用联机任务。
-3. 工作流先编译诊断工程，再执行固定用例；始终上传构建日志和回归报告，保留 14 天。
-
-没有启用执行环境时，联机任务会显示 skipped，不表示 UE 验证通过；工具检查仍正常执行。Fork PR 不在自托管机执行。
+[GAS Tools Checks 工作流](../.github/workflows/gas-regression.yml) 仅在 GitHub 提供的 Ubuntu 机器上执行无需 UE 的工具检查。UE 编译和联机复测由用户手动启动，不通过 GitHub 调度本机，也不安装后台 Runner。
 
 本目录为 **NexusUnreal 示例工程**内的 NexusLink L2 回归测试实现。
 

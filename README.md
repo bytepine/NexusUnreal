@@ -1,6 +1,6 @@
 ﻿# NexusUnreal
 
-GAS 联机诊断示例、一服两客户端 --quickstart 入门流程、固定用例基线回归及 HTML / JSON / JUnit 归档见 [测试指南](Tests/README.md#gas-诊断与联机复测)。默认游戏模式不变。
+GAS 联机诊断示例、一服两客户端 --quickstart 入门流程、手动启动的固定用例基线复测及 HTML / JSON / JUnit 归档见 [测试指南](Tests/README.md#gas-诊断与联机复测)。默认游戏模式不变。
 
 **公开** UE 5.7 **示例工程**：演示如何在 ThirdPerson 模板项目中集成 [NexusLink](https://github.com/bytepine/NexusLink) MCP 插件。含 UnLua 脚本、游戏 C++ 模块，MCP 回归测试放在这个工程里。
 
