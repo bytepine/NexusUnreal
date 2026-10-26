@@ -45,6 +45,8 @@ def test_capture_try_activate_and_stop(mcp, diagnostic_actor):
         assert events.get("Dropped", 0) == 0
         assert "Committed" in events["EventTypes"]
         assert "Activated" in events["EventTypes"]
+        repeated = cap_first(mcp.call_capability(GET, **args, Sections=["ActivationEvents"], CaptureId=capture))
+        assert repeated["Events"] == events["Events"]
     finally:
         mcp.call_capability(INTERACT, **args, Action="StopActivationCapture", CaptureId=capture)
     assert_tool_error(mcp.try_call(GET, **args, Sections=["ActivationEvents"], CaptureId=capture))

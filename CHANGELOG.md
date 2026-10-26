@@ -8,7 +8,15 @@
 
 ### Added
 
-- test(mcp): 代理基础协议回归检查真实 `/status` 字段、WS 状态方法、握手说明与代理配置；启动器继续按 `wsPort` 识别实例。
+- test(bt): 独立 GameModeBase 行为树夹具与 `Script/bt_retest_acceptance.py`，验证继承键、错误类型、显式 Pawn/Controller、条件失败/恢复、超时快照、清理、基线、停止树及目标销毁；原生类型与继承键 Automation 配套覆盖。
+
+- test(trace): 确定性完整帧窗口/中位数与真实停录 Trace 读取测试；`Script/trace_compare_acceptance.py` 通过隔离 Editor 的显式 MCP 端点验证导出、CPU 截断信息、原始快照与离线报告。
+
+- test(asset): 预览与验证 L1/MCP E2E 覆盖标量类型、只读资产/脏标记/Undo、过期前值、单次部分成功、跨调用回滚、编译失败与读回不一致；全部使用隔离测试资产。
+
+- test(gas): 新增独立 Actor / Pawn / PlayerState ASC 测试夹具，以及 `Script/gas_generic_retest.py`：使用 GameModeBase 独立进程验证通用接入、失败取证、恢复、重复执行和基线比较，不修改默认 GameMode。
+
+- test(mcp): 代理基础协议回归检查真实 `/status` 字段、WS 状态方法、握手说明与代理配置；启动器继续按 `wsPort` 识别实例；SchemaDump 默认导出 Saved，可显式指定输出路径，测试不再自动覆盖插件 Schema 清单。
 
 - feat(gas): 显式诊断 GameMode、复制角色与资源、LocalPredicted / ServerOnly 技能；`Script/gas_network_retest.py` 启动一服两客户端，验证常见激活失败、服务器拒绝预测及修复后复测，支持 --quickstart 一轮预测拒绝与恢复后成功，启动前只读检查角色与必需技能；用户手动运行 `Script/gas_regression.py` 可固定复测预测拒绝与恢复成功，先核对受版本控制的基线及签名，再生成对比和 HTML / JSON / JUnit / ZIP 归档，失败及未执行用例进入门禁；GitHub CI 仅在云端执行无需 UE 的工具检查；补 PIE GAS 诊断和 section 大小写 L1 回归。
 

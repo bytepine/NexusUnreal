@@ -1,8 +1,14 @@
 # NexusUnreal — pytest E2E 测试
 
+行为树验收：编译后运行 `python Script/bt_retest_acceptance.py --ue-root <UE-directory> --output <new-output-directory>`。独立 GameModeBase 服务器显式生成测试 Pawn/AIController 和继承 Blackboard，验证失败/恢复、末次快照、清理、基线、停止树及销毁目标。配套 UE Automation 前缀为 `NexusLink.AI.Blackboard`，不改项目默认 GameMode。
+
+性能对比验收：先运行 UE Automation `NexusLink.Trace.GetTrace` 与 `NexusLink.Trace.Statistics`，再运行 `python Script/trace_compare_acceptance.py --ue-root <UE-directory> --output <new-output-directory>`。脚本启动隔离 Editor，通过显式端点读取 Automation 生成并已停录的 Trace，验证导出和离线零差值报告，结束后关闭本次进程。
+
 `test_00_smoke.py::test_proxy_discovery_status` 检查真实 HTTP `/status` 的既有发现协议字段（含 `server`、`wsPort`、`authRequired`），避免 Capability 命名迁移破坏 Desktop / Rider / VSCode 的实例扫描。
 
 ## GAS 诊断与联机复测
+
+通用工程接入验收：编译后运行 `python Script/gas_generic_retest.py --ue-root <UE-directory>`。启动隔离的 `GameModeBase` 服务器，显式生成三个独立测试目标（普通 Actor、Pawn、PlayerState ASC），验证 GenericActivation 的预检、真实失败标签、恢复条件、再次执行及基线比较。输出在 `Saved/GenericGasRetest`，输出目录已有基线时拒绝覆盖，请用 `--output` 指定新目录。该场景不使用 `NexusDiagnosticGameMode`；未修改默认游戏配置。
 
 `test_120_gas_diagnostics.py` 在 PIE 验证诊断只读、已有技能激活、事件捕获与停止；标记 `l4_runtime`，用 `py Script/run_e2e.py --gui -k gas_diagnostics` 执行。测试依赖示例工程原生诊断类和 `Config/DefaultGameplayTags.ini`，不以 skip 代替功能通过。
 

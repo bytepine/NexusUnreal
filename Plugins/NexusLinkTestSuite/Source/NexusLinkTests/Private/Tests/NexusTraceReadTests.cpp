@@ -18,6 +18,8 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Utils/NexusEditorTraceUtils.h"
+#include "Utils/NexusTraceStatistics.h"
+#include <limits>
 #include "Capabilities/Trace/NexusTraceSession.h"
 #if !NX_UE_HAS_TRACE_STORE_DIRECTORY
 #include "Trace/StoreService.h"
@@ -170,7 +172,7 @@ bool FNexusTraceReadbackTest::RunTest(const FString& Parameters)
 	double FrameCount = 0.0;
 	TestTrue(TEXT("has frames"), Entry->TryGetNumberField(TEXT("FrameCount"), FrameCount) && FrameCount >= 1.0);
 
-	const TCHAR* NumericFields[] = { TEXT("AverageSeconds"), TEXT("P95Seconds"), TEXT("MaxSeconds"), TEXT("StartTime"), TEXT("EndTime") };
+	const TCHAR* NumericFields[] = { TEXT("AverageSeconds"), TEXT("MedianSeconds"), TEXT("P95Seconds"), TEXT("MaxSeconds"), TEXT("StartTime"), TEXT("EndTime"), TEXT("TotalTimerCount") };
 	for (const TCHAR* Field : NumericFields)
 	{
 		double Value = 0.0;
@@ -211,11 +213,34 @@ bool FNexusTraceReadbackTest::RunTest(const FString& Parameters)
 	const FCapabilityResult WindowResult = Capability->Run(Args);
 	const FJsonObject* WindowEntry = FirstEntry(WindowResult);
 	TestTrue(TEXT("explicit window"), WindowEntry && !WindowEntry->HasField(TEXT("SectionErrors")));
+	Args->SetNumberField(TEXT("TimerLimit"), 1);
+	const FCapabilityResult LimitedResult = Capability->Run(Args);
+	const FJsonObject* Limited = FirstEntry(LimitedResult);
+	TestTrue(TEXT("timer truncation explicitly reported"), Limited && Limited->HasField(TEXT("bTimersTruncated"))
+		&& Limited->GetNumberField(TEXT("TotalTimerCount")) >= Limited->GetArrayField(TEXT("Timers")).Num());
 	Args->SetNumberField(TEXT("EndTime"), 0.0);
 	const FCapabilityResult InvalidWindowResult = Capability->Run(Args);
 	const FJsonObject* InvalidWindowEntry = FirstEntry(InvalidWindowResult);
 	TestTrue(TEXT("invalid window"), InvalidWindowEntry && InvalidWindowEntry->HasField(TEXT("SectionErrors")));
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusTraceStatisticsTest, "NexusLink.Trace.Statistics.WindowAndMedian",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusTraceStatisticsTest::RunTest(const FString& Parameters)
+{
+	TestTrue(TEXT("Complete contained frame"), FNexusTraceStatistics::AcceptFrame(1, 2, true, 1, 2));
+	TestFalse(TEXT("Partial left frame excluded"), FNexusTraceStatistics::AcceptFrame(.5, 1.5, true, 1, 2));
+	TestFalse(TEXT("Partial right frame excluded"), FNexusTraceStatistics::AcceptFrame(1.5, 2.5, true, 1, 2));
+	TestFalse(TEXT("Unfinished frame excluded"), FNexusTraceStatistics::AcceptFrame(1, std::numeric_limits<double>::infinity(), false, 0, 0));
+	FJsonObject Stats;
+	FNexusTraceStatistics::Write({1, 2, 3, 100}, Stats);
+	TestEqual(TEXT("Even median"), Stats.GetNumberField(TEXT("MedianSeconds")), 2.5);
+	TestEqual(TEXT("Mean"), Stats.GetNumberField(TEXT("AverageSeconds")), 26.5);
+	TestEqual(TEXT("P95 nearest rank"), Stats.GetNumberField(TEXT("P95Seconds")), 100.0);
+	FNexusTraceStatistics::Write({1, 3, 9}, Stats);
+	TestEqual(TEXT("Odd median"), Stats.GetNumberField(TEXT("MedianSeconds")), 3.0);
 	return true;
 }
 

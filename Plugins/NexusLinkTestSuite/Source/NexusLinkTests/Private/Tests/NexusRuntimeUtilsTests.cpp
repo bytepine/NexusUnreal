@@ -4,11 +4,27 @@
 #include "Misc/AutomationTest.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Engine/DataTable.h"
 #include "Utils/NexusRuntimeUtils.h"
 
 #if WITH_EDITOR
 #include "Editor.h"
 #endif
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusObjectIdentityTest, "NexusLink.Utils.Runtime.ObjectIdentity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FNexusObjectIdentityTest::RunTest(const FString& Parameters)
+{
+	UObject* First = NewObject<UDataTable>();
+	UObject* Second = NewObject<UDataTable>();
+	const FString FirstId = FNexusRuntimeUtils::GetObjectIdentity(First);
+	TestTrue(TEXT("Null has no identity"), FNexusRuntimeUtils::GetObjectIdentity(nullptr).IsEmpty());
+	TestTrue(TEXT("Contains slot and serial"), FirstId.Contains(TEXT(":")));
+	TestEqual(TEXT("Stable while alive"), FNexusRuntimeUtils::GetObjectIdentity(First), FirstId);
+	TestNotEqual(TEXT("Distinct local objects"), FNexusRuntimeUtils::GetObjectIdentity(Second), FirstId);
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FNexusLinkRuntimeUtilsPlayWorldTest,

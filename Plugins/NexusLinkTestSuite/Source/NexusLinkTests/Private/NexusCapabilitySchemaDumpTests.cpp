@@ -8,6 +8,8 @@
 #include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -34,7 +36,9 @@ bool FNexusCapabilitySchemaDump::RunTest(const FString& Parameters)
 		}
 	}
 
-	const FString OutPath = FPaths::Combine(Plugin->GetBaseDir(), TEXT("scripts/generated/capability_schemas.json"));
+	// 测试默认只写 Saved；发布目录的 Schema 更新必须显式指定输出。
+	FString OutPath = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("NexusLink/capability-schemas.json"));
+	FParse::Value(FCommandLine::Get(), TEXT("NexusSchemaOutput="), OutPath);
 	IFileManager::Get().MakeDirectory(*FPaths::GetPath(OutPath), true);
 	const FString Json = FNexusJsonUtils::SerializeCondensed(Root);
 	const bool bOk = FFileHelper::SaveStringToFile(Json, *OutPath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);

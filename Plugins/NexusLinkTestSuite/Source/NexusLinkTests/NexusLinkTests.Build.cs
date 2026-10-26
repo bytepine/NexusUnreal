@@ -23,6 +23,7 @@ public class NexusLinkTests : ModuleRules
 			new string[]
 			{
 				"NexusLink",
+				"AIModule",
 				"Json",
 				"JsonUtilities",
 				"Projects",
