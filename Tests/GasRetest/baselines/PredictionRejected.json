@@ -1,0 +1,602 @@
+{
+  "Kind": "GasRetestBaseline",
+  "SchemaVersion": 1,
+  "SavedAt": "2026-10-26T05:03:49.293415+00:00",
+  "Report": {
+    "SchemaVersion": 1,
+    "Name": "PredictionRejected",
+    "ExitCode": 0,
+    "CaseSignature": "59c17eebd7d9dec25b228967d4a18d77075b2b0dc5c24fb2d3c5382bb17e5df3",
+    "Mode": "Replay",
+    "Contexts": {
+      "Owner": {
+        "ProcessId": 43676,
+        "WorldId": 50112,
+        "WorldName": "/Engine/Maps/Entry.Entry",
+        "Owner": "NexusDiagnosticCharacter_0",
+        "Avatar": "NexusDiagnosticCharacter_0",
+        "PlayerId": 256,
+        "bLocallyControlled": true,
+        "bAuthority": false,
+        "bActorInfoReady": true,
+        "NetMode": 3,
+        "LocalRole": 2
+      },
+      "Server": {
+        "ProcessId": 61552,
+        "WorldId": 46078,
+        "WorldName": "/Engine/Maps/Entry.Entry",
+        "Owner": "NexusDiagnosticCharacter_0",
+        "Avatar": "NexusDiagnosticCharacter_0",
+        "PlayerId": 256,
+        "bLocallyControlled": false,
+        "bAuthority": true,
+        "bActorInfoReady": true,
+        "NetMode": 1,
+        "LocalRole": 3
+      },
+      "Observer": {
+        "ProcessId": 42568,
+        "WorldId": 50112,
+        "WorldName": "/Engine/Maps/Entry.Entry",
+        "Owner": "NexusDiagnosticCharacter_1",
+        "Avatar": "NexusDiagnosticCharacter_1",
+        "PlayerId": 256,
+        "bLocallyControlled": false,
+        "bAuthority": false,
+        "bActorInfoReady": true,
+        "NetMode": 3,
+        "LocalRole": 1
+      }
+    },
+    "Endpoints": {
+      "Server": {
+        "Url": "http://127.0.0.1:55707/stream",
+        "bAuthority": true
+      },
+      "Owner": {
+        "Url": "http://127.0.0.1:50471/stream",
+        "bAuthority": false
+      },
+      "Observer": {
+        "Url": "http://127.0.0.1:50767/stream",
+        "bAuthority": false
+      }
+    },
+    "Records": [
+      {
+        "Id": "BindActors",
+        "Stage": "Preflight",
+        "Status": "Passed",
+        "Result": {
+          "Actors": {
+            "Hero": {
+              "Owner": "NexusDiagnosticCharacter_0",
+              "Server": "NexusDiagnosticCharacter_0",
+              "Observer": "NexusDiagnosticCharacter_1"
+            }
+          }
+        }
+      },
+      {
+        "Id": "Ability:Hero/Server",
+        "Stage": "Preflight",
+        "Endpoint": "Server",
+        "Status": "Passed",
+        "Result": {
+          "IsError": false,
+          "Payload": {
+            "ActorName": "NexusDiagnosticCharacter_0",
+            "Abilities": [
+              {
+                "AbilityClass": "NexusDiagnosticAbility",
+                "AbilityPath": "/Script/Nexus.NexusDiagnosticAbility",
+                "SpecHandle": "1",
+                "InstancingPolicy": 1,
+                "NetExecutionPolicy": 0,
+                "Level": 1,
+                "bIsActive": false,
+                "InputId": -1
+              },
+              {
+                "AbilityClass": "NexusDiagnosticServerAbility",
+                "AbilityPath": "/Script/Nexus.NexusDiagnosticServerAbility",
+                "SpecHandle": "2",
+                "InstancingPolicy": 1,
+                "NetExecutionPolicy": 3,
+                "Level": 1,
+                "bIsActive": false,
+                "InputId": -1
+              }
+            ],
+            "Count": 2
+          }
+        },
+        "AbilityPath": "/Script/Nexus.NexusDiagnosticAbility"
+      },
+      {
+        "Id": "Ability:Hero/Owner",
+        "Stage": "Preflight",
+        "Endpoint": "Owner",
+        "Status": "Passed",
+        "Result": {
+          "IsError": false,
+          "Payload": {
+            "ActorName": "NexusDiagnosticCharacter_0",
+            "Abilities": [
+              {
+                "AbilityClass": "NexusDiagnosticAbility",
+                "AbilityPath": "/Script/Nexus.NexusDiagnosticAbility",
+                "SpecHandle": "1",
+                "InstancingPolicy": 1,
+                "NetExecutionPolicy": 0,
+                "Level": 1,
+                "bIsActive": false,
+                "InputId": -1
+              },
+              {
+                "AbilityClass": "NexusDiagnosticServerAbility",
+                "AbilityPath": "/Script/Nexus.NexusDiagnosticServerAbility",
+                "SpecHandle": "2",
+                "InstancingPolicy": 1,
+                "NetExecutionPolicy": 3,
+                "Level": 1,
+                "bIsActive": false,
+                "InputId": -1
+              }
+            ],
+            "Count": 2
+          }
+        },
+        "AbilityPath": "/Script/Nexus.NexusDiagnosticAbility"
+      },
+      {
+        "Id": "clearCooldownServer",
+        "Endpoint": "Server",
+        "Status": "Passed",
+        "Stage": "Setup",
+        "Type": "Call",
+        "Capability": "InteractRuntimeActorAbilitySystem",
+        "StartedAt": "2026-10-26T05:01:32.194988+00:00",
+        "Result": {
+          "IsError": false,
+          "Payload": {
+            "ActorName": "NexusDiagnosticCharacter_0",
+            "Action": "RemoveEffect",
+            "EffectClass": "NexusDiagnosticCooldown",
+            "RemovedCount": 0
+          }
+        },
+        "DurationMs": 132.86
+      },
+      {
+        "Id": "setManaServer",
+        "Endpoint": "Server",
+        "Status": "Passed",
+        "Stage": "Setup",
+        "Type": "Call",
+        "Capability": "InteractRuntimeActorAbilitySystem",
+        "StartedAt": "2026-10-26T05:01:32.327870+00:00",
+        "Result": {
+          "IsError": false,
+          "Payload": {
+            "ActorName": "NexusDiagnosticCharacter_0",
+            "Action": "SetAttribute",
+            "AttributeName": "NexusDiagnosticAttributes.Mana",
+            "OldBaseValue": 100,
+            "NewBaseValue": 100
+          }
+        },
+        "DurationMs": 135.13
+      },
+      {
+        "Id": "clearCooldownOwner",
+        "Endpoint": "Owner",
+        "Status": "Passed",
+        "Stage": "Setup",
+        "Type": "Call",
+        "Capability": "InteractRuntimeActorAbilitySystem",
+        "StartedAt": "2026-10-26T05:01:32.463010+00:00",
+        "Result": {
+          "IsError": false,
+          "Payload": {
+            "ActorName": "NexusDiagnosticCharacter_0",
+            "Action": "RemoveEffect",
+            "EffectClass": "NexusDiagnosticCooldown",
+            "RemovedCount": 0
+          }
+        },
+        "DurationMs": 12.45
+      },
+      {
+        "Id": "setManaOwner",
+        "Endpoint": "Owner",
+        "Status": "Passed",
+        "Stage": "Setup",
+        "Type": "Call",
+        "Capability": "InteractRuntimeActorAbilitySystem",
+        "StartedAt": "2026-10-26T05:01:32.475465+00:00",
+        "Result": {
+          "IsError": false,
+          "Payload": {
+            "ActorName": "NexusDiagnosticCharacter_0",
+            "Action": "SetAttribute",
+            "AttributeName": "NexusDiagnosticAttributes.Mana",
+            "OldBaseValue": 100,
+            "NewBaseValue": 100
+          }
+        },
+        "DurationMs": 2.13
+      },
+      {
+        "Id": "break",
+        "Endpoint": "Server",
+        "Status": "Passed",
+        "Stage": "Setup",
+        "Type": "Call",
+        "Capability": "SetRuntimeActorProperty",
+        "StartedAt": "2026-10-26T05:01:32.477598+00:00",
+        "Result": {
+          "IsError": false,
+          "Payload": {
+            "ActorName": "NexusDiagnosticCharacter_0",
+            "PropertyPath": "bRejectActivation",
+            "ResolvedActor": "NexusDiagnosticCharacter_0",
+            "NewValue": "True"
+          }
+        },
+        "DurationMs": 117.87
+      },
+      {
+        "Id": "captureServer",
+        "Endpoint": "Server",
+        "Status": "Passed",
+        "Stage": "Setup",
+        "Type": "Call",
+        "Capability": "InteractRuntimeActorAbilitySystem",
+        "StartedAt": "2026-10-26T05:01:32.595476+00:00",
+        "Result": {
+          "IsError": false,
+          "Payload": {
+            "ActorName": "NexusDiagnosticCharacter_0",
+            "Action": "StartActivationCapture",
+            "CaptureId": "69D6CEA2428CCC666FC97C9FEC4D5F05"
+          }
+        },
+        "DurationMs": 133.53
+      },
+      {
+        "Id": "captureOwner",
+        "Endpoint": "Owner",
+        "Status": "Passed",
+        "Stage": "Setup",
+        "Type": "Call",
+        "Capability": "InteractRuntimeActorAbilitySystem",
+        "StartedAt": "2026-10-26T05:01:32.729017+00:00",
+        "Result": {
+          "IsError": false,
+          "Payload": {
+            "ActorName": "NexusDiagnosticCharacter_0",
+            "Action": "StartActivationCapture",
+            "CaptureId": "0AFCABEA4AC4E4B3172462886F58ABE6"
+          }
+        },
+        "DurationMs": 12.02
+      },
+      {
+        "Id": "diagnose",
+        "Endpoint": "Server",
+        "Status": "Passed",
+        "Stage": "Steps",
+        "Type": "Call",
+        "Capability": "GetRuntimeActorAbilitySystem",
+        "StartedAt": "2026-10-26T05:01:32.741054+00:00",
+        "Result": {
+          "IsError": false,
+          "Payload": {
+            "ActorName": "NexusDiagnosticCharacter_0",
+            "Context": {
+              "ProcessId": 61552,
+              "WorldId": 46078,
+              "WorldName": "/Engine/Maps/Entry.Entry",
+              "Owner": "NexusDiagnosticCharacter_0",
+              "Avatar": "NexusDiagnosticCharacter_0",
+              "PlayerId": 256,
+              "bLocallyControlled": false,
+              "bAuthority": true,
+              "bActorInfoReady": true,
+              "NetMode": 1,
+              "LocalRole": 3
+            },
+            "OwnedTags": [
+              "Nexus.Diagnostics.Required"
+            ],
+            "BlockedAbilityTags": [],
+            "ActivationDiagnostics": {
+              "bGranted": true,
+              "Evaluation": "SnapshotOnly",
+              "CustomChecks": "Unknown; reproduce with activation capture for engine failure tags",
+              "CostCheck": "Unknown; no project check functions invoked",
+              "SpecHandle": "1",
+              "AbilityPath": "/Script/Nexus.NexusDiagnosticAbility",
+              "bTagConfigurationKnown": true,
+              "MissingRequiredTags": [],
+              "BlockingOwnedTags": [],
+              "CostGE": "/Script/Nexus.NexusDiagnosticCost",
+              "CooldownGE": "/Script/Nexus.NexusDiagnosticCooldown",
+              "ConfiguredCooldownRemaining": 0
+            },
+            "Attributes": [
+              {
+                "name": "Mana",
+                "AttributeSet": "NexusDiagnosticAttributes",
+                "BaseValue": 100,
+                "CurrentValue": 100
+              }
+            ],
+            "Count": 0,
+            "Effects": []
+          }
+        },
+        "DurationMs": 121.4
+      },
+      {
+        "Id": "attempt",
+        "Endpoint": "Owner",
+        "Status": "Passed",
+        "Stage": "Steps",
+        "Type": "Call",
+        "Capability": "InteractRuntimeActorAbilitySystem",
+        "StartedAt": "2026-10-26T05:01:32.862464+00:00",
+        "Result": {
+          "IsError": false,
+          "Payload": {
+            "ActorName": "NexusDiagnosticCharacter_0",
+            "Action": "TryActivateGrantedAbility",
+            "SpecHandle": "1",
+            "bRequestAccepted": true,
+            "AuthorityOutcome": "Unconfirmed; inspect authority capture"
+          }
+        },
+        "DurationMs": 13.22
+      },
+      {
+        "Id": "authority",
+        "Endpoint": "Server",
+        "Status": "Passed",
+        "Stage": "Steps",
+        "Type": "Await",
+        "Capability": "GetRuntimeActorAbilitySystem",
+        "StartedAt": "2026-10-26T05:01:32.875685+00:00",
+        "Result": {
+          "IsError": false,
+          "Payload": {
+            "ActorName": "NexusDiagnosticCharacter_0",
+            "CaptureId": "69D6CEA2428CCC666FC97C9FEC4D5F05",
+            "Dropped": 0,
+            "LatestSequence": 1,
+            "Events": [
+              {
+                "Sequence": 1,
+                "Event": "Failed",
+                "Time": "2026-10-26T05:01:32.894Z",
+                "AbilityPath": "/Script/Nexus.NexusDiagnosticAbility",
+                "FailureTags": [
+                  "Nexus.Diagnostics.Rejected"
+                ],
+                "SpecHandle": "1",
+                "bIdentityKnown": true,
+                "PredictionKey": "[0/0]"
+              }
+            ],
+            "EventTypes": [
+              "Failed"
+            ],
+            "FailureTags": [
+              "Nexus.Diagnostics.Rejected"
+            ]
+          }
+        },
+        "DurationMs": 85.33
+      },
+      {
+        "Id": "authoritySkill",
+        "Endpoint": null,
+        "Status": "Passed",
+        "Stage": "Steps",
+        "Type": "Assert",
+        "Capability": null,
+        "StartedAt": "2026-10-26T05:01:32.961025+00:00",
+        "Result": {
+          "Passed": true
+        },
+        "DurationMs": 0.03
+      },
+      {
+        "Id": "authorityClass",
+        "Endpoint": null,
+        "Status": "Passed",
+        "Stage": "Steps",
+        "Type": "Assert",
+        "Capability": null,
+        "StartedAt": "2026-10-26T05:01:32.961054+00:00",
+        "Result": {
+          "Passed": true
+        },
+        "DurationMs": 0.01
+      },
+      {
+        "Id": "failureTag",
+        "Endpoint": null,
+        "Status": "Passed",
+        "Stage": "Steps",
+        "Type": "Assert",
+        "Capability": null,
+        "StartedAt": "2026-10-26T05:01:32.961065+00:00",
+        "Result": {
+          "Passed": true
+        },
+        "DurationMs": 0.01
+      },
+      {
+        "Id": "prediction",
+        "Endpoint": "Owner",
+        "Status": "Passed",
+        "Stage": "Steps",
+        "Type": "Await",
+        "Capability": "GetRuntimeActorAbilitySystem",
+        "StartedAt": "2026-10-26T05:01:32.961077+00:00",
+        "Result": {
+          "IsError": false,
+          "Payload": {
+            "ActorName": "NexusDiagnosticCharacter_0",
+            "CaptureId": "0AFCABEA4AC4E4B3172462886F58ABE6",
+            "Dropped": 0,
+            "LatestSequence": 3,
+            "Events": [
+              {
+                "Sequence": 1,
+                "Event": "Activated",
+                "Time": "2026-10-26T05:01:32.874Z",
+                "AbilityPath": "/Script/Nexus.NexusDiagnosticAbility",
+                "FailureTags": [],
+                "SpecHandle": "1",
+                "bIdentityKnown": true,
+                "PredictionKey": "[1/0]"
+              },
+              {
+                "Sequence": 2,
+                "Event": "Committed",
+                "Time": "2026-10-26T05:01:32.874Z",
+                "AbilityPath": "/Script/Nexus.NexusDiagnosticAbility",
+                "FailureTags": [],
+                "SpecHandle": "1",
+                "bIdentityKnown": true,
+                "PredictionKey": "[1/0]"
+              },
+              {
+                "Sequence": 3,
+                "Event": "Ended",
+                "Time": "2026-10-26T05:01:32.874Z",
+                "AbilityPath": "/Script/Nexus.NexusDiagnosticAbility",
+                "FailureTags": [],
+                "SpecHandle": "1",
+                "bIdentityKnown": true,
+                "PredictionKey": "[1/0]"
+              }
+            ],
+            "EventTypes": [
+              "Activated",
+              "Committed",
+              "Ended"
+            ],
+            "FailureTags": []
+          }
+        },
+        "DurationMs": 13.25
+      },
+      {
+        "Id": "requestAccepted",
+        "Endpoint": null,
+        "Status": "Passed",
+        "Stage": "Steps",
+        "Type": "Assert",
+        "Capability": null,
+        "StartedAt": "2026-10-26T05:01:32.974337+00:00",
+        "Result": {
+          "Passed": true
+        },
+        "DurationMs": 0.02
+      },
+      {
+        "Id": "predictionSkill",
+        "Endpoint": null,
+        "Status": "Passed",
+        "Stage": "Steps",
+        "Type": "Assert",
+        "Capability": null,
+        "StartedAt": "2026-10-26T05:01:32.974354+00:00",
+        "Result": {
+          "Passed": true
+        },
+        "DurationMs": 0.01
+      },
+      {
+        "Id": "restoreReject",
+        "Endpoint": "Server",
+        "Status": "Passed",
+        "Stage": "Teardown",
+        "Type": "Call",
+        "Capability": "SetRuntimeActorProperty",
+        "StartedAt": "2026-10-26T05:01:32.974367+00:00",
+        "Result": {
+          "IsError": false,
+          "Payload": {
+            "ActorName": "NexusDiagnosticCharacter_0",
+            "PropertyPath": "bRejectActivation",
+            "ResolvedActor": "NexusDiagnosticCharacter_0",
+            "OldValue": "True"
+          }
+        },
+        "DurationMs": 121.61
+      },
+      {
+        "Id": "stopServer",
+        "Endpoint": "Server",
+        "Status": "Passed",
+        "Stage": "Teardown",
+        "Type": "Call",
+        "Capability": "InteractRuntimeActorAbilitySystem",
+        "StartedAt": "2026-10-26T05:01:33.095990+00:00",
+        "Result": {
+          "IsError": false,
+          "Payload": {
+            "ActorName": "NexusDiagnosticCharacter_0",
+            "Action": "StopActivationCapture",
+            "bStopped": true
+          }
+        },
+        "DurationMs": 132.7
+      },
+      {
+        "Id": "stopOwner",
+        "Endpoint": "Owner",
+        "Status": "Passed",
+        "Stage": "Teardown",
+        "Type": "Call",
+        "Capability": "InteractRuntimeActorAbilitySystem",
+        "StartedAt": "2026-10-26T05:01:33.228699+00:00",
+        "Result": {
+          "IsError": false,
+          "Payload": {
+            "ActorName": "NexusDiagnosticCharacter_0",
+            "Action": "StopActivationCapture",
+            "bStopped": true
+          }
+        },
+        "DurationMs": 2.8
+      }
+    ],
+    "Actors": {
+      "Hero": {
+        "Owner": "NexusDiagnosticCharacter_0",
+        "Server": "NexusDiagnosticCharacter_0",
+        "Observer": "NexusDiagnosticCharacter_1"
+      }
+    },
+    "Identities": {
+      "Owner": [
+        43676,
+        50112
+      ],
+      "Server": [
+        61552,
+        46078
+      ],
+      "Observer": [
+        42568,
+        50112
+      ]
+    }
+  }
+}

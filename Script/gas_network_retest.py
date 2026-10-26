@@ -23,6 +23,7 @@ ABILITY = "/Script/Nexus.NexusDiagnosticAbility"
 SERVER_ABILITY = "/Script/Nexus.NexusDiagnosticServerAbility"
 GET = "GetRuntimeActorAbilitySystem"
 INTERACT = "InteractRuntimeActorAbilitySystem"
+QUICKSTART_SCENARIOS = ("PredictionRejected", "Success")
 
 
 def actor(endpoint):
@@ -185,7 +186,7 @@ def main():
         else:
             write_reports(report, args.output / "startup")
             raise RunError("Network actor binding did not become ready")
-        scenarios = ("PredictionRejected", "Success") if args.quickstart else ("NotGranted", "MissingRequired", "Blocked", "Cost", "Cooldown", "PredictionRejected", "Success", "ServerOnly")
+        scenarios = QUICKSTART_SCENARIOS if args.quickstart else ("NotGranted", "MissingRequired", "Blocked", "Cost", "Cooldown", "PredictionRejected", "Success", "ServerOnly")
         for iteration in range(args.repeat):
             for scenario in scenarios:
                 case = build_case(endpoints, scenario, SERVER_ABILITY if scenario == "ServerOnly" else ABILITY)

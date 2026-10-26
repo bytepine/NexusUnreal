@@ -1,0 +1,88 @@
+name: GAS Regression
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'Source/**'
+      - 'Nexus.uproject'
+      - 'Config/**'
+      - 'Plugins/**'
+      - 'Script/gas*.py'
+      - 'Script/tests/test_gas*.py'
+      - 'Tests/GasRetest/**'
+      - '.github/workflows/gas-regression.yml'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gas-regression-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tools-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate fixed cases, baselines and archive failure handling
+        run: python -m unittest discover -s Script/tests -p 'test_gas*.py'
+      - name: Validate replay and baseline comparison
+        working-directory: Plugins/NexusLink/tools
+        run: python -m unittest gas_retest.test_runner gas_retest.test_report gas_retest.test_compare
+
+  multiplayer:
+    # 仅可信 push / 手动执行进入自托管机；没有 UE 执行环境时不排队等待。
+    needs: tools-test
+    if: github.event_name != 'pull_request' && vars.GAS_REGRESSION_ENABLED == 'true'
+    runs-on: [self-hosted, Windows, X64, nexus-ue]
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      UE_ROOT: ${{ vars.UE_ROOT }}
+      REPORT_ROOT: Saved/GasRegression/ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+          submodules: recursive
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Prepare reports and validate engine
+        run: |
+          New-Item -ItemType Directory -Path $env:REPORT_ROOT -Force | Out-Null
+          if ([string]::IsNullOrWhiteSpace($env:UE_ROOT) -or !(Test-Path -LiteralPath "$env:UE_ROOT/Engine/Build/BatchFiles/Build.bat")) {
+            'Configure UE_ROOT with an installed UE 5.7 engine.' | Set-Content "$env:REPORT_ROOT/setup.log"
+            throw 'UE_ROOT is not configured for the Windows UE runner'
+          }
+
+      - name: Build diagnostic project
+        run: |
+          & "$env:UE_ROOT/Engine/Build/BatchFiles/Build.bat" NexusEditor Win64 Development "$PWD/Nexus.uproject" -WaitMutex -NoHotReload 2>&1 | Tee-Object -FilePath "$env:REPORT_ROOT/build.log"
+          exit $LASTEXITCODE
+
+      - name: Run fixed cases and compare baselines
+        run: python Script/gas_regression.py --ue-root "$env:UE_ROOT" --output "$env:REPORT_ROOT/regression"
+
+      - name: Archive reports even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gas-regression-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.REPORT_ROOT }}
+          retention-days: 14
+          if-no-files-found: error

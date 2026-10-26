@@ -18,6 +18,36 @@ py Script/gas_network_retest.py --ue-root <UE_5.7-directory> --repeat 10
 
 覆盖：未授予、缺少必需标签、阻止标签、冷却、消耗不足、预测客户端激活但服务器拒绝，以及恢复条件后的 LocalPredicted / ServerOnly 成功。观察客户端检查复制的提交计数，不要求它能看到其他玩家的技能列表。能力文档与 JSON 用例格式见 [GAS replay](../Plugins/NexusLink/docs/gas-retest.md)。
 
+### 固定用例自动回归与归档
+
+已编译诊断工程后运行：
+
+```sh
+py Script/gas_regression.py --ue-root <UE_5.7-directory>
+```
+
+固定运行 `PredictionRejected`、`Success`，复用同一套一服两客户端隔离流程。全部基线在启动 UE 前校验：必须是通过的完整复测，包含匹配当前用例的签名。`Tests/GasRetest/baselines/` 保存已验证结果；缺失、旧签名或用例变化会失败，不会拿本次运行自动生成/覆盖基线。
+
+每次生成新的 `Saved/GasRegression/<UTC-time>/`，也可用 `--output <new-directory>` 指定；已有目录会被拒绝，避免旧结果混入。支持 `--baselines <directory>` 和 `--uproject <built-project>`。输出包含：
+
+- `index.html` / `report.html`：固定用例状态与逐项对比入口。
+- `results.json` / `junit.xml`：汇总结果与每个固定用例的门禁状态；断言或缺失检查为失败，运行错误和未执行用例为错误，不以 skip 代替执行。
+- `current/`：启动预检、每个已执行用例的 HTML / JSON / JUnit、生成的用例和各端日志。
+- `comparisons/`：基线与本次的对比，保留前后完整证据；事件变化单独展示，不自动当成回归。
+- `run.log` / `reports.zip`：执行日志及全部报告归档，成功、断言失败、基线/配置/运行错误均尝试归档。
+
+退出码 `0`：所有固定用例及基线检查通过；`1`：断言或基线检查失败；`2`：基线/配置/运行错误、未执行用例或归档失败。联机脚本遇到失败会清理进程并停止后续场景；自动回归会明确标记余下用例未执行。写操作不重试。
+
+基线更新须人工审查：先用插件工具的 `--save-baseline` 保存到一个新文件，检查断言、权威端事件和用例签名，再替换对应受版本控制的文件，与用例变更一起提交。汇总报告不能替代单个场景基线。无需 UE 的门禁/归档回归：`py -m unittest discover -s Script/tests -p 'test_gas*.py'`。
+
+[GAS Regression 工作流](../.github/workflows/gas-regression.yml) 在相关 push、PR 和手动运行时执行工具检查；真实 UE 联机任务只接收可信 push / 手动运行，要求：
+
+1. Windows x64 自托管 Runner，额外标签 `nexus-ue`；安装 UE 5.7、C++ 编译工具链和 Git LFS。
+2. 仓库变量 `UE_ROOT` 指向引擎目录，`GAS_REGRESSION_ENABLED=true` 启用联机任务。
+3. 工作流先编译诊断工程，再执行固定用例；始终上传构建日志和回归报告，保留 14 天。
+
+没有启用执行环境时，联机任务会显示 skipped，不表示 UE 验证通过；工具检查仍正常执行。Fork PR 不在自托管机执行。
+
 本目录为 **NexusUnreal 示例工程**内的 NexusLink L2 回归测试实现。
 
 批量调用中只要有失败就返回 `isError=true`；预期失败用 `assert_tool_error(mcp.try_call(...))` 同时校验错误标记和 `structuredContent`，再检查 `FailureCount`、`bRolledBack` 与逐项结果。不要以请求未抛异常代替验证回滚状态。蓝图 CDO 或运行时控件依赖编译后的类，写入后先编译；网格、纹理与动画写入使用 `test_ns` 内的副本。
