@@ -29,7 +29,7 @@ bool FNexusBlackboardTypedTest::RunTest(const FString& Parameters)
 	UBlackboardComponent* Board = NewObject<UBlackboardComponent>(Owner);
 	TestTrue(TEXT("Initialize inherited data"), Board->InitializeBlackboard(*Child));
 	const auto KeyId = Board->GetKeyID(TEXT("CanRun"));
-	TestTrue(TEXT("Parent key retained"), Child->GetKey(KeyId) != nullptr && KeyId < Child->GetFirstKeyID());
+	TestTrue(TEXT("Parent key retained"), Child->GetKey(KeyId) != nullptr && static_cast<uint16>(KeyId) < static_cast<uint16>(Child->GetFirstKeyID()));
 	Board->SetValueAsBool(TEXT("CanRun"), true);
 	FJsonObject Result;
 	FNexusBlackboardUtils::WriteTyped(Board, TEXT("CanRun"), Condition.KeyType, Result);

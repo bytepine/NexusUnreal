@@ -1,4 +1,4 @@
-﻿# Changelog — NexusUnreal（示例工程）
+# Changelog — NexusUnreal（示例工程）
 
 > **NexusLink 插件**变更记录在公开仓 [NexusLink CHANGELOG](https://github.com/bytepine/NexusLink/blob/master/CHANGELOG.md)。
 
@@ -7,6 +7,8 @@
 ## [Unreleased]
 
 ### Added
+
+- 新增编辑器长操作会话隔离、终态、压缩输出契约及批次预检测试，Slate 中文输入/点击/按键和失效 Ref GUI 回归、本地 Automation 执行 E2E，以及进度/取消协议检查；自动启动按编辑器 PID 绑定实例端口。
 
 - test(widget): `NexusLink.Runtime.Widget.ExactInteraction` 验证同名歧义无副作用、列表路径精确点击、缓存与脱离层级实例拒绝、嵌套 UserWidget、隐藏父级、禁用按钮及 Switcher 活动页。
 
@@ -61,6 +63,8 @@
 - 示例工程默认关 MCP；`mcp_client` 带 Bearer；E2E 会话级 `-NexusEnableDangerousCaps`
 
 ### Fixed
+
+- 完整工程 GUI 回归：资产预览磁盘校验遵循 `--uproject`，PIE 按测试模块管理生命周期、Runtime 压缩用例显式请求 PIE、Slate 截图使用查询返回的 `Ref`；补充公共 C++ 布局变更后的完整重编与启动验收说明。
 
 - fix(test): E2E 预期业务失败同时校验 `isError` 与结构化详情；修正蓝图编译、原生字段、StateTree 类型及测试资产重名，网格、纹理与动画写入使用测试副本。
 - fix(test): E2E 覆盖审计扫描 NexusLink / NexusLinkExt 的 Runtime 与 Editor 模块，按 PascalCase 实际调用参数关联 action / section，支持列表变量、循环与参数化用例（含 `pytest.param`）；追加后的参数表保持行配对，容器别名与循环迭代值正确保留，不同用例的变更相互隔离；未知参数行仍扫描固定调用，不再将未调用的字面量或同文件其他能力误算为覆盖，空扫描直接失败；新增独立脚本回归测试

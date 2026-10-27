@@ -36,7 +36,10 @@ bool FNexusWidgetInteractionTest::RunTest(const FString& Parameters)
 	UGameViewportClient* Viewport = NewObject<UGameViewportClient>(GEngine);
 	Context.GameViewport = Viewport;
 	TSharedRef<SOverlay> Overlay = SNew(SOverlay);
-	Viewport->SetViewportOverlayWidget(nullptr, Overlay);
+    // The fixture intentionally mounts an isolated overlay without a real viewport.
+    PRAGMA_DISABLE_DEPRECATION_WARNINGS
+    Viewport->SetViewportOverlayWidget(nullptr, Overlay);
+    PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	TArray<UUserWidget*> Instances;
 	ON_SCOPE_EXIT
 	{

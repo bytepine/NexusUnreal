@@ -57,7 +57,8 @@ def test_search_asset_all_still_valid(mcp):
     )
 
 
-def test_list_actors_defaults_shape(mcp):
+@pytest.mark.requires_gui
+def test_list_actors_defaults_shape(mcp, pie):
     """list_runtime_actors 返回体若产生 actors_defaults，必须是合法 dict 且合并后字段完整。"""
     try:
         r = mcp.call("ListRuntimeActors", Limit=200)
@@ -110,7 +111,7 @@ def test_get_asset_blueprint_defaults_shape(mcp):
 
 
 @pytest.mark.requires_gui
-def test_diff_actors_baseline_values_shape(mcp):
+def test_diff_actors_baseline_values_shape(mcp, pie):
     """diff_runtime_actors 批量模式若产出任何 diff，baseline.values 必须是字符串字典，
     且 comparisons[].diffs[] 里不再出现 valueA。"""
     listing = mcp.call("ListRuntimeActors", Limit=10)
@@ -317,7 +318,7 @@ def test_get_asset_user_widget_defaults_shape(mcp, test_ns):
 
 
 @pytest.mark.requires_gui
-def test_list_runtime_widgets_defaults_shape(mcp):
+def test_list_runtime_widgets_defaults_shape(mcp, pie):
     """list_runtime_widgets widgets_defaults（候选 widgetClass + class）。
     非 PIE 时可能无数据，跳过。"""
     try:
@@ -479,7 +480,7 @@ def test_auto_discover_undeclared_fields_in_defaults(mcp):
 
 
 @pytest.mark.requires_gui
-def test_get_actor_animation_variables_defaults_shape(mcp):
+def test_get_actor_animation_variables_defaults_shape(mcp, pie):
     """get_runtime_actor_animation View=variables：variables_defaults 候选 type + value。
     需要 PIE 运行中的 Actor；若无 Actor 或 AnimInstance 则跳过。"""
     try:

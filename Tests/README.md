@@ -6,6 +6,12 @@
 
 `test_00_smoke.py::test_proxy_discovery_status` 检查真实 HTTP `/status` 的既有发现协议字段（含 `server`、`wsPort`、`authRequired`），避免 Capability 命名迁移破坏 Desktop / Rider / VSCode 的实例扫描。
 
+## 完整工程启动验收
+
+修改公共 C++ 结构或基类布局后，关闭编辑器并完整重编所有引用模块，包括 NexusLink、编辑器模块、扩展及测试插件；Live Coding 不能替代这一步。不要把旧 `Intermediate` 的目标文件与新源码重新链接。`Script/build_test.py` 默认在干净目录构建完整示例工程；自行保留隔离目录作增量测试时，也必须确保依赖重编。
+
+如果编辑器在 MCP 就绪前报告 DLL `GetLastError=1114`，应定位加载阶段的首个异常；卸载后的类注册回调崩溃可能是连带结果。编译通过不代表启动通过：完整工程验收还须以对应引擎启动 GUI，再运行 `test_00_smoke.py`、`test_15_editor_operations.py` 和本次涉及的运行测试。跨版本验收使用独立的内容及配置副本，避免测试写入原工程。 `test_02_asset_edit_preview.py` 的磁盘校验遵循 `--uproject`，读取当前被测工程的资产文件。 PIE 夹具按测试模块启动与停止，避免 Automation 等编辑器操作结束 PIE 后，后续模块沿用已失效的会话。 Runtime 压缩用例显式请求 PIE；Slate 截图使用窗口查询返回的 `Ref`，不依赖此前 PIE 窗口的焦点。
+
 ## GAS 诊断与联机复测
 
 通用工程接入验收：编译后运行 `python Script/gas_generic_retest.py --ue-root <UE-directory>`。启动隔离的 `GameModeBase` 服务器，显式生成三个独立测试目标（普通 Actor、Pawn、PlayerState ASC），验证 GenericActivation 的预检、真实失败标签、恢复条件、再次执行及基线比较。输出在 `Saved/GenericGasRetest`，输出目录已有基线时拒绝覆盖，请用 `--output` 指定新目录。该场景不使用 `NexusDiagnosticGameMode`；未修改默认游戏配置。
@@ -184,3 +190,11 @@ pytest Tests --ue-url http://127.0.0.1:45000/stream
 跨版本运行使用隔离测试宿主：低于 UE 5.6 的副本不声明 Target 原本就不编译的 `NexusGameplay` 模板模块，并用 `-ini:EditorPerProjectUserSettings:[/Script/UnrealEd.EditorLoadingSavingSettings]:LoadLevelAtStartup=None` 禁止加载高版本默认关卡；不修改原工程。
 
 UE4 的 Store 用例在独立临时目录启动自动分配端口的 Store，不依赖用户已有的 Insights 会话；检查无路径列表、TraceId 流回读及会话复用。快照流测试覆盖读取上限和提前断流。测试用的 Store 端口仅通过 C++ 内部入口传递，不增加 MCP 参数。
+
+### 编辑器长操作回归
+
+`test_15_editor_operations.py` 覆盖错误操作 ID、Slate 只读与截图（GUI）、本地 Automation 发现及完整名称运行。所有状态经 `GetEditorOperation` 查询，不从代理缓存读取。
+
+C++ `NexusLink.EditorOperations` 覆盖操作归属、最终压缩输出 Schema、批次预检和 GUI 中文输入、点击、按键、禁用/隐藏/失效 Ref。GUI 探针需要会话明确启用危险能力。隔离工程加 `-NexusEditorOperationFailureProbe` 后，`NexusLink.EditorOperations.Probe.Outcome` 会故意失败，用于检查适配层逐项失败结果；普通测试不启用该参数。`Probe.Latent` 用于进度、有限等待和停止边界验证。
+
+自动启动等待就绪时按本次编辑器 PID 的实例注册文件绑定端口；多个编辑器同时启动不会因先监听的端口而连接到另一个工程。

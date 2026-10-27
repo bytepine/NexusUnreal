@@ -27,9 +27,11 @@ def edit_target(mcp, test_ns, request):
     return path, "ManageAsset" + kind, operation
 
 
-def test_asset_edit_preview_and_verified_write(mcp, edit_target):
+def test_asset_edit_preview_and_verified_write(mcp, edit_target, pytestconfig):
     path, capability, operation = edit_target
-    disk = Path(__file__).resolve().parents[1] / "Content" / (path.removeprefix("/Game/") + ".uasset")
+    project = pytestconfig.getoption("--uproject")
+    project_root = Path(project).resolve().parent if project else Path(__file__).resolve().parents[1]
+    disk = project_root / "Content" / (path.removeprefix("/Game/") + ".uasset")
     before = disk.read_bytes()
     preview = cap_first(mcp.call_capability("GetAssetEditPreview", AssetPath=path, Capability=capability, Operations=[operation]))
     assert preview["bValid"] and preview["PropertyType"], preview

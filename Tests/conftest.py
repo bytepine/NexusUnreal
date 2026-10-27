@@ -274,13 +274,11 @@ def test_ns(mcp: MCPClient, pytestconfig: pytest.Config) -> Generator[str, None,
 # PIE fixture (opt-in)
 # ─────────────────────────────────────────────────────────────
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def pie(mcp: MCPClient) -> Generator[None, None, None]:
-    """Session-wide PIE: started once for tests marked l4_runtime.
+    """每个测试模块独立维护 PIE，避免 Automation 结束会话后被后续模块复用。
 
-    Tests that do NOT request this fixture will not start PIE. The fixture
-    tolerates already-running PIE (idempotent start) and best-effort stops
-    on teardown.
+    只有显式请求本夹具的用例才启动 PIE；允许复用已运行的会话，模块结束时停止。
     """
     with contextlib.suppress(MCPError):
         status = mcp.call("ControlPie", Action="Status")

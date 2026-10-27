@@ -30,6 +30,7 @@ import platform
 import re
 import shutil
 import subprocess
+import tempfile
 import sys
 import time
 from dataclasses import dataclass
@@ -390,8 +391,23 @@ class UELauncher:
                     continue
         return found
 
+    def _registered_mcp_port(self) -> Optional[int]:
+        """Bind readiness to the process we launched, including concurrent editor starts."""
+        if self._proc is None:
+            return None
+        manifest = Path(tempfile.gettempdir()) / "NexusLink" / f"{self._proc.pid}.json"
+        try:
+            data = json.loads(manifest.read_text(encoding="utf-8-sig"))
+            if int(data.get("pid", 0)) != self._proc.pid:
+                return None
+            if str(data.get("projectName", "")).casefold() != self.uproject.stem.casefold():
+                return None
+            port = int(data.get("mcpPort", 0))
+            return port if port in self.port_range else None
+        except (OSError, ValueError, TypeError):
+            return None
+
     def _wait_until_ready(self, skip_ports: Optional[set] = None) -> None:
-        skip = skip_ports or set()
         deadline = time.monotonic() + self.ready_timeout
         last_err: Optional[BaseException] = None
         with httpx.Client(timeout=2.0) as client:
@@ -404,9 +420,10 @@ class UELauncher:
                         f"Full log: {self._stdout_log_path}\n"
                         f"--- tail ---\n{tail}\n--- end tail ---"
                     )
-                for port in self.port_range:
-                    if port in skip:
-                        continue
+                registered_port = self._registered_mcp_port()
+                # Occupancy at launch is insufficient: two new editors can race to
+                # become ready. Only the PID manifest identifies our editor.
+                for port in (() if registered_port is None else (registered_port,)):
                     try:
                         r = client.get(f"http://127.0.0.1:{port}{_STATUS_ENDPOINT}")
                         if r.status_code == 200 and "wsPort" in r.text:
