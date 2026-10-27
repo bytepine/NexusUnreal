@@ -8,6 +8,8 @@
 
 ### Added
 
+- test(widget): `NexusLink.Runtime.Widget.ExactInteraction` 验证同名歧义无副作用、列表路径精确点击、缓存与脱离层级实例拒绝、嵌套 UserWidget、隐藏父级、禁用按钮及 Switcher 活动页。
+
 - test(bt): 独立 GameModeBase 行为树夹具与 `Script/bt_retest_acceptance.py`，验证继承键、错误类型、显式 Pawn/Controller、条件失败/恢复、超时快照、清理、基线、停止树及目标销毁；原生类型与继承键 Automation 配套覆盖。
 
 - test(trace): 确定性完整帧窗口/中位数与真实停录 Trace 读取测试；`Script/trace_compare_acceptance.py` 通过隔离 Editor 的显式 MCP 端点验证导出、CPU 截断信息、原始快照与离线报告。

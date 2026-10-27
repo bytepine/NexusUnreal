@@ -9,6 +9,16 @@
 UENUM()
 enum class ENexusPreviewTestEnum : uint8 { First, Second };
 
+/** 记录真实按钮委托，验证定位失败不会触发任何点击。 */
+UCLASS()
+class UNexusWidgetClickRecorder : public UObject
+{
+	GENERATED_BODY()
+public:
+	int32 ClickCount = 0;
+	UFUNCTION() void RecordClick() { ++ClickCount; }
+};
+
 /** 含非平凡成员的测试行，用析构计数验证临时行在成功和失败路径均被释放。 */
 USTRUCT()
 struct FNexusReliabilityTestRow : public FTableRowBase
