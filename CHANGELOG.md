@@ -41,6 +41,7 @@
 
 ### Changed
 
+- 移除 NexusLinkTestSuite / NexusLinkExtTestSuite 的 `PlatformAllowList` 与 `WhitelistPlatforms`，测试模块按 `DeveloperTool` 类型及依赖规则参与构建。
 - chore(test): e2e 文件编号去重。`test_97` 只留 StateTree；Enhanced Input、材质子类型、IK、MVVM、PCG 改为 `test_115`–`test_119`
 - chore(test): `build_test` 按 CPU 与 Windows 可用物理/提交内存限制引擎和 UBT action 并发（预留 4 GiB，每 action 预算 4 GiB）；单引擎也限制 `-MaxParallelActions`，C3859/C1076 自动单引擎、单 action 重试；导入脚本不再注册退出清理，避免删除其他编译的隔离目录；新增调度回归测试
 - chore(plugin): NexusLink 子模块从 `Plugins/Developer/NexusLink` 迁到 `Plugins/NexusLink`；`Nexus.uproject` 启用 NexusLink / NexusLinkTestSuite
