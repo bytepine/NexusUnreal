@@ -180,7 +180,7 @@ pytest Tests --ue-url http://127.0.0.1:45000/stream
 | Enhanced Input | `test_115_enhanced_input.py` |
 | 材质子类型 | `test_116_material_subtypes.py` |
 | IKRig / IKRetargeter | `test_117_ik.py` |
-| MVVM | `test_118_mvvm.py`（UE 5.5+） |
+| MVVM | `test_118_mvvm.py`（UE 5.5+）：上下文/嵌套路径、五种方向、单输入转换、编译保存读回与无效配置不新增绑定 |
 | PCG Graph | `test_119_pcg.py`（UE 5.4+） |
 
 ## Trace L1（UE 4.26+）
