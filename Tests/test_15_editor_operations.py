@@ -41,6 +41,16 @@ def test_editor_automation_local_run(mcp, require_tools):
     result = operation_result(mcp, mcp.call("ControlEditorAutomation", Action="Run", TestNames=[name]))
     assert len(result["Tests"]) == 1, result
     assert result["Tests"][0]["Name"] == name, result
-    assert result["Tests"][0]["Outcome"] == "Passed", result
+    assert result["Tests"][0]["Outcome"] == "Passed", result["Tests"][0]
     assert isinstance(result["Tests"][0]["Errors"], list), result
     assert isinstance(result["Tests"][0]["Warnings"], list), result
+
+
+@pytest.mark.requires_gui
+def test_editor_slate_advanced_interactions(mcp, require_tools):
+    require_tools("ControlEditorAutomation", "InteractEditorSlate", "GetEditorOperation")
+    operation_result(mcp, mcp.call("ControlEditorAutomation", Action="Discover"))
+    name = "NexusLink.EditorOperations.SlateInput"
+    result = operation_result(mcp, mcp.call("ControlEditorAutomation", Action="Run", TestNames=[name]))
+    assert len(result["Tests"]) == 1 and result["Tests"][0]["Name"] == name, result
+    assert result["Tests"][0]["Outcome"] == "Passed", result

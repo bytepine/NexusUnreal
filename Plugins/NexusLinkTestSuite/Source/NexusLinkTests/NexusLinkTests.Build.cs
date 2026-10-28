@@ -46,6 +46,7 @@ public class NexusLinkTests : ModuleRules
 					"UMGEditor",
 					"Slate",
 					"SlateCore",
+					"InputCore",
 					"MovieScene",
 					"MovieSceneTracks",
 					"AnimGraph",

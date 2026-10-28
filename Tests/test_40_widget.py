@@ -11,6 +11,91 @@ from _framework.mcp_client import MCPError, cap_first
 pytestmark = pytest.mark.l3_asset
 
 
+@pytest.mark.skipif_ue_below("5.8")
+def test_widget_structure_move_wrap_and_unwrap(mcp, test_ns):
+    path = f"{test_ns}/WBP_Structure"
+    mcp.call("CreateAssetUserWidget", AssetPath=path)
+    result = mcp.call("ManageAssetUserWidget", AssetPath=path, Operations=[
+        {"Action": "Add", "WidgetName": "Root", "WidgetClass": "VerticalBox"},
+        {"Action": "Add", "WidgetName": "First", "WidgetClass": "TextBlock", "ParentWidget": "Root"},
+        {"Action": "Add", "WidgetName": "Second", "WidgetClass": "TextBlock", "ParentWidget": "Root"},
+        {"Action": "Move", "WidgetName": "First", "ParentWidget": "Root", "ChildIndex": 1},
+    ])
+    assert_success_count(result, 4)
+    def tree():
+        return cap_first(mcp.call("GetAssetUserWidget", Sections=["Widgets"], AssetPath=path))
+    widgets = {w["name"]: w for w in tree()["Widgets"]}
+    assert widgets["First"]["ChildIndex"] == 1 and widgets["Second"]["ChildIndex"] == 0, widgets
+    wrapped = mcp.call("ManageAssetUserWidget", AssetPath=path, Operations=[
+        {"Action": "Wrap", "WidgetName": "First", "WidgetClass": "Border"},
+    ])
+    assert_success_count(wrapped, 1)
+    widgets = {w["name"]: w for w in tree()["Widgets"]}
+    wrapper = widgets["First"]["Parent"]
+    assert widgets[wrapper]["Class"] == "Border" and widgets[wrapper]["Parent"] == "Root", widgets
+    result = mcp.call("ManageAssetUserWidget", AssetPath=path, Operations=[
+        {"Action": "ReplaceWithChild", "WidgetName": wrapper},
+        {"Action": "ReplaceWithTemplate", "WidgetName": "First", "WidgetClass": "Button"},
+    ])
+    assert_success_count(result, 2)
+    widgets = {w["name"]: w for w in tree()["Widgets"]}
+    assert widgets["First"]["Class"] == "Button" and widgets["First"]["Parent"] == "Root", widgets
+    assert wrapper not in widgets, widgets
+    mcp.call("SaveAsset", AssetPath=path)
+
+
+@pytest.mark.skipif_ue_below("5.8")
+def test_widget_structure_cycle_rejected(mcp, test_ns):
+    path = f"{test_ns}/WBP_NoCycle"
+    mcp.call("CreateAssetUserWidget", AssetPath=path)
+    assert_success_count(mcp.call("ManageAssetUserWidget", AssetPath=path, Operations=[
+        {"Action": "Add", "WidgetName": "Root", "WidgetClass": "VerticalBox"},
+        {"Action": "Add", "WidgetName": "Child", "WidgetClass": "VerticalBox", "ParentWidget": "Root"},
+    ]), 2)
+    before = cap_first(mcp.call("GetAssetUserWidget", AssetPath=path))
+    try:
+        result = mcp.call("ManageAssetUserWidget", AssetPath=path, Operations=[
+            {"Action": "Move", "WidgetName": "Root", "ParentWidget": "Child"},
+        ])
+        assert "Error" in str(result), result
+    except MCPError:
+        pass
+    after = cap_first(mcp.call("GetAssetUserWidget", AssetPath=path))
+    assert before["Widgets"] == after["Widgets"] and after["RootWidget"] == "Root", after
+
+
+@pytest.mark.skipif_ue_below("5.8")
+def test_widget_named_slot_content(mcp, test_ns):
+    template = f"{test_ns}/WBP_SlotTemplate"
+    child = f"{test_ns}/WBP_SlotChild"
+    mcp.call("CreateAssetUserWidget", AssetPath=template)
+    assert_success_count(mcp.call("ManageAssetUserWidget", AssetPath=template, bCompile=True, Operations=[
+        {"Action": "Add", "WidgetName": "Body", "WidgetClass": "NamedSlot"},
+    ]), 1)
+    parent_class = f"{template}.{template.rsplit('/', 1)[1]}_C"
+    mcp.call("CreateAssetUserWidget", AssetPath=child, ParentClass=parent_class)
+    before = cap_first(mcp.call("GetAssetUserWidget", AssetPath=child))
+    assert any(s["Name"] == "Body" for s in before.get("InheritedNamedSlots", [])), before
+    assert_success_count(mcp.call("ManageAssetUserWidget", AssetPath=child, Operations=[
+        {"Action": "SetNamedSlotContent", "SlotName": "Body", "WidgetName": "Content", "WidgetClass": "TextBlock"},
+    ]), 1)
+    result = cap_first(mcp.call("GetAssetUserWidget", AssetPath=child))
+    assert any(s["Name"] == "Body" and s.get("Content") == "Content" for s in result["InheritedNamedSlots"]), result
+    try:
+        rejected = mcp.call("ManageAssetUserWidget", AssetPath=child, Operations=[
+            {"Action": "SetNamedSlotContent", "SlotName": "Body", "WidgetName": "MustNotExist", "WidgetClass": "TextBlock"},
+        ])
+        assert "Error" in str(rejected), rejected
+    except MCPError:
+        pass
+    assert "MustNotExist" not in str(mcp.call("GetAssetUserWidget", AssetPath=child))
+    assert_success_count(mcp.call("ManageAssetUserWidget", AssetPath=child, Operations=[
+        {"Action": "Remove", "WidgetName": "Content"},
+    ]), 1)
+    after = cap_first(mcp.call("GetAssetUserWidget", AssetPath=child))
+    assert all(not s.get("Content") for s in after["InheritedNamedSlots"]), after
+
+
 @pytest.fixture(scope="module")
 def wbp_path(test_ns, mcp):
     path = f"{test_ns}/WBP_TestHUD"

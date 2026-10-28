@@ -26,7 +26,7 @@ def test_pcg_create_add_remove_edge(test_ns, mcp):
     add_a = mcp.call_capability(
         "ManageAssetPCGGraph",
         AssetPath=path,
-        Operations=[{"Action": "AddNode", "SettingsClass": "PCGDebugSettings"}],
+        Operations=[{"Action": "AddNode", "SettingsClass": "PCGTransformPointsSettings"}],
     )
     a = cap_first(add_a)
     if a.get("Error"):
@@ -35,7 +35,7 @@ def test_pcg_create_add_remove_edge(test_ns, mcp):
     add_b = mcp.call_capability(
         "ManageAssetPCGGraph",
         AssetPath=path,
-        Operations=[{"Action": "AddNode", "SettingsClass": "PCGDebugSettings"}],
+        Operations=[{"Action": "AddNode", "SettingsClass": "PCGTransformPointsSettings"}],
     )
     id_b = cap_first(add_b).get("NodeId")
     if not id_a or not id_b:

@@ -8,7 +8,8 @@
 
 ### Added
 
-- 新增编辑器长操作会话隔离、终态、压缩输出契约及批次预检测试，Slate 中文输入/点击/按键和失效 Ref GUI 回归、本地 Automation 执行 E2E，以及进度/取消协议检查；自动启动按编辑器 PID 绑定实例端口。
+
+- 扩充编辑器 MCP 回归：长操作会话隔离、终态、压缩输出、批次预检与进度/取消；Slate 中文输入、表单/下拉框/拖拽、失效 Ref 和 Automation 执行；项目设置/插件、UE 5.8 技能/语义搜索/PCG 执行采样/Niagara 诊断及 UMG 结构/继承命名槽；PNG/JPEG 标准图片、可信附件、数量/字节限制与批量返回。自动启动按编辑器 PID 绑定实例端口。
 
 - test(widget): `NexusLink.Runtime.Widget.ExactInteraction` 验证同名歧义无副作用、列表路径精确点击、缓存与脱离层级实例拒绝、嵌套 UserWidget、隐藏父级、禁用按钮及 Switcher 活动页。
 

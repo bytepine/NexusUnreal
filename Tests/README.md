@@ -198,3 +198,11 @@ UE4 的 Store 用例在独立临时目录启动自动分配端口的 Store，不
 C++ `NexusLink.EditorOperations` 覆盖操作归属、最终压缩输出 Schema、批次预检和 GUI 中文输入、点击、按键、禁用/隐藏/失效 Ref。GUI 探针需要会话明确启用危险能力。隔离工程加 `-NexusEditorOperationFailureProbe` 后，`NexusLink.EditorOperations.Probe.Outcome` 会故意失败，用于检查适配层逐项失败结果；普通测试不启用该参数。`Probe.Latent` 用于进度、有限等待和停止边界验证。
 
 自动启动等待就绪时按本次编辑器 PID 的实例注册文件绑定端口；多个编辑器同时启动不会因先监听的端口而连接到另一个工程。
+
+## UE 5.8 领域与图片回归
+
+`test_16_project_discovery.py` 覆盖设置注册树、明确属性读取、插件依赖与挂载归属。`test_17_native_toolsets.py` 在启用对应官方 Toolset 的 UE 5.8 宿主验证 AgentSkill 列表/详情、带类型的语义查询、PCG 创建实例→执行→节点采样和 Niagara 诊断；语义索引/提供器未就绪时保留明确跳过原因。
+
+`test_40_widget.py` 的 5.8 用例验证移动/重排、包裹/单子项还原/模板替换、循环拒绝及继承命名槽的编译、填充、占用拒绝和移除。`NexusLink.EditorOperations.SlateInput` 通过临时窗口验证替换、可见等待、表单预检、复选框/组合框、同名误点防护、拖拽和失效 Ref，使用 GUI 执行。
+
+`test_18_mcp_images.py` 验证真实 PNG/JPEG 字节、仅路径模式、异步及批量图片；`NexusLink.Protocol.ImageContent` 验证可信附件、数量/字节上限、去重和保留文本元数据。GUI 截图使用 Windows 查询返回的有效 Ref；断言先合并通用压缩输出的 `_defaults` 再检查字段。
