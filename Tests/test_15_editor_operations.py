@@ -28,8 +28,11 @@ def test_editor_slate_read_and_capture(mcp, require_tools):
     assert windows.get("Windows"), windows
     snapshot = operation_result(mcp, mcp.call("GetEditorSlate", Action="Snapshot", MaxDepth=2))
     assert snapshot.get("Nodes") or snapshot.get("Snapshot"), snapshot
+    sequence = mcp.call("GetOutputLog", Limit=1).get("LatestSequence", 0)
     image = operation_result(mcp, mcp.call("CaptureEditorSlate", Ref=windows["Windows"][0]["Ref"]))
     assert image.get("FilePath"), image
+    errors = mcp.call("GetOutputLog", TextFilter="Ensure condition failed", SinceSequence=sequence, Limit=20)
+    assert not errors.get("Entries"), errors
 
 
 def test_editor_automation_local_run(mcp, require_tools):

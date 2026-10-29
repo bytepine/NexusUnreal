@@ -225,7 +225,13 @@ def test_mvvm_explicit_unary_conversion(mcp, binding_wbp, reverse):
 
 
 def test_mvvm_missing_remove_id_keeps_existing_binding(mcp, binding_wbp):
-    added = cap_first(mcp.call_capability("ManageAssetViewModel", AssetPath=binding_wbp, Operations=[{"Action": "AddBinding"}]))
+    added = cap_first(mcp.call_capability(
+        "ManageAssetViewModel", AssetPath=binding_wbp, bCompile=True,
+        Operations=[{
+            "Action": "AddBinding", "SourceContext": "ViewModel:First", "SourcePath": "Health",
+            "DestinationContext": "Widget:Bar", "DestinationPath": "Percent", "BindingType": "OneTimeToDestination",
+        }],
+    ))
     try:
         removed = mcp.call_capability("ManageAssetViewModel", AssetPath=binding_wbp, Operations=[{"Action": "RemoveBinding"}])
         assert cap_first(removed).get("Error"), removed

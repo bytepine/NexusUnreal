@@ -12,6 +12,8 @@
 
 如果编辑器在 MCP 就绪前报告 DLL `GetLastError=1114`，应定位加载阶段的首个异常；卸载后的类注册回调崩溃可能是连带结果。编译通过不代表启动通过：完整工程验收还须以对应引擎启动 GUI，再运行 `test_00_smoke.py`、`test_15_editor_operations.py` 和本次涉及的运行测试。跨版本验收使用独立的内容及配置副本，避免测试写入原工程。 `test_02_asset_edit_preview.py` 的磁盘校验遵循 `--uproject`，读取当前被测工程的资产文件。 PIE 夹具按测试模块启动与停止，避免 Automation 等编辑器操作结束 PIE 后，后续模块沿用已失效的会话。 Runtime 压缩用例显式请求 PIE；Slate 截图使用窗口查询返回的 `Ref`，不依赖此前 PIE 窗口的焦点。
 
+MVVM 删除负例使用完整可编译的绑定，验证删除失败后保留原绑定，避免空绑定触发编译弹窗并阻塞后续 PIE。Slate 截图回归按日志序号检查截图期间不产生 ensure。
+
 ## GAS 诊断与联机复测
 
 通用工程接入验收：编译后运行 `python Script/gas_generic_retest.py --ue-root <UE-directory>`。启动隔离的 `GameModeBase` 服务器，显式生成三个独立测试目标（普通 Actor、Pawn、PlayerState ASC），验证 GenericActivation 的预检、真实失败标签、恢复条件、再次执行及基线比较。输出在 `Saved/GenericGasRetest`，输出目录已有基线时拒绝覆盖，请用 `--output` 指定新目录。该场景不使用 `NexusDiagnosticGameMode`；未修改默认游戏配置。
