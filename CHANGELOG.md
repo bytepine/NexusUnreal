@@ -8,7 +8,7 @@
 
 ### Added
 
-- 增补 Sequencer/Control Rig、Niagara 深层写入、Game Features 与自定义 Toolset 发现回归；Registry 原生 Handler 过滤、禁用与注销验证。
+- 增补 Sequencer/Control Rig、Niagara 深层写入、Game Features 与自定义 Toolset 发现回归；Registry 原生 Handler 过滤、禁用与注销验证，以及旧入口同步契约、官方后端选择和过滤后拒绝兼容重试。
 - 新增 PCG 参数/子图/实例覆盖、PhysicsAsset 精细编辑、Tag INI 生命周期及 DataRegistry 真实缓存行与缺失状态的回归用例。
 
 

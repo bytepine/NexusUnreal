@@ -49,4 +49,25 @@ bool FNexusToolsetDiscoveryTest::RunTest(const FString&)
     TestTrue(TEXT("Unregistered schema cannot be read"), Query(TEXT("Schema"), TEXT("NexusFixture.CustomDiscovery.Visible")).HasErrors());
     return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusToolsetLegacySyncTest, "NexusLink.Toolsets.LegacySync", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusToolsetLegacySyncTest::RunTest(const FString&)
+{
+    auto Subsystem = UToolsetRegistrySubsystem::Get();
+    const FCapRecord* Capability = FNexusCapabilityRegistry::Get().FindRecordByName(TEXT("GetProjectPlugins"));
+    if (Subsystem.HasError() || !Capability) { AddError(TEXT("Native registry/capability unavailable")); return false; }
+    auto& Registry = Subsystem.GetValue()->ToolsetRegistry;
+    if (!Registry.Find(TEXT("PluginToolset.PluginToolset")).IsValid()) { AddWarning(TEXT("PluginToolset not enabled; native sync test skipped")); return true; }
+    auto Args = MakeShared<FJsonObject>(); Args->SetArrayField(TEXT("Sections"), {MakeShared<FJsonValueString>(TEXT("Plugins"))});
+    auto Before = Capability->Instance->Run(Args); TestFalse(TEXT("Synchronous native listing succeeds"), Before.HasErrors());
+    if (Before.Entries.Num()) TestEqual(TEXT("Native backend is reported"), Before.Entries[0]->AsObject()->GetStringField(TEXT("Backend")), FString(TEXT("OfficialToolset")));
+    const FString Pattern = TEXT("PluginToolset.PluginToolset.ListDiscoveredPlugins");
+    const bool bPreviouslyBlocked = Registry.GetBlockedNames().Contains(Pattern);
+    if (!bPreviouslyBlocked) Registry.AddBlockedName(Pattern);
+    auto Blocked = Capability->Instance->Run(Args);
+    if (!bPreviouslyBlocked) Registry.RemoveBlockedName(Pattern);
+    TestTrue(TEXT("Native filtering fails without compatibility retry"), Blocked.HasErrors());
+    auto After = Capability->Instance->Run(Args); TestFalse(TEXT("Native listing recovers after filter restore"), After.HasErrors());
+    return true;
+}
 #endif
