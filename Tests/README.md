@@ -6,6 +6,14 @@
 
 `test_00_smoke.py::test_proxy_discovery_status` 检查真实 HTTP `/status` 的既有发现协议字段（含 `server`、`wsPort`、`authRequired`），避免 Capability 命名迁移破坏 Desktop / Rider / VSCode 的实例扫描。
 
+## 动画、Niagara 与 Toolset 回归
+
+`test_19_remaining_toolsets.py` 覆盖 Sequencer 分段及 float/bool 关键帧、Control Rig 四帧烘焙与控件键读回、Niagara 系统/渲染器/用户变量及嵌套动态输入写入、Game Features 生命周期和自定义 Toolset 注册/注销。Registry 过滤与禁用还通过 `NexusLink.Toolsets.DiscoveryFilters` Automation 验证。
+
+动画、Niagara 深层接口与自定义 Toolset 发现需 UE 5.8，并在宿主启用相应官方插件；Game Features 需 UE 5.7+ 的 `GameFeatures`。用例可在 headless 执行，Control Rig 场景另需示例 Mannequin 网格与 Body Rig 内容。
+
+生命周期用例仅使用环境变量 `NEXUS_GAME_FEATURE_FIXTURE` 明确指定的专用空 Feature 插件：须已被编辑器发现、允许内容且位于引擎认可的 Game Features 目录。缺少该配置时跳过；配置后验证缺少 GameFeatureData 的失败、创建测试 DataAsset、激活到 `Active`、停用到 `Loaded`。只在隔离测试宿主配置此变量，不指向业务 Feature 插件。
+
 ## 完整工程启动验收
 
 修改公共 C++ 结构或基类布局后，关闭编辑器并完整重编所有引用模块，包括 NexusLink、编辑器模块、扩展及测试插件；Live Coding 不能替代这一步。不要把旧 `Intermediate` 的目标文件与新源码重新链接。`Script/build_test.py` 默认在干净目录构建完整示例工程；自行保留隔离目录作增量测试时，也必须确保依赖重编。

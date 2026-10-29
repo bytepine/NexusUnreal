@@ -36,6 +36,8 @@ public class NexusLinkTests : ModuleRules
             var RegistrySearchDirs = NexusLinkOptionalPlugins.CollectPluginSearchDirs(RegistryProjectRoot, this);
             var RegistryConfig = NexusLinkOptionalPlugins.Opt(new[] { "DataRegistry.uplugin" }, "WITH_NEXUS_TEST_DATA_REGISTRY", "NEXUS_TEST_DATA_REGISTRY", 5, 0, rt: new[] { "DataRegistry" }, uproj: "DataRegistry");
             NexusLinkOptionalPlugins.Apply(this, Target, RegistryConfig, RegistrySearchDirs, RegistryProjectRoot, false);
+            var ToolsetConfig = NexusLinkOptionalPlugins.Opt(new[] { "ToolsetRegistry.uplugin" }, "WITH_NEXUS_TEST_TOOLSETS", "NEXUS_TEST_TOOLSETS", 5, 8, rt: new[] { "ToolsetRegistry" }, uproj: "ToolsetRegistry");
+            NexusLinkOptionalPlugins.Apply(this, Target, ToolsetConfig, RegistrySearchDirs, RegistryProjectRoot, false);
 
 			PrivateDependencyModuleNames.AddRange(
 				new string[]
@@ -62,6 +64,7 @@ public class NexusLinkTests : ModuleRules
 		else
 		{
 			PrivateDefinitions.Add("WITH_NEXUS_TEST_DATA_REGISTRY=0");
+            PrivateDefinitions.Add("WITH_NEXUS_TEST_TOOLSETS=0");
 			// Game 目标不链接 NexusLinkEditor，WITH_STATETREE 等 Editor 域可选插件宏没有
 			// 定义来源；测试文件里直接 #if WITH_STATETREE 检测（非 #ifdef），未定义时 MSVC 报
 			// C4668。这里兜底置 0。WITH_GAS/WITH_NIAGARA 由 NexusLink 定义。
