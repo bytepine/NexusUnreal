@@ -208,3 +208,5 @@ C++ `NexusLink.EditorOperations` 覆盖操作归属、最终压缩输出 Schema�
 `test_40_widget.py` 的 5.8 用例验证移动/重排、包裹/单子项还原/模板替换、循环拒绝及继承命名槽的编译、填充、占用拒绝和移除。`NexusLink.EditorOperations.SlateInput` 通过临时窗口验证替换、可见等待、表单预检、复选框/组合框、同名误点防护、拖拽和失效 Ref，使用 GUI 执行。
 
 `test_18_mcp_images.py` 验证真实 PNG/JPEG 字节、仅路径模式、异步及批量图片；`NexusLink.Protocol.ImageContent` 验证可信附件、数量/字节上限、去重和保留文本元数据。GUI 截图使用 Windows 查询返回的有效 Ref；断言先合并通用压缩输出的 `_defaults` 再检查字段。
+
+`test_19_native_followups.py` 覆盖 PCG 参数/子图/实例覆盖及读回、PhysicsAsset 创建和精细编辑、Tag INI 生命周期，以及 DataRegistry 真实表行/缓存缺失。Tag 写入回归必须使用独立 Config 副本，避免引擎重命名 Redirect 写回用户配置；DataRegistry 使用临时内存夹具并只注销本用例对象。

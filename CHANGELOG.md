@@ -8,6 +8,11 @@
 
 ### Added
 
+- 新增 PCG 参数/子图/实例覆盖、PhysicsAsset 精细编辑、Tag INI 生命周期及 DataRegistry 真实缓存行与缺失状态的回归用例。
+
+
+
+
 
 - 扩充编辑器 MCP 回归：长操作会话隔离、终态、压缩输出、批次预检与进度/取消；Slate 中文输入、表单/下拉框/拖拽、失效 Ref 和 Automation 执行；项目设置/插件、UE 5.8 技能/语义搜索/PCG 执行采样/Niagara 诊断及 UMG 结构/继承命名槽；PNG/JPEG 标准图片、可信附件、数量/字节限制与批量返回。自动启动按编辑器 PID 绑定实例端口。
 
