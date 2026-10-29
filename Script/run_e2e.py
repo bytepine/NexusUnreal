@@ -148,7 +148,10 @@ def _resolve_connection(args: argparse.Namespace) -> Tuple[List[str], str]:
     human_readable_mode_label)."""
     # 1. Explicit --ue-url wins.
     if args.ue_url:
-        return ["--ue-url", args.ue_url], f"explicit --ue-url {args.ue_url}"
+        out = ["--ue-url", args.ue_url]
+        if args.uproject:
+            out.extend(["--uproject", args.uproject])
+        return out, f"explicit --ue-url {args.ue_url}"
 
     # 2. Explicit --ue-root wins (force launch a specific UE version).
     if args.ue_root:
@@ -160,7 +163,10 @@ def _resolve_connection(args: argparse.Namespace) -> Tuple[List[str], str]:
     # 3. Auto mode: probe for an existing Editor first.
     live = _probe_live_editor()
     if live:
-        return ["--ue-url", live], f"auto: reusing live Editor at {live}"
+        out = ["--ue-url", live]
+        if args.uproject:
+            out.extend(["--uproject", args.uproject])
+        return out, f"auto: reusing live Editor at {live}"
 
     # 4. Auto-launch fallback. Pass --no-launch to skip and surface a hint
     #    instead (useful for CI that wants a hard fail when the Editor is
