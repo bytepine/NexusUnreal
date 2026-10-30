@@ -224,3 +224,5 @@ C++ `NexusLink.EditorOperations` 覆盖操作归属、最终压缩输出 Schema�
 `test_18_mcp_images.py` 验证真实 PNG/JPEG 字节、仅路径模式、异步及批量图片；`NexusLink.Protocol.ImageContent` 验证可信附件、数量/字节上限、去重和保留文本元数据。GUI 截图使用 Windows 查询返回的有效 Ref；断言先合并通用压缩输出的 `_defaults` 再检查字段。
 
 `test_19_native_followups.py` 覆盖 PCG 参数/子图/实例覆盖及读回、PhysicsAsset 创建和精细编辑、Tag INI 生命周期，以及 DataRegistry 真实表行/缓存缺失。Tag 写入回归必须使用独立 Config 副本，避免引擎重命名 Redirect 写回用户配置；DataRegistry 使用临时内存夹具并只注销本用例对象。
+
+`test_21_editor_followups.py` 覆盖 UMG 重命名/变量/委托与 UIComponent、材质及函数图整理、类型化设置、内容插件生命周期、Sequence 文件夹/条件/FBX 和原生 AnimMixer。持久化工程设置与插件用例仅在显式设置 `NEXUS_PERSISTENT_EDIT_FIXTURE=1` 的隔离可写宿主运行；Outliner/自定义绑定转换用例需 `--gui` 与 UE5.8。
