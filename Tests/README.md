@@ -10,6 +10,8 @@
 
 `test_19_toolset_reuse.py` 检查既有查询/编辑入口保持同步返回，在 5.8 启用官方插件时报告原生后端，并通过 `NexusLink.Toolsets.LegacySync` 验证 Registry 过滤不会触发兼容重试。旧版继续运行同一查询契约，原生专用检查按版本跳过。
 
+`test_20_editor_compatibility.py` 对原生与兼容后端运行相同的蓝图 GraphPlan/函数参数、UMG 结构、静态网格 LOD/凸包、场景文件夹、Sequencer 分段/关键帧、Niagara User Variables/Renderer 及 PCG 参数回环。测试使用独立资产，并验证错误连接、环与非法参数被拒绝；PCG 用例最低 UE 5.4。GraphPlan 失败应移除本次节点，原生 Registry 拒绝不得执行兼容重试。
+
 `test_19_remaining_toolsets.py` 覆盖 Sequencer 分段及 float/bool 关键帧、Control Rig 四帧烘焙与控件键读回、Niagara 系统/渲染器/用户变量及嵌套动态输入写入、Game Features 生命周期和自定义 Toolset 注册/注销。Registry 过滤与禁用还通过 `NexusLink.Toolsets.DiscoveryFilters` Automation 验证。
 
 动画、Niagara 深层接口与自定义 Toolset 发现需 UE 5.8，并在宿主启用相应官方插件；Game Features 需 UE 5.7+ 的 `GameFeatures`。用例可在 headless 执行，Control Rig 场景另需示例 Mannequin 网格与 Body Rig 内容。
