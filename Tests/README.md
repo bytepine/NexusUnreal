@@ -10,6 +10,8 @@ Lua 工具 L1：`NexusLinkExt.Lua.ValueToJsonStackBalance` 使用独立 Lua 状�
 
 ## 动画、Niagara 与 Toolset 回归
 
+`test_22_feature_gap_followups.py` 覆盖动作 Schema、结构计划/回读与过期哈希拒绝、PNG/WAV/FBX 首次导入冲突、骨骼姿态、所属任务历史和源控只读预检。PCG 生成/点读取、双人 ListenServer PIE、骨骼网格/动画 FBX 导出夹具需 GUI/RHI，标记 requires_gui；使用 `py Script/run_e2e.py --gui -k gap_`。任务列举/取消的跨 Owner 隔离同时由 `NexusLink.EditorOperations.OwnerAndContract` 验证。离线预算回归位于插件 `tools/trace_compare/test_runner.py`。
+
 `test_19_toolset_reuse.py` 检查既有查询/编辑入口保持同步返回，在 5.8 启用官方插件时报告原生后端，并通过 `NexusLink.Toolsets.LegacySync` 验证 Registry 过滤不会触发兼容重试。旧版继续运行同一查询契约，原生专用检查按版本跳过。
 
 `test_20_editor_compatibility.py` 对原生与兼容后端运行相同的蓝图 GraphPlan/函数参数、UMG 结构、静态网格 LOD/凸包、场景文件夹、Sequencer 分段/关键帧、Niagara User Variables/Renderer 及 PCG 参数回环。测试使用独立资产，并验证错误连接、环与非法参数被拒绝；PCG 用例最低 UE 5.4。GraphPlan 失败应移除本次节点，原生 Registry 拒绝不得执行兼容重试。

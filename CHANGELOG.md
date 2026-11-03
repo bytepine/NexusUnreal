@@ -8,6 +8,7 @@
 
 ### Added
 
+- 增补功能缺口首批回归：动作级 Schema、BP/UMG/PCG 结构计划与过期前置条件、首次导入冲突策略、多人 PIE 世界、兼容 PCG 点输出、骨骼姿态采样、所属任务历史/取消隔离与源控预检。
 - 增补编辑器兼容回归：蓝图结构化图计划和函数参数、UMG 结构、静态网格生成、场景文件夹，以及 PCG/Niagara/Sequencer 的原生与兼容读写闭环；补充 UMG 变量/事件/组件、材质函数图整理、设置/插件持久化、Sequencer 条件/文件夹/FBX 和原生 Mixer/Outliner 用例。
 
 - 增补 Sequencer/Control Rig、Niagara 深层写入、Game Features 与自定义 Toolset 发现回归；Registry 原生 Handler 过滤、禁用与注销验证，以及旧入口同步契约、官方后端选择和过滤后拒绝兼容重试。

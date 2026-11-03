@@ -20,10 +20,19 @@ bool FNexusOperationIsolationTest::RunTest(const FString& Parameters)
 		TGuardValue<FString> Foreign(FNexusEditorOperations::RequestOwner(), TEXT("test-owner-b"));
 		TestFalse(TEXT("Another session cannot read operation"), FNexusEditorOperations::Find(Operation->Id).IsValid());
 		TestFalse(TEXT("Another session cannot cancel operation"), FNexusEditorOperations::Cancel(Operation->Id));
+		TestEqual(TEXT("Another session cannot list operation"), FNexusEditorOperations::List(false, 128).Num(), 0);
 	}
 	TestFalse(TEXT("Uncancellable work stays running"), FNexusEditorOperations::Cancel(Operation->Id));
 	auto Result = MakeShared<FJsonObject>(); Result->SetStringField(TEXT("Outcome"), TEXT("Unknown"));
 	FNexusEditorOperations::Finish(Operation, TEXT("Completed"), Result);
+	const auto History = FNexusEditorOperations::List(false, 128);
+	TestTrue(TEXT("Owner sees retained result summary"), History.ContainsByPredicate([&](const TSharedPtr<FJsonValue>& Value) { return Value->AsObject()->GetStringField(TEXT("OperationId")) == Operation->Id && Value->AsObject()->GetBoolField(TEXT("bHasResult")) && !Value->AsObject()->HasField(TEXT("Result")); }));
+	TestEqual(TEXT("Running-only list hides completed task"), FNexusEditorOperations::List(true, 128).Num(), 0);
+	auto Cancellable = FNexusEditorOperations::Create(TEXT("Test"));
+	if (!Cancellable) return false;
+	Cancellable->Stop = [Cancellable]() { FNexusEditorOperations::Finish(Cancellable, TEXT("Cancelled"), nullptr); return true; };
+	TestTrue(TEXT("Owner can stop work with a callback"), FNexusEditorOperations::Cancel(Cancellable->Id));
+	TestEqual(TEXT("Cancellation reaches terminal state"), Cancellable->State, FString(TEXT("Cancelled")));
 	FNexusEditorOperations::Finish(Operation, TEXT("Failed"), nullptr, TEXT("Late callback"));
 	TestEqual(TEXT("Late completion cannot overwrite outcome"), Operation->State, FString(TEXT("Completed")));
 	auto Copy = Operation->Snapshot();
