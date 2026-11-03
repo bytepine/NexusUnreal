@@ -1,5 +1,7 @@
 # NexusUnreal — pytest E2E 测试
 
+Lua 工具 L1：`NexusLinkExt.Lua.ValueToJsonStackBalance` 使用独立 Lua 状态验证 0/1/49/50/51/120 项表、嵌套表、正负索引与循环引用的栈平衡和截断结果，无需 PIE。可在 Session Frontend → Automation 运行该名称，或用 Editor-Cmd 的 `-ExecCmds="Automation RunTests NexusLinkExt.Lua.ValueToJsonStackBalance" -TestExit="Automation Test Queue Empty" -unattended -nullrhi`；宿主尚未启用已链接的可选依赖时，可在测试会话添加 `-EnablePlugins=GameFeatures,DataRegistry,GameplayTagsEditor`。
+
 行为树验收：编译后运行 `python Script/bt_retest_acceptance.py --ue-root <UE-directory> --output <new-output-directory>`。独立 GameModeBase 服务器显式生成测试 Pawn/AIController 和继承 Blackboard，验证失败/恢复、末次快照、清理、基线、停止树及销毁目标。配套 UE Automation 前缀为 `NexusLink.AI.Blackboard`，不改项目默认 GameMode。
 
 性能对比验收：先运行 UE Automation `NexusLink.Trace.GetTrace` 与 `NexusLink.Trace.Statistics`，再运行 `python Script/trace_compare_acceptance.py --ue-root <UE-directory> --output <new-output-directory>`。脚本启动隔离 Editor，通过显式端点读取 Automation 生成并已停录的 Trace，验证导出和离线零差值报告，结束后关闭本次进程。

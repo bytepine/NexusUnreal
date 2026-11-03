@@ -33,7 +33,7 @@
 
 - feat(gas): 显式诊断 GameMode、复制角色与资源、LocalPredicted / ServerOnly 技能；`Script/gas_network_retest.py` 启动一服两客户端，验证常见激活失败、服务器拒绝预测及修复后复测，支持 --quickstart 一轮预测拒绝与恢复后成功，启动前只读检查角色与必需技能；用户手动运行 `Script/gas_regression.py` 可固定复测预测拒绝与恢复成功，先核对受版本控制的基线及签名，再生成对比和 HTML / JSON / JUnit / ZIP 归档，失败及未执行用例进入门禁；GitHub CI 仅在云端执行无需 UE 的工具检查；补 PIE GAS 诊断和 section 大小写 L1 回归。
 
-- feat(plugin): `NexusLinkExt` 以子模块挂载 [bytepine/NexusLinkExt](https://github.com/bytepine/NexusLinkExt)；`NexusLinkExt`（Runtime）与 `NexusLinkExtEditor`（Editor）承接从 NexusLink 迁出的 UnLua Capability。L1 拆到工程侧 `Plugins/NexusLinkExtTestSuite`（模块 `NexusLinkExtTests`，过滤前缀 `NexusLinkExt.`）；`NexusLinkTestSuite` 不再依赖 NexusLinkExt
+- feat(plugin): `NexusLinkExt` 以子模块挂载 [bytepine/NexusLinkExt](https://github.com/bytepine/NexusLinkExt)；`NexusLinkExt`（Runtime）与 `NexusLinkExtEditor`（Editor）承接从 NexusLink 迁出的 UnLua Capability。L1 拆到工程侧 `Plugins/NexusLinkExtTestSuite`（模块 `NexusLinkExtTests`，过滤前缀 `NexusLinkExt.`）；补充 Lua 表转 JSON 在截断边界、嵌套表、正负索引和循环引用下的栈平衡回归；`NexusLinkTestSuite` 不再依赖 NexusLinkExt
 - test(e2e): `test_00` 覆盖 `GetOutputLog` 的 `watch` / `bCollectWatch` / `disarm`；L1 `NexusLink.Log.Watch.CollapseFilterDrop` 覆盖连续合并、筛选与旁路溢出
 - test(e2e): `test_00` 覆盖 `current map` / `get refs` / `cpp enum` hint / `RoutingHints` 可精确点名；`test_10` `GetEditorContext` `CurrentMap`；`test_95` PIE `bHasPlayWorld`
 - feat(unreal): `Script/package.py` 任意平台打包（RunUAT BuildCookRun；默认 EngineAssociation + 本机平台 + Development；`--platform` 可多个/别名/原样透传；`--` 后参数转给 UAT）；入口 `package.bat` / `package.sh`
