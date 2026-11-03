@@ -172,10 +172,12 @@ def test_gap_first_skeleton_fbx_import(mcp, require_tools, test_ns, tmp_path, ki
              "task.automated=True\ntask.prompt=False\ntask.replace_identical=True\n"
              f"task.exporter=unreal.{exporter}()\n"
              "task.options=unreal.FbxExportOption()\n"
+             "task.options.level_of_detail=False\n"
              "assert unreal.Exporter.run_asset_export_task(task)")
     result = cap_first(mcp.call("ImportAsset", SourceFile=source, DestinationPath=test_ns,
                                AssetName="FirstImport_" + kind, AssetType=kind, SkeletonPath=skeleton))
     assert result["AssetClass"] == kind and result["bVerified"], result
+    assert result["Path"] == f"{test_ns}/FirstImport_{kind}.FirstImport_{kind}", result
     readback = cap_first(mcp.call("GetAsset" + kind, AssetPath=result["Path"]))
     assert readback["Skeleton"].startswith(skeleton), readback
 

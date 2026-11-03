@@ -4,7 +4,23 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
+#include "UObject/Interface.h"
 #include "NexusReliabilityTestTypes.generated.h"
+
+/** 带返回值的接口函数生成独立实现图，覆盖结构副本的接口图保留。 */
+UINTERFACE(Blueprintable)
+class UNexusPreviewTestInterface : public UInterface
+{
+	GENERATED_BODY()
+};
+
+class INexusPreviewTestInterface
+{
+	GENERATED_BODY()
+public:
+	UFUNCTION(BlueprintImplementableEvent, Category="NexusTest")
+	int32 GetPreviewValue() const;
+};
 
 UENUM()
 enum class ENexusPreviewTestEnum : uint8 { First, Second };
