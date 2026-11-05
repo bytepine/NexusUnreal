@@ -93,8 +93,14 @@ def test_get_python_api_log(mcp, require_tools):
     assert any("log" in (e.get("name") or "").lower() for e in entries), r
 
 
+def test_get_python_api_bare_identifier_is_prefixed(mcp, require_tools):
+    """裸标识符补成 unreal.AssetData，不再因缺少前缀被拒绝。"""
+    require_tools("GetPythonApi")
+    r = cap_first(mcp.call("GetPythonApi", Target="AssetData", Limit=5))
+    assert r.get("EngineVersion"), r
+
+
 @pytest.mark.parametrize("bad_target", [
-    "os",                    # 非 unreal 顶层模块
     "unrealx.Foo",           # 前缀相同但不是 unreal
     "unreal..log",           # 连续点
     "unreal'; import os; '", # 注入字符
