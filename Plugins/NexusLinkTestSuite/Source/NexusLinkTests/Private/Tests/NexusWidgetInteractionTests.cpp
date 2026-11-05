@@ -11,6 +11,8 @@
 #include "Components/Button.h"
 #include "Components/VerticalBox.h"
 #include "Components/WidgetSwitcher.h"
+#include "Components/WidgetComponent.h"
+#include "GameFramework/Actor.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/World.h"
@@ -175,6 +177,56 @@ bool FNexusWidgetInteractionTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Active switcher page accepted"), Click(TEXT("WidgetPath"), SecondButton->GetPathName()).HasErrors());
 	TestEqual(TEXT("Only active nested page clicked"), SecondClicks->ClickCount, 2);
 	TestEqual(TEXT("Cached button still untouched"), CachedClicks->ClickCount, 0);
+
+	// WidgetComponent 的列表路径须能贯通交互和属性读写，移除或隐藏后拒绝交互。
+	Second->RemoveFromParent();
+	AActor* Actor = World->SpawnActor<AActor>();
+	if (!TestNotNull(TEXT("Widget Actor"), Actor)) return false;
+	UWidgetComponent* Component = NewObject<UWidgetComponent>(Actor);
+	Actor->SetRootComponent(Component);
+	Component->RegisterComponent();
+	Component->SetWidget(Second);
+	TestFalse(TEXT("Component widget is outside viewport"), Second->IsInViewport());
+	ListArgs->SetStringField(TEXT("ActorName"), Actor->GetName());
+	const FCapabilityResult ComponentList = List->Instance->Run(ListArgs);
+	if (!TestFalse(TEXT("Component list succeeds"), ComponentList.HasErrors()) || ComponentList.Entries.Num() != 1) return false;
+	TestEqual(TEXT("Viewport and component widget both listed"), ComponentList.Entries[0]->AsObject()->GetArrayField(TEXT("Widgets")).Num(), 2);
+	TestFalse(TEXT("Component exact path click"), Click(TEXT("WidgetPath"), SecondButton->GetPathName()).HasErrors());
+	TestEqual(TEXT("Component button clicked"), SecondClicks->ClickCount, 3);
+	TSharedPtr<FJsonObject> ReadArgs = MakeShared<FJsonObject>();
+	ReadArgs->SetStringField(TEXT("WidgetPath"), SecondButton->GetPathName());
+	const FCapRecord* Read = FNexusCapabilityRegistry::Get().FindRecordByName(TEXT("GetRuntimeWidgetProperty"));
+	const FCapRecord* Write = FNexusCapabilityRegistry::Get().FindRecordByName(TEXT("SetRuntimeWidgetProperty"));
+	if (!TestNotNull(TEXT("Read registered"), Read) || !TestNotNull(TEXT("Write registered"), Write)) return false;
+	TestFalse(TEXT("Read component by exact path"), Read->Instance->Run(ReadArgs).HasErrors());
+	TSharedPtr<FJsonObject> Update = MakeShared<FJsonObject>(*ReadArgs);
+	Update->SetStringField(TEXT("PropertyPath"), TEXT("RenderOpacity"));
+	Update->SetStringField(TEXT("Value"), TEXT("0.25"));
+	TSharedPtr<FJsonObject> WriteArgs = MakeShared<FJsonObject>();
+	WriteArgs->SetArrayField(TEXT("Updates"), {MakeShared<FJsonValueObject>(Update)});
+	const FCapabilityResult Written = Write->Instance->Run(WriteArgs);
+	TestFalse(TEXT("Write component by exact path"), Written.HasErrors());
+	if (TestEqual(TEXT("Write result entry"), Written.Entries.Num(), 1))
+	{
+		TestEqual(TEXT("Written field value"), FCString::Atof(*Written.Entries[0]->AsObject()->GetStringField(TEXT("NewValue"))), 0.25f);
+	}
+	// 使用非默认数值验证完整回读，避免 ExportText 省略零/False 的文本。
+	ReadArgs->SetArrayField(TEXT("PropertyPaths"), {MakeShared<FJsonValueString>(TEXT("RenderOpacity"))});
+	const FCapabilityResult ReadBack = Read->Instance->Run(ReadArgs);
+	if (!TestFalse(TEXT("Component property readback"), ReadBack.HasErrors()) || !TestEqual(TEXT("Readback entry"), ReadBack.Entries.Num(), 1)) return false;
+	TestEqual(TEXT("Component field changed"), FCString::Atof(*ReadBack.Entries[0]->AsObject()->GetStringField(TEXT("Value"))), 0.25f);
+	ReadArgs->SetStringField(TEXT("WidgetName"), TEXT("BackButton"));
+	ReadArgs->SetStringField(TEXT("WidgetPath"), SecondButton->GetPathName() + TEXT("_missing"));
+	TestTrue(TEXT("Read invalid explicit path never falls back"), Read->Instance->Run(ReadArgs).HasErrors());
+	Component->SetVisibility(false);
+	TestTrue(TEXT("Hidden component rejected"), Click(TEXT("WidgetPath"), SecondButton->GetPathName()).HasErrors());
+	Component->SetVisibility(true);
+	Actor->SetActorHiddenInGame(true);
+	TestTrue(TEXT("Hidden owner rejected"), Click(TEXT("WidgetPath"), SecondButton->GetPathName()).HasErrors());
+	Actor->SetActorHiddenInGame(false);
+	Component->UnregisterComponent();
+	TestTrue(TEXT("Unregistered component rejected"), Click(TEXT("WidgetPath"), SecondButton->GetPathName()).HasErrors());
+	TestNull(TEXT("Unregistered component unavailable for property access"), FNexusRuntimeUtils::FindRuntimeWidget(TEXT(""), TEXT(""), SecondButton->GetPathName()));
 	return true;
 }
 #endif

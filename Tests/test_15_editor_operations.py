@@ -35,11 +35,17 @@ def test_editor_slate_read_and_capture(mcp, require_tools):
     assert not errors.get("Entries"), errors
 
 
-def test_editor_automation_local_run(mcp, require_tools):
+@pytest.mark.parametrize("name", [
+    "NexusLink.EditorOperations.OwnerAndContract",
+    "NexusLink.Review.ScsReattachAndCopy",
+    "NexusLink.Review.TransformValidation",
+    "NexusLink.Review.DirtyLevelProtection",
+    "NexusLink.Runtime.Widget.ExactInteraction",
+])
+def test_editor_automation_local_run(mcp, require_tools, name):
     require_tools("ControlEditorAutomation", "ListEditorAutomationTests", "GetEditorOperation")
     operation_result(mcp, mcp.call("ControlEditorAutomation", Action="Discover"))
-    listed = operation_result(mcp, mcp.call("ListEditorAutomationTests", NameFilter="NexusLink.EditorOperations.OwnerAndContract"))
-    name = "NexusLink.EditorOperations.OwnerAndContract"
+    listed = operation_result(mcp, mcp.call("ListEditorAutomationTests", NameFilter=name))
     assert name in listed["Tests"], listed
     result = operation_result(mcp, mcp.call("ControlEditorAutomation", Action="Run", TestNames=[name]))
     assert len(result["Tests"]) == 1, result

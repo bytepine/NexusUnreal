@@ -1,5 +1,7 @@
 # NexusUnreal — pytest E2E 测试
 
+审查修复回归：UE Automation `NexusLink.Review` 验证关卡/外部 Actor 脏包保护、SCS 重挂载拒绝循环及根节点一致性、复制继承组件的覆盖模板，以及变换参数全量预检与无副作用失败。`NexusLink.Runtime.Widget.ExactInteraction` 同时验证 WidgetComponent 列表路径的交互和属性读写、隐藏/注销后的拒绝。均可在隔离 Editor-Cmd 用 `-ExecCmds="Automation RunTests NexusLink.Review+NexusLink.Runtime.Widget.ExactInteraction" -TestExit="Automation Test Queue Empty" -unattended -nullrhi` 执行。
+
 Lua 工具 L1：`NexusLinkExt.Lua.ValueToJsonStackBalance` 使用独立 Lua 状态验证 0/1/49/50/51/120 项表、嵌套表、正负索引与循环引用的栈平衡和截断结果，无需 PIE。可在 Session Frontend → Automation 运行该名称，或用 Editor-Cmd 的 `-ExecCmds="Automation RunTests NexusLinkExt.Lua.ValueToJsonStackBalance" -TestExit="Automation Test Queue Empty" -unattended -nullrhi`；宿主尚未启用已链接的可选依赖时，可在测试会话添加 `-EnablePlugins=GameFeatures,DataRegistry,GameplayTagsEditor`。
 
 行为树验收：编译后运行 `python Script/bt_retest_acceptance.py --ue-root <UE-directory> --output <new-output-directory>`。独立 GameModeBase 服务器显式生成测试 Pawn/AIController 和继承 Blackboard，验证失败/恢复、末次快照、清理、基线、停止树及销毁目标。配套 UE Automation 前缀为 `NexusLink.AI.Blackboard`，不改项目默认 GameMode。

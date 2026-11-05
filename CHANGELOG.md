@@ -20,7 +20,8 @@
 
 - 扩充编辑器 MCP 回归：长操作会话隔离、终态、压缩输出、批次预检与进度/取消；Slate 中文输入、表单/下拉框/拖拽、失效 Ref 和 Automation 执行；项目设置/插件、UE 5.8 技能/语义搜索/PCG 执行采样/Niagara 诊断及 UMG 结构/继承命名槽；PNG/JPEG 标准图片、可信附件、数量/字节限制与批量返回。自动启动按编辑器 PID 绑定实例端口。
 
-- test(widget): `NexusLink.Runtime.Widget.ExactInteraction` 验证同名歧义无副作用、列表路径精确点击、缓存与脱离层级实例拒绝、嵌套 UserWidget、隐藏父级、禁用按钮及 Switcher 活动页。
+- test(widget): `NexusLink.Runtime.Widget.ExactInteraction` 验证同名歧义无副作用、列表路径精确点击、缓存与脱离层级实例拒绝、嵌套 UserWidget、隐藏父级、禁用按钮及 Switcher 活动页；补充 WidgetComponent 路径交互/属性读写及隐藏、注销后的拒绝。
+- test(review): `NexusLink.Review` 覆盖脏关卡/外部 Actor 包切换保护、组件循环拒绝和重挂载根节点一致性、复制继承覆盖值，以及错误变换参数不产生部分写入。
 
 - test(bt): 独立 GameModeBase 行为树夹具与 `Script/bt_retest_acceptance.py`，验证继承键、错误类型、显式 Pawn/Controller、条件失败/恢复、超时快照、清理、基线、停止树及目标销毁；原生类型与继承键 Automation 配套覆盖。
 
