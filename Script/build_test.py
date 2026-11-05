@@ -11,9 +11,8 @@ build_test.py -- NexusUnreal 工程跨版本编译
 不改仓库工程（不写 Intermediate/Binaries，不改 .uproject / .uplugin）。
 每套引擎在系统临时目录建隔离工程：junction Content/Source/Config，
 插件根建真实目录（Intermediate 落在临时树），然后对该副本调 UBT。
-多引擎可并行（默认 --max-workers 3 为上限），所有构建均给 UBT 加
-`-MaxParallelActions`（同时按 CPU 与可用物理/提交内存预算），避免
-MSVC PCH 内存耗尽（C3859/C1076）；仍出现则单引擎、单 action 重试。
+一次只编一套引擎。不传 `-MaxParallelActions`，并行度交给 UBT
+（按物理核与空闲内存决定）。若 MSVC PCH 内存耗尽（C3859/C1076），再以单 action 重试。
 开跑前清残留 UBT / 调用 UBT 的 dotnet / 相关 MSBuild / VBCSCompiler，
 避免上次中断锁住 UnLuaDefaultParamCollectorUbtPlugin.dll 导致临时目录删不掉。
 
@@ -506,45 +505,18 @@ def _isolated_uproject(ver: str) -> Path:
     return path
 
 
-def _compile_action_budget() -> int:
-    """Windows 预留 4 GiB，每个编译任务预算 4 GiB；读不到内存时保守并发。"""
-    cpu_limit = max(1, (os.cpu_count() or 8) // 2)
-    if _SYSTEM != "Windows":
-        return cpu_limit
-    import ctypes
-
-    class MemoryStatus(ctypes.Structure):
-        _fields_ = [
-            ("length", ctypes.c_ulong), ("load", ctypes.c_ulong),
-            ("total_phys", ctypes.c_ulonglong), ("avail_phys", ctypes.c_ulonglong),
-            ("total_commit", ctypes.c_ulonglong), ("avail_commit", ctypes.c_ulonglong),
-            ("total_virtual", ctypes.c_ulonglong), ("avail_virtual", ctypes.c_ulonglong),
-            ("extended", ctypes.c_ulonglong),
-        ]
-
-    memory = MemoryStatus()
-    memory.length = ctypes.sizeof(memory)
-    if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(memory)):
-        return min(cpu_limit, 2)
-    gib = 1024 ** 3
-    available = min(memory.avail_phys, memory.avail_commit)
-    return max(1, min(cpu_limit, (available - 4 * gib) // (4 * gib)))
-
-
-def _parallel_limits(max_workers: int, engine_count: int) -> Tuple[int, int]:
-    budget = _compile_action_budget()
-    workers = min(max_workers, engine_count, budget)
-    return workers, max(1, budget // workers)
+def _parallel_limits(max_workers: int, engine_count: int) -> Tuple[int, Optional[int]]:
+    """一次只编一套引擎。不传 -MaxParallelActions，并行度交给 UBT。"""
+    del max_workers, engine_count
+    return 1, None
 
 
 def _format_workers(editor_n: Optional[int] = None, game_n: Optional[int] = None) -> str:
-    parts = []
-    if editor_n is not None:
-        parts.append(f"Editor<={editor_n}")
-    if game_n is not None:
-        parts.append(f"Game<={game_n}")
-    label = "; ".join(parts) if parts else "serial"
-    return f"Worker limits: {label}; CPU/memory-budgeted; PCH OOM retries workers=1 MaxParallelActions=1"
+    del editor_n, game_n
+    return (
+        "Worker limits: one engine at a time; MaxParallelActions=UBT default; "
+        "PCH OOM retries MaxParallelActions=1"
+    )
 
 
 def _is_pch_oom(result: Dict) -> bool:
@@ -767,7 +739,11 @@ def _run_phase(engines: List[dict], target: str, max_workers: int,
         max_workers, mpa = 1, 1
     else:
         max_workers, mpa = _parallel_limits(max_workers, total)
-    print(f"{label}: workers={max_workers} MaxParallelActions={mpa}", flush=True)
+    print(
+        f"{label}: workers={max_workers} MaxParallelActions="
+        f"{'UBT default' if mpa is None else mpa}",
+        flush=True,
+    )
 
     for e in engines:
         print(f"[{e['version']}] {label} Pending...", flush=True)
@@ -835,7 +811,7 @@ def _write_phase_log(path: Path, header: List[str], engines: List[dict],
         f.write("\n".join(lines_out) + "\n")
 
 
-def run_build_test_game(engines: List[dict], max_workers: int = 3,
+def run_build_test_game(engines: List[dict], max_workers: int = 1,
                         vs_version: Optional[str] = None) -> int:
     """Game-target only (WITH_EDITOR=0). See run_build_test(..., include_game=True)."""
     LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -866,16 +842,16 @@ def run_build_test_game(engines: List[dict], max_workers: int = 3,
     return fail_count
 
 
-def run_build_test(engines: List[dict], max_workers: int = 3,
+def run_build_test(engines: List[dict], max_workers: int = 1,
                    vs_version: Optional[str] = None,
                    include_game: bool = True,
-                   game_max_workers: int = 3) -> int:
+                   game_max_workers: int = 1) -> int:
     """
     Build all engine versions: Editor phase, then optional Game phase (WITH_EDITOR=0).
 
-    :param max_workers: concurrent Editor-phase engines (isolated temp per version).
+    :param max_workers: 保留；引擎并发固定为 1，并行度交给 UBT。
     :param include_game: Run Nexus Game target after Editor (default True).
-    :param game_max_workers: concurrent Game-phase engines.
+    :param game_max_workers: 保留；Game 阶段同样一次一套引擎。
     :return: Total failed version slots across phases.
     """
     LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -983,10 +959,10 @@ def main() -> int:
     parser.add_argument(
         "--max-workers",
         type=int,
-        default=3,
+        default=1,
         metavar="N",
-        help="Max concurrent Editor-phase builds (default 3). 按 CPU 与可用物理/提交内存 "
-             "限制引擎及 action 并发；C3859/C1076 自动单引擎、单 action 重试。",
+        help="保留参数，不提高引擎并发。一次只编一套引擎，"
+             "不传 -MaxParallelActions，由 UBT 决定；C3859/C1076 时改为单 action 重试。",
     )
     parser.add_argument(
         "--versions",
@@ -1019,8 +995,8 @@ def main() -> int:
         type=int,
         default=None,
         metavar="N",
-        help="Max concurrent Game-phase workers (default: same as --max-workers). "
-             "同样按内存预算限制并发，PCH OOM 同样单引擎、单 action 重试。",
+        help="保留参数，不提高引擎并发。Game 阶段同样一次一套引擎，"
+             "不传 -MaxParallelActions，由 UBT 决定。",
     )
     args = parser.parse_args()
 
