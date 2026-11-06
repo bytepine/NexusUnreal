@@ -24,6 +24,7 @@ public class NexusLinkTests : ModuleRules
 			{
 				"NexusLink",
 				"AIModule",
+				"NavigationSystem",
 				"Json",
 				"JsonUtilities",
 				"Projects",

@@ -6,7 +6,9 @@
 #include "Server/NexusMcpServer.h"
 #include "Async/TaskGraphInterfaces.h"
 #include "Utils/NexusVersionCompat.h"
+#include "Utils/NexusJsonUtils.h"
 #include "Components/SceneComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Engine/Blueprint.h"
 #include "Engine/BlueprintGeneratedClass.h"
 #include "Engine/Engine.h"
@@ -17,6 +19,7 @@
 #include "GameFramework/Actor.h"
 #include "GameFramework/Character.h"
 #include "Kismet2/KismetEditorUtilities.h"
+#include "Kismet2/BlueprintEditorUtils.h"
 #include "Editor.h"
 #include "FileHelpers.h"
 #include "Misc/ScopeExit.h"
@@ -87,6 +90,34 @@ bool FNexusReviewScsTest::RunTest(const FString& Parameters)
 	const FVector OverrideLocation(111, 222, 333);
 	SceneOverride->SetRelativeLocation(OverrideLocation);
 	FKismetEditorUtilities::CompileBlueprint(Child);
+	CastChecked<ACharacter>(Child->GeneratedClass->GetDefaultObject())->GetCapsuleComponent()->SetCapsuleSize(80, 120);
+	auto ReadArgs = MakeShared<FJsonObject>();
+	ReadArgs->SetStringField(TEXT("AssetPath"), Child->GetPathName());
+	ReadArgs->SetArrayField(TEXT("Sections"), {MakeShared<FJsonValueString>(TEXT("Component"))});
+	const FCapabilityResult Components = ReviewCall(TEXT("GetAssetBlueprint"), ReadArgs);
+	TestFalse(TEXT("Read inherited/native component overrides"), Components.HasErrors());
+	bool bFoundNative = false, bFoundInherited = false;
+	if (Components.Entries.Num() > 0)
+	{
+		for (const auto& Value : Components.Entries[0]->AsObject()->GetArrayField(TEXT("Components")))
+		{
+			const auto Component = Value->AsObject();
+			const FString Name = Component->GetStringField(TEXT("VariableName"));
+			if (Name == ACharacter::CapsuleComponentName.ToString())
+			{
+				bFoundNative = true;
+				TestEqual(TEXT("Native override radius"), FCString::Atod(*Component->GetObjectField(TEXT("TemplateProperties"))->GetStringField(TEXT("CapsuleRadius"))), 80.0);
+				TestTrue(TEXT("Native override resolved"), Component->GetBoolField(TEXT("bOverridesResolved")));
+			}
+			if (Name == TEXT("InheritedPart"))
+			{
+				bFoundInherited = true;
+				TestTrue(TEXT("Inherited override template is target child"), Component->GetStringField(TEXT("TemplatePath")) == SceneOverride->GetPathName());
+			}
+		}
+	}
+	TestTrue(TEXT("Native component returned"), bFoundNative);
+	TestTrue(TEXT("Inherited component returned"), bFoundInherited);
 	UBlueprint* Dest = ReviewBlueprint(AActor::StaticClass());
 	if (!TestNotNull(TEXT("Destination blueprint"), Dest)) return false;
 	TSharedPtr<FJsonObject> CopyArgs = MakeShared<FJsonObject>();
@@ -104,6 +135,93 @@ bool FNexusReviewScsTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Child override copied"), CastChecked<USceneComponent>(Copied->ComponentTemplate)->GetRelativeLocation().Equals(OverrideLocation));
 	}
 	for (UBlueprint* Blueprint : {Parent, Child, Dest}) Blueprint->GetOutermost()->SetDirtyFlag(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusFeedbackVariableTest, "NexusLink.Review.FeedbackVariableTypesAndRename",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusFeedbackVariableTest::RunTest(const FString& Parameters)
+{
+	TStrongObjectPtr<UBlueprint> Parent(ReviewBlueprint(AActor::StaticClass()));
+	if (!TestNotNull(TEXT("Parent"), Parent.Get())) return false;
+	ON_SCOPE_EXIT { Parent->GetOutermost()->SetDirtyFlag(false); };
+	auto Args = MakeShared<FJsonObject>();
+	Args->SetStringField(TEXT("AssetPath"), Parent->GetPathName());
+	Args->SetBoolField(TEXT("bCompile"), true);
+	auto Add = MakeShared<FJsonObject>();
+	Add->SetStringField(TEXT("Action"), TEXT("AddVariable"));
+	Add->SetStringField(TEXT("VariableName"), TEXT("OldCount"));
+	Add->SetStringField(TEXT("VariableType"), TEXT("int"));
+	Add->SetStringField(TEXT("DefaultValue"), TEXT("7"));
+	auto Array = MakeShared<FJsonObject>();
+	Array->SetStringField(TEXT("Action"), TEXT("AddVariable"));
+	Array->SetStringField(TEXT("VariableName"), TEXT("Points"));
+	Array->SetStringField(TEXT("VariableType"), TEXT("/Script/CoreUObject.Vector[]"));
+	Args->SetArrayField(TEXT("Operations"), {MakeShared<FJsonValueObject>(Add), MakeShared<FJsonValueObject>(Array)});
+	if (!TestFalse(TEXT("Typed variables compile"), ReviewCall(TEXT("ManageAssetBlueprint"), Args).HasErrors())) return false;
+	const FGuid VariableGuid = Parent->NewVariables[0].VarGuid;
+	auto Rename = MakeShared<FJsonObject>();
+	Rename->SetStringField(TEXT("Action"), TEXT("RenameVariable"));
+	Rename->SetStringField(TEXT("VariableName"), TEXT("OldCount"));
+	Rename->SetStringField(TEXT("NewVariableName"), TEXT("RenamedCount"));
+	Args->SetArrayField(TEXT("Operations"), {MakeShared<FJsonValueObject>(Rename)});
+	TestFalse(TEXT("Native leaf member rename"), ReviewCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	TestTrue(TEXT("Rename preserves variable GUID"), Parent->NewVariables[0].VarGuid == VariableGuid);
+	TStrongObjectPtr<UBlueprint> Child(ReviewBlueprint(Parent->GeneratedClass));
+	if (!TestNotNull(TEXT("Child"), Child.Get())) return false;
+	ON_SCOPE_EXIT { Child->GetOutermost()->SetDirtyFlag(false); };
+	FIntProperty* OldProperty = FindFProperty<FIntProperty>(Child->GeneratedClass, TEXT("RenamedCount"));
+	if (!TestNotNull(TEXT("Child property"), OldProperty)) return false;
+	OldProperty->SetPropertyValue_InContainer(Child->GeneratedClass->GetDefaultObject(), 42);
+	FBlueprintEditorUtils::MarkBlueprintAsModified(Child.Get());
+	FKismetEditorUtilities::CompileBlueprint(Child.Get());
+	OldProperty = FindFProperty<FIntProperty>(Child->GeneratedClass, TEXT("RenamedCount"));
+	if (!TestNotNull(TEXT("Compiled child property"), OldProperty)) return false;
+	TestEqual(TEXT("Child override exists before rename"), OldProperty->GetPropertyValue_InContainer(Child->GeneratedClass->GetDefaultObject()), 42);
+	Rename->SetStringField(TEXT("VariableName"), TEXT("RenamedCount"));
+	Rename->SetStringField(TEXT("NewVariableName"), TEXT("FinalCount"));
+	TestTrue(TEXT("Rename with descendants rejected before modification"), ReviewCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	TestTrue(TEXT("Parent variable name unchanged"), Parent->NewVariables[0].VarName == FName(TEXT("RenamedCount")));
+	FKismetEditorUtilities::CompileBlueprint(Child.Get());
+	FIntProperty* Renamed = FindFProperty<FIntProperty>(Child->GeneratedClass, TEXT("RenamedCount"));
+	if (TestNotNull(TEXT("Renamed child property"), Renamed))
+		TestEqual(TEXT("Rejected rename preserves child default override"), Renamed->GetPropertyValue_InContainer(Child->GeneratedClass->GetDefaultObject()), 42);
+	Rename->SetStringField(TEXT("VariableName"), TEXT("RenamedCount"));
+	Rename->SetStringField(TEXT("NewVariableName"), TEXT("Points"));
+	TestTrue(TEXT("Duplicate variable name rejected"), ReviewCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusFeedbackLevelPropertyTest, "NexusLink.Review.FeedbackLevelActorProperties",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusFeedbackLevelPropertyTest::RunTest(const FString& Parameters)
+{
+	UPackage* Package = CreatePackage(*(TEXT("/Game/_McpTest/ReadLevel_") + FGuid::NewGuid().ToString(EGuidFormats::Digits)));
+	UWorld* World = UWorld::CreateWorld(EWorldType::Editor, false, TEXT("ReadLevel"), Package);
+	ON_SCOPE_EXIT { Package->SetDirtyFlag(false); World->DestroyWorld(false); };
+	AActor* Actor = World->SpawnActor<AActor>();
+	if (!TestNotNull(TEXT("Level actor"), Actor)) return false;
+	Actor->SetCanBeDamaged(false);
+	Package->SetDirtyFlag(false);
+	auto Args = MakeShared<FJsonObject>();
+	Args->SetStringField(TEXT("AssetPath"), World->GetPathName());
+	Args->SetStringField(TEXT("ActorName"), Actor->GetName());
+	Args->SetArrayField(TEXT("Sections"), {MakeShared<FJsonValueString>(TEXT("ActorProperties"))});
+	Args->SetArrayField(TEXT("PropertyPaths"), {MakeShared<FJsonValueString>(TEXT("bCanBeDamaged"))});
+	const FCapabilityResult Result = ReviewCall(TEXT("GetAssetLevel"), Args);
+	if (!TestFalse(TEXT("Level property read"), Result.HasErrors()))
+	{
+		AddInfo(Result.FatalError);
+		for (const auto& Entry : Result.Entries) AddInfo(FNexusJsonUtils::SerializeCondensed(Entry->AsObject()));
+		return false;
+	}
+	const auto Property = Result.Entries[0]->AsObject()->GetArrayField(TEXT("Properties"))[0]->AsObject();
+	TestEqual(TEXT("Actor property value"), Property->GetStringField(TEXT("Value")), FString(TEXT("False")));
+	TestEqual(TEXT("Class default value"), Property->GetStringField(TEXT("DefaultValue")), FString(TEXT("True")));
+	TestTrue(TEXT("Difference from CDO"), Property->GetBoolField(TEXT("bDiffersFromDefault")));
+	TestFalse(TEXT("Read preserves dirty flag"), Package->IsDirty());
+	Args->SetArrayField(TEXT("PropertyPaths"), {MakeShared<FJsonValueString>(TEXT("MissingProperty"))});
+	TestTrue(TEXT("Invalid property reports a section error"), ReviewCall(TEXT("GetAssetLevel"), Args).HasErrors());
 	return true;
 }
 
@@ -185,6 +303,21 @@ bool FNexusComponentBatchCompileTest::RunTest(const FString& Parameters)
 	auto Copy = ComponentOperation(TEXT("CopyComponent"), TEXT("BatchCopy"));
 	Copy->SetStringField(TEXT("SourceAssetPath"), Blueprint->GetPathName());
 	Copy->SetStringField(TEXT("SourceComponentName"), TEXT("BatchBody"));
+	auto Defaults = MakeShared<FJsonObject>();
+	Defaults->SetStringField(TEXT("Action"), TEXT("SetDefaults"));
+	Defaults->SetStringField(TEXT("PropertyPath"), TEXT("bCanBeDamaged"));
+	Defaults->SetStringField(TEXT("Value"), TEXT("false"));
+	Operations.Add(MakeShared<FJsonValueObject>(Defaults));
+	auto Function = MakeShared<FJsonObject>();
+	Function->SetStringField(TEXT("Action"), TEXT("AddFunction"));
+	Function->SetStringField(TEXT("FunctionName"), TEXT("ReadDamageFlag"));
+	Operations.Add(MakeShared<FJsonValueObject>(Function));
+	auto Node = MakeShared<FJsonObject>();
+	Node->SetStringField(TEXT("Action"), TEXT("AddNode"));
+	Node->SetStringField(TEXT("GraphName"), TEXT("ReadDamageFlag"));
+	Node->SetStringField(TEXT("NodeClass"), TEXT("K2Node_VariableGet"));
+	Node->SetStringField(TEXT("VariableName"), TEXT("bCanBeDamaged"));
+	Operations.Add(MakeShared<FJsonValueObject>(Node));
 	auto Args = MakeShared<FJsonObject>();
 	Args->SetStringField(TEXT("AssetPath"), Blueprint->GetPathName());
 	Args->SetBoolField(TEXT("bCompile"), true);

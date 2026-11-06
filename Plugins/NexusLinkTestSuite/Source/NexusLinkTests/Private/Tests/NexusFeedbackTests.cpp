@@ -17,7 +17,7 @@
 
 // ── 测试辅助 ──────────────────────────────────────────────────────────────
 
-/** 临时把反馈目录重定向到 Saved/NexusFeedbackTests_<uuid>，测试后自动清理。 */
+/** 测试须在隔离宿主执行，使用其独立反馈目录。 */
 struct FNexusFeedbackTestScope
 {
 	FString OrigDir;
@@ -366,5 +366,41 @@ bool FNexusLinkFeedbackProxyTest::RunTest(const FString& /*Parameters*/)
 			MdContent.Contains(TEXT("desktop")) && MdContent.Contains(TEXT("proxy_connect_fail")));
 	}
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusFeedbackReportRegressionTest, "NexusLink.Feedback.ReportRegression",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusFeedbackReportRegressionTest::RunTest(const FString& Parameters)
+{
+	FNexusFeedbackTestScope Scope;
+	const FString ArchiveDir = FNexusFeedback::GetFeedbackDir() / TEXT("archive");
+	IFileManager::Get().MakeDirectory(*ArchiveDir, true);
+	FFileHelper::SaveStringToFile(TEXT("{\"categories\":{\"search_zero\":2,\"SearchZero\":1,\"other\":1}}"), *(ArchiveDir / TEXT("last_summary.json")));
+	FNexusFeedback::FFields Fields;
+	Fields.Query = TEXT("asset editor"); Fields.MatchCount = 28;
+	FNexusFeedback::RecordManual(TEXT("SearchOverflow"), Fields);
+	Fields.MatchCount = 0;
+	FNexusFeedback::RecordManual(TEXT("SearchOverflow"), Fields);
+	Fields.Query = TEXT("missing operation");
+	FNexusFeedback::RecordManual(TEXT("search_zero"), Fields);
+	FNexusFeedback::RecordManual(TEXT("SearchZero"), Fields);
+	Fields = FNexusFeedback::FFields(); Fields.Capability = TEXT("SlowCapability");
+	Fields.Note = TEXT("2000ms > threshold 1500ms");
+	FNexusFeedback::RecordManual(TEXT("SlowCall"), Fields);
+	Fields.Capability = TEXT("ManageAssetBlueprint");
+	Fields.Note = TEXT("ManualCrashDetailsMustRemainVisible"); Fields.ActualError = TEXT("Access violation");
+	FNexusFeedback::RecordManual(TEXT("Other"), Fields);
+	FNexusFeedback::FIssueDraft Draft;
+	TestTrue(TEXT("Build issue draft"), FNexusFeedback::BuildIssueDraft(Draft));
+	TestTrue(TEXT("Manual actual error outranks slow-call sample"), Draft.Title.Contains(TEXT("ManageAssetBlueprint")));
+	const FString Report = FNexusFeedback::ExportReport();
+	FString Markdown;
+	TestTrue(TEXT("Read report"), FFileHelper::LoadFileToString(Markdown, *Report));
+	TestTrue(TEXT("Legacy categories merged in trend"), Markdown.Contains(TEXT("| `SearchZero` | 3 | 2 | ↓1 |")));
+	TestFalse(TEXT("No split legacy category"), Markdown.Contains(TEXT("`search_zero`")));
+	TestTrue(TEXT("Missing MatchCount is not a zero-valued sample"), Markdown.Contains(TEXT("| `asset editor` | 2 | 28.0 |")));
+	TestTrue(TEXT("Other details are visible"), Markdown.Contains(TEXT("ManualCrashDetailsMustRemainVisible")));
+	TestTrue(TEXT("Unique issue prefill section"), Markdown.Contains(TEXT("## §11 GitHub Issue")));
 	return true;
 }

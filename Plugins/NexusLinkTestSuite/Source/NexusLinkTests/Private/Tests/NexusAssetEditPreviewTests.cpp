@@ -12,6 +12,8 @@
 #include "Engine/DataTable.h"
 #include "Engine/BlueprintGeneratedClass.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Character.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Editor.h"
 #include "Editor/TransBuffer.h"
@@ -28,6 +30,10 @@
 #include "K2Node_VariableGet.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "GraphEditAction.h"
+#include "Misc/ScopeExit.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "HAL/FileManager.h"
 
 static FCapabilityResult AssetEditCall(const TCHAR* Capability, const TSharedPtr<FJsonObject>& Args)
 {
@@ -67,6 +73,7 @@ bool FNexusAssetScalarPreviewTest::RunTest(const FString& Parameters)
 	Package->SetDirtyFlag(false);
 	const int32 UndoCount = GEditor->Trans->GetQueueLength();
 	const TCHAR* ValidSamples[][2] = {
+		{TEXT("Count"), TEXT("0")}, {TEXT("bEnabled"), TEXT("false")}, {TEXT("Weight"), TEXT("0")},
 		{TEXT("Count"), TEXT("00012")}, {TEXT("bEnabled"), TEXT("true")}, {TEXT("Weight"), TEXT("2.5")},
 		{TEXT("Label"), TEXT("hello")}, {TEXT("Key"), TEXT("MyName")}, {TEXT("Text"), TEXT("hello")}, {TEXT("Choice"), TEXT("Second")}};
 	for (const auto& Sample : ValidSamples)
@@ -142,10 +149,26 @@ bool FNexusAssetBlueprintVerificationTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Blueprint preview preserves Undo"), GEditor->Trans->GetQueueLength(), UndoCount);
 	Args->RemoveField(TEXT("Capability")); Args->SetBoolField(TEXT("bVerify"), true); Args->SetBoolField(TEXT("bSaveToDisk"), true);
 	int32 SaveCount = 0;
+	const auto OriginalFinalize = FNexusEditorServices::ApplyManageFinalize;
 	TGuardValue<decltype(FNexusEditorServices::ApplyManageFinalize)> Guard(FNexusEditorServices::ApplyManageFinalize,
-		[&](const FString&, bool, bool bSave, TSharedPtr<FJsonObject>&) { if (bSave) ++SaveCount; });
-	TestFalse(TEXT("Compile and reread succeeds"), AssetEditCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+		[&](const FString& Path, bool bCompile, bool bSave, TSharedPtr<FJsonObject>& Top)
+		{ if (bCompile) OriginalFinalize(Path, true, false, Top); if (bSave) ++SaveCount; });
+	int32 CompileCount = 0;
+	FDelegateHandle CountHook = GEditor->OnBlueprintCompiled().AddLambda([&]() { ++CompileCount; });
+	ON_SCOPE_EXIT { GEditor->OnBlueprintCompiled().Remove(CountHook); };
+	TestFalse(TEXT("Memory verification without compile succeeds"), AssetEditCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	TestEqual(TEXT("bVerify respects default bCompile=false"), CompileCount, 0);
 	TestEqual(TEXT("Successful BP save"), SaveCount, 1);
+	Args->SetBoolField(TEXT("bCompile"), true);
+	Args->SetBoolField(TEXT("bSaveToDisk"), false);
+	const auto First = Args->GetArrayField(TEXT("Operations"))[0]->AsObject();
+	TSharedPtr<FJsonObject> Second = MakeShared<FJsonObject>(*First);
+	Second->SetStringField(TEXT("Value"), TEXT("true"));
+	Args->SetArrayField(TEXT("Operations"), {MakeShared<FJsonValueObject>(First), MakeShared<FJsonValueObject>(Second)});
+	TestFalse(TEXT("Two writes compile once"), AssetEditCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	TestEqual(TEXT("Exactly one requested compile"), CompileCount, 1);
+	Args->SetArrayField(TEXT("Operations"), {MakeShared<FJsonValueObject>(First)});
+	Args->SetBoolField(TEXT("bSaveToDisk"), true);
 	FDelegateHandle ReadbackHook = GEditor->OnBlueprintCompiled().AddLambda([&]()
 		{ Cast<AActor>(Blueprint->GeneratedClass->GetDefaultObject())->SetCanBeDamaged(true); });
 	TestTrue(TEXT("Readback mismatch fails"), AssetEditCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
@@ -156,6 +179,61 @@ bool FNexusAssetBlueprintVerificationTest::RunTest(const FString& Parameters)
 	GEditor->OnBlueprintCompiled().Remove(CompileHook);
 	TestEqual(TEXT("Compiler failure never saves"), SaveCount, 1);
 	Package->SetDirtyFlag(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusAssetOwnedComponentPreviewTest, "NexusLink.AssetEdit.OwnedComponentPreview",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusAssetOwnedComponentPreviewTest::RunTest(const FString& Parameters)
+{
+	UPackage* Package = AssetEditPackage();
+	TStrongObjectPtr<UBlueprint> Blueprint(FKismetEditorUtilities::CreateBlueprint(ACharacter::StaticClass(), Package,
+		TEXT("Character"), BPTYPE_Normal, UBlueprint::StaticClass(), UBlueprintGeneratedClass::StaticClass()));
+	ACharacter* Defaults = Cast<ACharacter>(Blueprint->GeneratedClass->GetDefaultObject());
+	const FVector Before = Defaults->GetMesh()->GetRelativeLocation();
+	TSharedPtr<FJsonObject> Args = AssetEditArgs(Blueprint.Get(), TEXT("ManageAssetBlueprint"), TEXT("SetDefaults"), TEXT("Mesh.RelativeLocation.Z"), TEXT("123"));
+	Package->SetDirtyFlag(false);
+	TestFalse(TEXT("Owned native component scalar preview"), AssetEditCall(TEXT("GetAssetEditPreview"), Args).HasErrors());
+	TestFalse(TEXT("Preview does not dirty package"), Package->IsDirty());
+	TestTrue(TEXT("Preview does not change component"), Defaults->GetMesh()->GetRelativeLocation().Equals(Before));
+	Args->RemoveField(TEXT("Capability")); Args->SetBoolField(TEXT("bVerify"), true);
+	TestFalse(TEXT("Owned component scalar write and readback"), AssetEditCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	TestTrue(TEXT("Component scalar written"), FMath::IsNearlyEqual(static_cast<double>(Defaults->GetMesh()->GetRelativeLocation().Z), 123.0));
+	const auto ExternalArgs = AssetEditArgs(Blueprint.Get(), TEXT("ManageAssetBlueprint"), TEXT("SetDefaults"), TEXT("Owner.bCanBeDamaged"), TEXT("false"));
+	TestTrue(TEXT("Null subobject preview rejected"), AssetEditCall(TEXT("GetAssetEditPreview"), ExternalArgs).HasErrors());
+	FObjectPropertyBase* OwnerProperty = FindFProperty<FObjectPropertyBase>(AActor::StaticClass(), TEXT("Owner"));
+	if (TestNotNull(TEXT("Owner reference property"), OwnerProperty))
+	{
+		OwnerProperty->SetObjectPropertyValue_InContainer(Defaults, AActor::StaticClass()->GetDefaultObject());
+		TestTrue(TEXT("External subobject preview rejected"), AssetEditCall(TEXT("GetAssetEditPreview"), ExternalArgs).HasErrors());
+		OwnerProperty->SetObjectPropertyValue_InContainer(Defaults, nullptr);
+	}
+	Package->SetDirtyFlag(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusAssetAutomatedExportTest, "NexusLink.AssetEdit.AutomatedExport",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusAssetAutomatedExportTest::RunTest(const FString& Parameters)
+{
+	UPackage* Package = AssetEditPackage();
+	TStrongObjectPtr<UDataTable> Table(NewObject<UDataTable>(Package, TEXT("Table"), RF_Public | RF_Transactional));
+	Table->RowStruct = FNexusReliabilityTestRow::StaticStruct();
+	Table->AddRow(TEXT("Row"), FNexusReliabilityTestRow());
+	const FString File = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("FeedbackExport.t3d"));
+	ON_SCOPE_EXIT { IFileManager::Get().Delete(*File); Package->SetDirtyFlag(false); };
+	auto Args = MakeShared<FJsonObject>();
+	Args->SetStringField(TEXT("AssetPath"), Table->GetPathName());
+	Args->SetStringField(TEXT("OutputPath"), File);
+	const FCapabilityResult Result = AssetEditCall(TEXT("ExportAsset"), Args);
+	if (!TestFalse(TEXT("Automated typed text export"), Result.HasErrors())) return false;
+	TestTrue(TEXT("Automated mode returned"), Result.Entries[0]->AsObject()->GetBoolField(TEXT("bAutomated")));
+	FString Text;
+	TestTrue(TEXT("Export file exists"), FFileHelper::LoadFileToString(Text, *File));
+	TestTrue(TEXT("Correct exporter content"), Text.Contains(TEXT("Begin Object")) && Text.Contains(TEXT("DataTable")));
+	Args->SetStringField(TEXT("OutputPath"), File + TEXT(".unsupported"));
+	TestTrue(TEXT("Unsupported extension rejected"), AssetEditCall(TEXT("ExportAsset"), Args).HasErrors());
+	TestFalse(TEXT("Unsupported export does not create a file"), IFileManager::Get().FileExists(*(File + TEXT(".unsupported"))));
 	return true;
 }
 

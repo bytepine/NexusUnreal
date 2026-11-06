@@ -1,5 +1,11 @@
 # NexusUnreal — pytest E2E 测试
 
+编辑器缺口：Automation `NexusLink.EditorGaps` 验证重设父类及 Undo/继承循环/数据丢失前置条件，真实 NavigationSystem 分派的完整/部分路径、普通 Actor 无移动，以及资产编辑器实际打开、聚焦和只验证；导航使用确定性 ANavigationData 夹具，无需构建 Recast 网格。MCP 用例在 `test_23_editor_feedback_gaps.py`，实际打开编辑器用例标记 `requires_gui`，其余可 headless 执行。
+
+反馈回归：`NexusLink.Review.FeedbackVariableTypesAndRename`、`NexusLink.Review.FeedbackLevelActorProperties`、`NexusLink.Review.ScsReattachAndCopy`、`NexusLink.AssetEdit.BlueprintVerification`、`NexusLink.AssetEdit.OwnedComponentPreview`、`NexusLink.Utils.PinType.ParsePrimitives`、`NexusLink.Feedback.ReportRegression` 覆盖蓝图类型/叶子成员重命名及子类默认值保护、关卡属性、组件覆盖、集中编译和报告统计；`NexusLink.AssetEdit.ScalarPreview` 同时覆盖 false/0 导出。在隔离 Editor-Cmd 宿主执行，不在业务会话重放崩溃批次。
+
+`NexusLink.AssetEdit.AutomatedExport` 验证 T3D 自动化导出、输出内容及不支持扩展名的无文件失败；组件预览同时验证空引用与外部对象引用拒绝。
+
 PascalCase 契约回归：`NexusLink.Reliability.PascalCasePayload` 验证实际注册的输入 Schema、创建结果 Name 字段和 GetAsset/ManageAsset 路径去重；`NexusLink.Feedback.RoundTrip` 验证 Call* 分类进入草稿及汇总报告；`NexusLinkExt.Smoke.LuaCaps` 和 `NexusLinkExt.Lua.ValueToJsonStackBalance` 验证 Lua 能力名及表字段 Type 元数据。Python 用例和行为树复测工具使用同一字段命名。
 
 审查修复回归：UE Automation `NexusLink.Review` 验证关卡/外部 Actor 脏包保护、SCS 重挂载拒绝循环及根节点一致性、复制继承组件的覆盖模板，以及变换参数全量预检与无副作用失败。`NexusLink.Runtime.Widget.ExactInteraction` 同时验证 WidgetComponent 列表路径的交互和属性读写、隐藏/注销后的拒绝。均可在隔离 Editor-Cmd 用 `-ExecCmds="Automation RunTests NexusLink.Review+NexusLink.Runtime.Widget.ExactInteraction" -TestExit="Automation Test Queue Empty" -unattended -nullrhi` 执行。
