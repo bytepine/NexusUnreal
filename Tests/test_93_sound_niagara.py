@@ -70,7 +70,7 @@ def test_niagara_emitter_enable_rename(mcp, require_tools):
     emitters = got.get("Emitters") or []
     if not emitters:
         pytest.skip("系统无 Emitter")
-    name = emitters[0].get("name")
+    name = emitters[0].get("Name")
     r = mcp.call_capability(
         "ManageAssetNiagaraSystem",
         AssetPath=path,
@@ -109,7 +109,7 @@ def test_niagara_add_emitter(test_ns, mcp):
     )
     assert not cap_first(add).get("Error"), add
     got = cap_first(mcp.call_capability("GetAssetNiagaraSystem", AssetPath=path))
-    names = [e.get("name") for e in (got.get("Emitters") or []) if isinstance(e, dict)]
+    names = [e.get("Name") for e in (got.get("Emitters") or []) if isinstance(e, dict)]
     assert any(n and "TestEmitter" in n for n in names) or got.get("EmitterCount", 0) >= 1, got
     extra_ops = [
         {"Action": "SetProperty", "PropertyPath": "bFixedBounds", "Value": "false"},
@@ -177,7 +177,7 @@ def test_niagara_add_remove_module(test_ns, mcp):
     for e in emitters:
         mods.extend(e.get("Modules") or [])
     assert mods, got
-    mod_name = mod_entry.get("ModuleName") or (mods[0].get("name") if isinstance(mods[0], dict) else None)
+    mod_name = mod_entry.get("ModuleName") or (mods[0].get("Name") if isinstance(mods[0], dict) else None)
     assert mod_name, add_mod
     rm = mcp.call_capability(
         "ManageAssetNiagaraSystem",
@@ -241,12 +241,12 @@ def test_niagara_set_module_parameter_roundtrip(test_ns, mcp):
     for e in (got.get("Emitters") or []):
         if isinstance(e, dict):
             mods.extend(e.get("Modules") or [])
-    target = next((m for m in mods if isinstance(m, dict) and m.get("name") == mod_name), None)
+    target = next((m for m in mods if isinstance(m, dict) and m.get("Name") == mod_name), None)
     assert target, got
     assert target.get("Usage"), target
     inputs = target.get("Inputs") or []
     assert isinstance(inputs, list), target
-    spawn = next((i for i in inputs if isinstance(i, dict) and "SpawnRate" in (i.get("name") or "")), None)
+    spawn = next((i for i in inputs if isinstance(i, dict) and "SpawnRate" in (i.get("Name") or "")), None)
     if spawn:
         assert "42" in str(spawn.get("Value") or ""), spawn
 

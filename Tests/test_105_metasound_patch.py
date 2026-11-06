@@ -57,7 +57,7 @@ class TestManageMetaSoundPatch:
         # 添加一个 float input
         r = mcp.call_capability("ManageAssetMetaSound",
                                 AssetPath=patch_full,
-                                Operations=[{"Action": "AddInput", "name": "TestFloat", "TypeName": "float"}])
+                                Operations=[{"Action": "AddInput", "Name": "TestFloat", "TypeName": "float"}])
         payload = r if isinstance(r, dict) else {}
         entries = payload.get("Entries") or payload.get("Results") or []
         first = entries[0] if entries else payload
@@ -66,7 +66,7 @@ class TestManageMetaSoundPatch:
         # 移除
         mcp.call_capability("ManageAssetMetaSound",
                             AssetPath=patch_full,
-                            Operations=[{"Action": "RemoveInput", "name": "TestFloat"}])
+                            Operations=[{"Action": "RemoveInput", "Name": "TestFloat"}])
 
 
 @pytest.mark.l3_asset

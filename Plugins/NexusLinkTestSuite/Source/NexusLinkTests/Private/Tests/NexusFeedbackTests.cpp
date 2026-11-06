@@ -57,10 +57,11 @@ bool FNexusLinkFeedbackRoundTripTest::RunTest(const FString& /*Parameters*/)
 	// 写入 3 条不同 category 的手动记录
 	{
 		FNexusFeedback::FFields F;
-		F.Tool = TEXT("call_capability");
-		F.Capability = TEXT("test_cap_a");
+		F.Tool = TEXT("CallCapability");
+		F.Capability = TEXT("GetPascalCaseFeedbackTest");
+		F.ErrorText = TEXT("PascalCase feedback regression");
 		F.Note = TEXT("RoundTrip test note A");
-		FNexusFeedback::RecordManual(TEXT("wrong_tool"), F);
+		FNexusFeedback::RecordManual(TEXT("CallUnknown"), F);
 	}
 	{
 		FNexusFeedback::FFields F;
@@ -100,6 +101,10 @@ bool FNexusLinkFeedbackRoundTripTest::RunTest(const FString& /*Parameters*/)
 		TestEqual(TEXT("Each jsonl line has pluginVersion+ueVersion"), VersionedLines, 3);
 	}
 
+	FNexusFeedback::FIssueDraft Draft;
+	TestTrue(TEXT("生成反馈草稿"), FNexusFeedback::BuildIssueDraft(Draft));
+	TestTrue(TEXT("草稿汇总新版 Call 分类"), Draft.Body.Contains(TEXT("## Top Capability 误用")));
+
 	// 导出报告
 	const FString ReportPath = FNexusFeedback::ExportReport();
 	TestFalse(TEXT("ExportReport returns non-empty path"), ReportPath.IsEmpty());
@@ -112,6 +117,7 @@ bool FNexusLinkFeedbackRoundTripTest::RunTest(const FString& /*Parameters*/)
 		// 报告包含总条数行
 		FString MdContent;
 		FFileHelper::LoadFileToString(MdContent, *ReportPath);
+		TestTrue(TEXT("报告汇总新版 Call 分类"), MdContent.Contains(TEXT("**GetPascalCaseFeedbackTest** (1 次)")));
 		TestTrue(TEXT("Report contains totalCount line"),
 			MdContent.Contains(TEXT("总条数：**3**")));
 		TestTrue(TEXT("Report has env section"), MdContent.Contains(TEXT("## 环境")));

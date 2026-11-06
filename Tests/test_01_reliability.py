@@ -47,7 +47,7 @@ def test_reliability_datatable_fields(mcp, reliability_table):
     row = cap_first(mcp.call_capability(
         "GetAssetDataTable", AssetPath=reliability_table, Mode="Rows", RowNames=["Initial"],
     ))
-    fields = {field["name"]: {**row.get("Fields_defaults", {}), **field} for field in row["Fields"]}
+    fields = {field["Name"]: {**row.get("Fields_defaults", {}), **field} for field in row["Fields"]}
     assert fields["Count"]["Value"] == "42", row
     assert "stored" in fields["Label"]["Value"], row
     failed = mcp.try_call("ManageAssetDataTable", AssetPath=reliability_table,

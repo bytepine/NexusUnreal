@@ -192,13 +192,13 @@ def _resolve_connection(args: argparse.Namespace) -> Tuple[List[str], str]:
     return out, f"auto: launching {ver} from {path}{matched_note}"
 
 
-def _purge_disk_artifacts(label: str, *, include_report: bool = True) -> None:
+def _purge_disk_artifacts(label: str, *, project_root: Optional[Path] = None, include_report: bool = True) -> None:
     """删除上一轮 pytest/e2e 落在 Saved/Logs、Content/_McpTest、Content/_NexusTest 的临时文件。"""
     sys.path.insert(0, str(TESTS_DIR))
     from _framework.test_cleanup import purge_disk_test_artifacts
 
     removed = purge_disk_test_artifacts(
-        NEXUS_UNREAL_DIR,
+        project_root if project_root is not None else NEXUS_UNREAL_DIR,
         include_report=include_report,
     )
     if removed:
@@ -263,7 +263,8 @@ def main() -> int:
     args, forwarded = parser.parse_known_args()
 
     _ensure_deps()
-    _purge_disk_artifacts("pre")
+    project_root = Path(args.uproject).resolve().parent if args.uproject else NEXUS_UNREAL_DIR
+    _purge_disk_artifacts("pre", project_root=project_root)
 
     plugin_scripts = NEXUS_UNREAL_DIR / "Plugins/NexusLink/scripts"
     for name in ("audit_capability_naming.py", "audit_capability_params.py"):
@@ -323,7 +324,7 @@ def main() -> int:
 
     print(f"[run] {' '.join(cmd)}", flush=True)
     rc = subprocess.call(cmd, cwd=str(NEXUS_UNREAL_DIR))
-    _purge_disk_artifacts("post", include_report=False)
+    _purge_disk_artifacts("post", project_root=project_root, include_report=False)
     return rc
 
 

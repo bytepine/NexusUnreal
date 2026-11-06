@@ -17,7 +17,7 @@ def test_create_material_function(test_ns, mcp):
     r = mcp.call_capability(
         "CreateAssetMaterialFunction",
         AssetPath=path,
-        description="测试函数",
+        Description="测试函数",
         bExposeToLibrary=False,
     )
     entry = cap_first(r)
@@ -108,7 +108,7 @@ def test_manage_mpc_add_vector(test_ns, mcp):
     r = mcp.call_capability(
         "ManageAssetMaterialParameterCollection",
         AssetPath=path,
-        Operations=[{"Action": "AddVector", "ParamName": "GlobalTint", "r": 1.0, "g": 0.5, "b": 0.0, "a": 1.0}],
+        Operations=[{"Action": "AddVector", "ParamName": "GlobalTint", "R": 1.0, "G": 0.5, "B": 0.0, "A": 1.0}],
     )
     entry = cap_first(r)
     assert not entry.get("Error"), r
@@ -141,12 +141,12 @@ def test_manage_mpc_set_vector_default(test_ns, mcp):
         mcp.call_capability(
             "ManageAssetMaterialParameterCollection",
             AssetPath=path,
-            Operations=[{"Action": "AddVector", "ParamName": "GlobalColor", "r": 1, "g": 1, "b": 1, "a": 1}],
+            Operations=[{"Action": "AddVector", "ParamName": "GlobalColor", "R": 1, "G": 1, "B": 1, "A": 1}],
         )
         r = mcp.call_capability(
             "ManageAssetMaterialParameterCollection",
             AssetPath=path,
-            Operations=[{"Action": "SetVectorDefault", "ParamName": "GlobalColor", "r": 1, "g": 1, "b": 1, "a": 1}],
+            Operations=[{"Action": "SetVectorDefault", "ParamName": "GlobalColor", "R": 1, "G": 1, "B": 1, "A": 1}],
         )
     except MCPError as e:
         pytest.skip(f"set_vector_default 跳过: {e}")

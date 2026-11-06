@@ -61,6 +61,21 @@ bool FNexusLuaValueToJsonStackTest::RunTest(const FString& Parameters)
 	lua_newtable(L);
 	lua_pushvalue(L, -1);
 	lua_setfield(L, -2, "self");
+	TArray<TSharedPtr<FJsonValue>> Keys;
+	int32 TotalKeys = 0;
+	FNexusLuaUtils::CollectTableKeys(L, -1, FString(), 10, Keys, TotalKeys);
+	TestEqual(TEXT("枚举表字段保持栈高度"), lua_gettop(L), 1);
+	if (TestEqual(TEXT("枚举唯一字段"), Keys.Num(), 1))
+	{
+		const auto Entry = Keys[0]->AsObject();
+		TestEqual(TEXT("表字段类型使用 Type"), Entry->GetStringField(TEXT("Type")), FString(TEXT("table")));
+		bool bHasExactType = false;
+		for (const auto& Pair : Entry->Values)
+		{
+			bHasExactType |= Pair.Key.Equals(TEXT("Type"), ESearchCase::CaseSensitive);
+		}
+		TestTrue(TEXT("Type 元数据大小写精确匹配"), bHasExactType);
+	}
 	TSharedPtr<FJsonValue> Cycle = FNexusLuaUtils::LuaValueToJson(L, -1);
 	TestEqual(TEXT("Cyclic table preserves stack height"), lua_gettop(L), 1);
 	TestEqual(TEXT("Cyclic table stops at depth limit"),

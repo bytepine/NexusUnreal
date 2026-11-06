@@ -54,7 +54,7 @@ def test_control_rig_remaining_actions(test_ns, mcp):
         AssetPath=path,
         Operations=[
             {"Action": "RenameElement", "ElementName": "NxCtrl", "NewName": "NxCtrlRenamed"},
-            {"Action": "SetControlColor", "ElementName": "NxCtrlRenamed", "r": 1, "g": 0, "b": 0, "a": 1},
+            {"Action": "SetControlColor", "ElementName": "NxCtrlRenamed", "R": 1, "G": 0, "B": 0, "A": 1},
             {"Action": "AddNull", "ElementName": "NxNull"},
             {"Action": "AddRigNode", "StructType": "RigUnit_GetTransform", "NodeName": "NxGetXform"},
             {"Action": "SetPinDefault", "PinPath": "NxGetXform.Item", "PinDefaultValue": ""},

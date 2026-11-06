@@ -25,14 +25,14 @@ class TestAnimComposite:
         first = results[0] if isinstance(results[0], dict) else {}
         if first.get("Error") and "already exists" in str(first.get("Error")):
             return
-        assert (not first.get("Error") and first.get("bSuccess") is not False) or first.get("name"), f"创建失败: {first}"
+        assert (not first.get("Error") and first.get("bSuccess") is not False) or first.get("Name"), f"创建失败: {first}"
 
     def test_get_empty(self, mcp):
         r = mcp.call_capability("GetAssetAnimComposite", AssetPath=self.path)
         results = cap_entries(r)
         assert results, f"get_asset_anim_composite 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
-        assert first.get("name"), f"缺少 name: {first}"
+        assert first.get("Name"), f"缺少 name: {first}"
         assert first.get("SegmentCount", -1) == 0, f"初始应为 0 segments: {first}"
 
     def test_manage_add_segment(self, mcp):
@@ -166,7 +166,7 @@ class TestRenderTarget:
         first = results[0] if isinstance(results[0], dict) else {}
         if first.get("Error") and "already exists" in str(first.get("Error")):
             return
-        assert (not first.get("Error") and first.get("bSuccess") is not False) or first.get("name"), f"创建失败: {first}"
+        assert (not first.get("Error") and first.get("bSuccess") is not False) or first.get("Name"), f"创建失败: {first}"
 
     def test_get(self, mcp):
         r = mcp.call_capability("GetAssetRenderTarget", AssetPath=self.path)

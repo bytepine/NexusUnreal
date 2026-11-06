@@ -47,7 +47,7 @@ class TestCurveFloat:
         results = cap_entries(r)
         assert results, f"create_asset_curve float 无结果: {r}"
         first = results[0] if isinstance(results[0], dict) else {}
-        assert _create_ok(first) or first.get("name"), f"创建失败: {first}"
+        assert _create_ok(first) or first.get("Name"), f"创建失败: {first}"
 
     def test_manage_add_key(self, mcp, curve_float_path):
         r = mcp.call_capability("ManageAssetCurve",

@@ -103,11 +103,11 @@ def _data_asset_entry(mcp, path: str) -> dict:
 
 
 def _first_editable_property_name(entry: dict) -> str | None:
-    for row in entry.get("properties") or []:
+    for row in entry.get("Properties") or []:
         if not isinstance(row, dict):
             continue
-        name = row.get("name") or row.get("PropertyName")
-        if name and row.get("type") == "bool":
+        name = row.get("Name") or row.get("PropertyName")
+        if name and row.get("Type") == "bool":
             return str(name)
     return None
 

@@ -28,13 +28,13 @@ pytestmark = pytest.mark.smoke
 
 
 def test_search_asset_defaults_shape(mcp):
-    """search_asset 返回体若产生 assets_defaults，必须是合法 dict 且合并后字段完整。"""
+    """search_asset 返回体若产生 Assets_defaults，必须是合法 dict 且合并后字段完整。"""
     r = mcp.call("SearchAsset", AssetType="Blueprint", Limit=200)
     merged = assert_respecting_defaults(
         cap_first(r),
         list_key="Assets",
         defaults_prefix="Assets",
-        required_fields=("name", "Path", "AssetType"),
+        required_fields=("Name", "Path", "AssetType"),
         context="search_asset Blueprint",
     )
     for entry in merged:
@@ -52,14 +52,14 @@ def test_search_asset_all_still_valid(mcp):
         cap_first(r),
         list_key="Assets",
         defaults_prefix="Assets",
-        required_fields=("name", "Path", "AssetType"),
+        required_fields=("Name", "Path", "AssetType"),
         context="search_asset all",
     )
 
 
 @pytest.mark.requires_gui
 def test_list_actors_defaults_shape(mcp, pie):
-    """list_runtime_actors 返回体若产生 actors_defaults，必须是合法 dict 且合并后字段完整。"""
+    """list_runtime_actors 返回体若产生 Actors_defaults，必须是合法 dict 且合并后字段完整。"""
     try:
         r = mcp.call("ListRuntimeActors", Limit=200)
     except MCPError as e:
@@ -68,13 +68,13 @@ def test_list_actors_defaults_shape(mcp, pie):
         cap_first(r),
         list_key="Actors",
         defaults_prefix="Actors",
-        required_fields=("name", "Class", "Location"),
+        required_fields=("Name", "Class", "Location"),
         context="ListRuntimeActors",
     )
 
 
 def test_get_asset_blueprint_defaults_shape(mcp):
-    """对任意一个 BP 发 Sections=['All']，properties_defaults / graphs_defaults 可选，
+    """对任意一个 BP 发 Sections=['All']，Properties_defaults / Graphs_defaults 可选，
     出现时必须是合法 dict 且合并后字段完整。"""
     listing = mcp.call("SearchAsset", AssetType="Blueprint", Limit=1)
     assets = cap_first(listing).get("Assets") or []
@@ -92,12 +92,12 @@ def test_get_asset_blueprint_defaults_shape(mcp):
     if bp.get("Error"):
         pytest.skip(f"get_asset_blueprint 返回错误：{bp['Error']}")
 
-    if isinstance(bp.get("properties"), list):
+    if isinstance(bp.get("Properties"), list):
         assert_respecting_defaults(
             bp,
-            list_key="properties",
-            defaults_prefix="properties",
-            required_fields=("name", "Kind"),
+            list_key="Properties",
+            defaults_prefix="Properties",
+            required_fields=("Name", "Kind"),
             context=f"get_asset_blueprint {bp_path} properties",
         )
     if isinstance(bp.get("Graphs"), list):
@@ -117,8 +117,8 @@ def test_diff_actors_baseline_values_shape(mcp, pie):
     listing = mcp.call("ListRuntimeActors", Limit=10)
     payload = cap_first(listing)
     actors = payload.get("Actors") or []
-    merged = merge_with_defaults(actors, payload.get("actors_defaults") or {})
-    names = [a.get("name") for a in merged if a.get("name")]
+    merged = merge_with_defaults(actors, payload.get("Actors_defaults") or {})
+    names = [a.get("Name") for a in merged if a.get("Name")]
     if len(names) < 2:
         pytest.skip(f"need at least 2 actors for diff_runtime_actors: {names!r}")
 
@@ -131,7 +131,7 @@ def test_diff_actors_baseline_values_shape(mcp, pie):
     except MCPError as e:
         pytest.skip(f"diff_runtime_actors rejected: {e}")
 
-    baseline = r.get("baseline") or {}
+    baseline = r.get("Baseline") or {}
     values = baseline.get("Values")
     if values is not None:
         assert isinstance(values, dict), f"baseline.values must be dict: {values!r}"
@@ -139,7 +139,7 @@ def test_diff_actors_baseline_values_shape(mcp, pie):
             assert isinstance(k, str) and k, f"bad baseline.values key: {k!r}"
             assert isinstance(v, str), f"baseline.values[{k}] must be str: {v!r}"
 
-    comparisons = r.get("comparisons") or []
+    comparisons = r.get("Comparisons") or []
     for comp in comparisons:
         if not isinstance(comp, dict):
             continue
@@ -216,7 +216,7 @@ def test_get_asset_refs_defaults_shape(mcp, test_ns):
 
 
 def test_get_asset_graph_nodes_defaults_shape(mcp, test_ns):
-    """BP Sections=['graph'] 指定 graphName 的 nodes_defaults（候选 nodeClass）。"""
+    """BP Sections=['graph'] 指定 graphName 的 Nodes_defaults（候选 nodeClass）。"""
     bp = _probe_blueprint(mcp, test_ns)
     assert bp, "无法定位或创建 Blueprint 探测资产"
 
@@ -228,7 +228,7 @@ def test_get_asset_graph_nodes_defaults_shape(mcp, test_ns):
     if overview.get("Error"):
         pytest.skip(f"get_asset_blueprint graph 概览返回错误：{overview['Error']!r}")
     graphs_list = overview.get("Graphs") or []
-    graphs = merge_with_defaults(graphs_list, overview.get("graphs_defaults") or {})
+    graphs = merge_with_defaults(graphs_list, overview.get("Graphs_defaults") or {})
     target_graph = next(
         (g.get("GraphName") for g in graphs if g.get("NodeCount", 0) > 0 and g.get("GraphName")),
         None,
@@ -254,7 +254,7 @@ def test_get_asset_graph_nodes_defaults_shape(mcp, test_ns):
 
 
 def test_get_asset_struct_fields_defaults_shape(mcp, test_ns):
-    """UserDefinedStruct fields_defaults（候选 type）。"""
+    """UserDefinedStruct Fields_defaults（候选 type）。"""
     path = _probe_struct(mcp, test_ns)
 
     try:
@@ -271,13 +271,13 @@ def test_get_asset_struct_fields_defaults_shape(mcp, test_ns):
         r,
         list_key="Fields",
         defaults_prefix="Fields",
-        required_fields=("name", "type"),
+        required_fields=("Name", "Type"),
         context=f"get_asset_struct {path}",
     )
 
 
 def test_get_asset_material_params_defaults_shape(mcp, test_ns):
-    """Material/MaterialInstance params 返回体的 parameters_defaults（候选 paramType）。"""
+    """Material/MaterialInstance params 返回体的 Parameters_defaults（候选 paramType）。"""
     path = _probe_material(mcp, test_ns)
 
     try:
@@ -290,16 +290,16 @@ def test_get_asset_material_params_defaults_shape(mcp, test_ns):
     if not isinstance(r.get("Parameters"), list):
         pytest.skip(f"返回体无 parameters 列表：{r!r}")
 
-    merged = merge_with_defaults(r["Parameters"], r.get("parameters_defaults") or {})
+    merged = merge_with_defaults(r["Parameters"], r.get("Parameters_defaults") or {})
     for entry in merged:
         assert "ParamType" in entry, (
             f"parameters[].paramType missing after merge: {entry!r} "
-            f"Defaults={r.get('parameters_defaults')!r}"
+            f"Defaults={r.get('Parameters_defaults')!r}"
         )
 
 
 def test_get_asset_user_widget_defaults_shape(mcp, test_ns):
-    """get_asset_user_widget widgets_defaults（候选 class）。"""
+    """get_asset_user_widget Widgets_defaults（候选 class）。"""
     path = _probe_widget(mcp, test_ns)
 
     try:
@@ -312,14 +312,14 @@ def test_get_asset_user_widget_defaults_shape(mcp, test_ns):
         payload,
         list_key="Widgets",
         defaults_prefix="Widgets",
-        required_fields=("name", "Class"),
+        required_fields=("Name", "Class"),
         context=f"get_asset_user_widget {path}",
     )
 
 
 @pytest.mark.requires_gui
 def test_list_runtime_widgets_defaults_shape(mcp, pie):
-    """list_runtime_widgets widgets_defaults（候选 widgetClass + class）。
+    """list_runtime_widgets Widgets_defaults（候选 widgetClass + class）。
     非 PIE 时可能无数据，跳过。"""
     try:
         r = mcp.call("ListRuntimeWidgets", Limit=200)
@@ -334,7 +334,7 @@ def test_list_runtime_widgets_defaults_shape(mcp, pie):
         r,
         list_key="Widgets",
         defaults_prefix="Widgets",
-        required_fields=("name", "WidgetClass", "Class"),
+        required_fields=("Name", "WidgetClass", "Class"),
         context="ListRuntimeWidgets",
     )
 
@@ -398,13 +398,13 @@ def test_get_gameplay_tags_hierarchy_defaults_shape(mcp):
             assert "Tag" in entry, f"tags[].tag missing after merge: {entry!r}"
             children = entry.get("Children") or []
             if isinstance(children, list) and children:
-                _walk(children, entry.get("children_defaults") or {})
+                _walk(children, entry.get("Children_defaults") or {})
 
-    _walk(tags, r.get("tags_defaults") or {})
+    _walk(tags, r.get("Tags_defaults") or {})
 
 
 def test_get_asset_blackboard_type_defaults(mcp, test_ns):
-    """get_asset_blackboard：keys_defaults 候选 type。"""
+    """get_asset_blackboard：Keys_defaults 候选 type。"""
     path = _probe_blackboard(mcp, test_ns)
 
     try:
@@ -416,15 +416,15 @@ def test_get_asset_blackboard_type_defaults(mcp, test_ns):
     if len(keys) < 3:
         pytest.skip(f"blackboard key 数量不足以触发压缩（{len(keys)} 条）")
 
-    defaults = bt_r.get("keys_defaults") or {}
+    defaults = bt_r.get("Keys_defaults") or {}
     merged = merge_with_defaults(keys, defaults)
     for entry in merged:
-        assert "name" in entry, f"keys[].name missing after merge: {entry!r}"
+        assert "Name" in entry, f"keys[].name missing after merge: {entry!r}"
 
 
 def test_get_asset_bp_defaults_section_inherited_compression(mcp, test_ns):
     """get_asset_blueprint Sections=['Defaults']：inherited 全员写出（true/false），
-    主流值可抽到 defaults_defaults；合并后每条均为 bool。"""
+    主流值可抽到 Defaults_defaults；合并后每条均为 bool。"""
     bp = _probe_blueprint(mcp, test_ns)
     assert bp, "无法定位或创建 Blueprint 探测资产"
 
@@ -445,7 +445,7 @@ def test_get_asset_bp_defaults_section_inherited_compression(mcp, test_ns):
         payload,
         list_key="Defaults",
         defaults_prefix="Defaults",
-        required_fields=("Path", "type", "bInherited"),
+        required_fields=("Path", "Type", "bInherited"),
         context=f"get_asset_blueprint defaults {bp}",
     )
     for entry in merged:
@@ -455,18 +455,18 @@ def test_get_asset_bp_defaults_section_inherited_compression(mcp, test_ns):
 
 
 def test_auto_discover_undeclared_fields_in_defaults(mcp):
-    """自动扫描模式覆盖验证：assets_defaults 里出现的任何字段（包括未被显式 AddCandidate
+    """自动扫描模式覆盖验证：Assets_defaults 里出现的任何字段（包括未被显式 AddCandidate
     声明的字段）合并回条目后仍必须存在；同时 name/path 等身份字段不得出现在 defaults 里。"""
     r = mcp.call("SearchAsset", AssetType="Blueprint", Limit=200)
     payload = cap_first(r)
-    defaults = payload.get("assets_defaults") or {}
+    defaults = payload.get("Assets_defaults") or {}
     assets = payload.get("Assets") or []
 
     # 身份字段绝对不能出现在 defaults 里（AutoDiscoverExclusions 保护）
-    identity_fields = {"name", "Path", "AssetPath", "Id", "Label", "Error"}
+    identity_fields = {"Name", "Path", "AssetPath", "Id", "Label", "Error"}
     for field in identity_fields:
         assert field not in defaults, (
-            f"identity field '{field}' must not appear in assets_defaults: {defaults!r}"
+            f"identity field '{field}' must not appear in Assets_defaults: {defaults!r}"
         )
 
     # defaults 里出现的任意字段，合并后每条 entry 都必须含有（或本来就有）
@@ -481,7 +481,7 @@ def test_auto_discover_undeclared_fields_in_defaults(mcp):
 
 @pytest.mark.requires_gui
 def test_get_actor_animation_variables_defaults_shape(mcp, pie):
-    """get_runtime_actor_animation View=variables：variables_defaults 候选 type + value。
+    """get_runtime_actor_animation View=variables：Variables_defaults 候选 type + value。
     需要 PIE 运行中的 Actor；若无 Actor 或 AnimInstance 则跳过。"""
     try:
         actors_r = mcp.call("ListRuntimeActors", Limit=50)
@@ -490,20 +490,20 @@ def test_get_actor_animation_variables_defaults_shape(mcp, pie):
 
     actors_payload = cap_first(actors_r)
     actors = actors_payload.get("Actors") or []
-    actors_defaults = actors_payload.get("actors_defaults") or {}
+    actors_defaults = actors_payload.get("Actors_defaults") or {}
     merged_actors = merge_with_defaults(actors, actors_defaults)
 
     # 找第一个带 AnimInstance 的 Actor（有骨骼网格且动画已初始化）
     target = None
     for a in merged_actors:
-        name = a.get("name", "")
+        name = a.get("Name", "")
         cls = a.get("Class", "")
         # 优先选 Character 类
         if "Character" in cls or "Pawn" in cls:
             target = name
             break
     if not target and merged_actors:
-        target = merged_actors[0].get("name", "")
+        target = merged_actors[0].get("Name", "")
     if not target:
         pytest.skip("PIE 世界中无 Actor")
 
@@ -522,11 +522,11 @@ def test_get_actor_animation_variables_defaults_shape(mcp, pie):
         pytest.skip(f"变量数量不足以触发压缩（{len(variables)} 条）")
 
     # 若触发压缩则校验 defaults 契约；未触发允许无 defaults
-    defaults = entry.get("variables_defaults") or {}
+    defaults = entry.get("Variables_defaults") or {}
     merged = merge_with_defaults(variables, defaults)
     for var in merged:
-        assert "name" in var, f"variables[].name missing after merge: {var!r}"
-        assert "type" in var, f"variables[].type missing after merge: {var!r}"
+        assert "Name" in var, f"variables[].name missing after merge: {var!r}"
+        assert "Type" in var, f"variables[].type missing after merge: {var!r}"
 
 
 def test_structured_content_toggle(mcp):

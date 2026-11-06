@@ -95,7 +95,7 @@ def test_manage_blend_space_samples(test_ns, skel_path, mcp):
     assets = (listing.get("Assets") or []) if isinstance(listing, dict) else []
     if assets:
         seq = assets[0].get("Path") or assets[0].get("AssetPath")
-    ops = [{"Action": "AddSample", "x": 0, "y": 0}]
+    ops = [{"Action": "AddSample", "X": 0, "Y": 0}]
     if seq:
         ops[0]["AnimationPath"] = seq
     ops.append({"Action": "RemoveSample", "SampleIndex": 0})

@@ -407,9 +407,9 @@ def test_manage_asset_blackboard_enum_key(test_ns, mcp):
     entry = cap_first(r)
     keys = entry.get("Keys") or []
     assert keys, entry
-    enum_keys = [k for k in keys if (k.get("name") or "") == "TestEnumKey"]
+    enum_keys = [k for k in keys if (k.get("Name") or "") == "TestEnumKey"]
     assert enum_keys, f"enum key not found: {keys!r}"
-    assert enum_keys[0].get("type") == "Enum", enum_keys[0]
+    assert enum_keys[0].get("Type") == "Enum", enum_keys[0]
 
 
 # ─────────────────────────────────────────────────────────────
@@ -429,7 +429,7 @@ def _anim_actor(mcp, pie, test_ns):
         if isinstance(a, dict):
             cls = a.get("Class", "")
             if "Character" in cls or "Pawn" in cls:
-                return a.get("name") or a.get("ActorName")
+                return a.get("Name") or a.get("ActorName")
     pytest.skip("PIE 世界中无 Character/Pawn Actor，跳过 interact_runtime_actor_animation 测试")
 
 

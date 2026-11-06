@@ -34,7 +34,7 @@ def test_ga_create(test_ns, mcp):
     r = mcp.call("CreateAssetGameplayAbility", AssetPath=path)
     entry = cap_first(r)
     assert not entry.get("Error") and entry.get("bSuccess") is not False, f"create_asset_gameplay_ability 返回: {r!r}"
-    assert entry.get("name") or entry.get("Path"), entry
+    assert entry.get("Name") or entry.get("Path"), entry
 
 
 def test_ga_get_metadata(test_ns, mcp):

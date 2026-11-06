@@ -38,13 +38,13 @@ def main():
                 if response["IsError"]: raise RunError(f"{cap}: {response['Payload']}")
                 return response["Payload"]
             spawned = call("SpawnRuntimeActor", ClassName="NexusBehaviorRetestPawn")
-            name = spawned.get("ActorName") or spawned["name"]
+            name = spawned.get("ActorName") or spawned["Name"]
             tree = call("GetRuntimeActorBehaviorTree", ActorName=name)
-            condition = next(key for key in tree["BlackboardKeys"] if key["name"] == "CanRun")
+            condition = next(key for key in tree["BlackboardKeys"] if key["Name"] == "CanRun")
             assert condition["bInherited"] and condition["TypeName"] == "Bool" and condition["TypedValue"] is False
             invalid = client.call("InteractRuntimeActorBehaviorTree", {"ActorName": name, "Action": "SetBlackboard", "KeyName": "CanRun", "Value": "not-a-bool"})
             assert invalid["IsError"]
-            assert next(key for key in call("GetRuntimeActorBehaviorTree", ActorName=name)["BlackboardKeys"] if key["name"] == "CanRun")["TypedValue"] is False
+            assert next(key for key in call("GetRuntimeActorBehaviorTree", ActorName=name)["BlackboardKeys"] if key["Name"] == "CanRun")["TypedValue"] is False
             config = {"Name": "Inherited Blackboard condition", "Endpoint": endpoint, "ActorName": name, "TreePath": tree["TreePath"],
                       "Condition": {"Key": "CanRun", "Type": "Bool", "BlockedValue": False, "ChangedValue": True},
                       "Before": {"Node": "Blocked"}, "Expected": {"Node": "Allowed"}, "Timeout": 1, "Interval": .03}
@@ -57,7 +57,7 @@ def main():
             assert before["ExitCode"] == 1
             failed = next(record for record in before["Records"] if record["Id"] == "expected")
             assert failed["Result"]["Payload"]["bRunning"] is True
-            assert next(key for key in failed["Result"]["Payload"]["BlackboardKeys"] if key["name"] == "CanRun")["TypedValue"] is True
+            assert next(key for key in failed["Result"]["Payload"]["BlackboardKeys"] if key["Name"] == "CanRun")["TypedValue"] is True
             assert next(record for record in before["Records"] if record["Id"] == "restored")["Status"] == "Passed"
             call("SetRuntimeActorProperty", Updates=[{"ActorName": name, "PropertyPath": "bHoldBlocked", "Value": "false"}])
             after = Runner(case).run(); write_reports(after, args.output / "recovered")

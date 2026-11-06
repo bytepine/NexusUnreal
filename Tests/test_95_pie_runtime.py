@@ -88,7 +88,7 @@ def test_list_actors_contains_spawned(mcp, spawned_actors):
     names = []
     for a in payload.get("Actors", []) or []:
         if isinstance(a, dict):
-            names.append(a.get("name") or a.get("ActorName") or "")
+            names.append(a.get("Name") or a.get("ActorName") or "")
     for n in spawned_actors:
         assert n in names, f"spawned actor {n} missing: {names}"
 
@@ -352,7 +352,7 @@ def test_destroy_runtime_widget(mcp, pie, test_ns):
     for row in widgets:
         if not isinstance(row, dict):
             continue
-        name = row.get("name") or row.get("WidgetName") or row.get("instanceName") or ""
+        name = row.get("Name") or row.get("WidgetName") or row.get("instanceName") or ""
         if name in ("RootCanvas", "CanvasPanel"):
             continue
         dump = str(row)
@@ -398,6 +398,7 @@ def test_lua_version(mcp, _unlua_available):
     entry = cap_first(r)
     assert entry.get("LuaPath") == "_VERSION", f"expected luaPath echo: {entry}"
     assert "Lua" in str(entry.get("Value", "")), f"expected Lua version: {entry}"
+    assert entry.get("Type") == "string" and "type" not in entry, entry
 
 
 @pytest.mark.lua
@@ -405,6 +406,7 @@ def test_lua_eval(mcp, _unlua_available):
     r = mcp.call_capability("EvalRuntimeLua", Code="return 1+1")
     entry = cap_first(r)
     assert entry.get("Value") == 2, f"expected Value=2: {entry}"
+    assert entry.get("Type") == "number" and "type" not in entry, entry
 
 
 @pytest.mark.lua

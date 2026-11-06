@@ -1,5 +1,7 @@
 # NexusUnreal — pytest E2E 测试
 
+PascalCase 契约回归：`NexusLink.Reliability.PascalCasePayload` 验证实际注册的输入 Schema、创建结果 Name 字段和 GetAsset/ManageAsset 路径去重；`NexusLink.Feedback.RoundTrip` 验证 Call* 分类进入草稿及汇总报告；`NexusLinkExt.Smoke.LuaCaps` 和 `NexusLinkExt.Lua.ValueToJsonStackBalance` 验证 Lua 能力名及表字段 Type 元数据。Python 用例和行为树复测工具使用同一字段命名。
+
 审查修复回归：UE Automation `NexusLink.Review` 验证关卡/外部 Actor 脏包保护、SCS 重挂载拒绝循环及根节点一致性、复制继承组件的覆盖模板，以及变换参数全量预检与无副作用失败。`NexusLink.Runtime.Widget.ExactInteraction` 同时验证 WidgetComponent 列表路径的交互和属性读写、隐藏/注销后的拒绝。均可在隔离 Editor-Cmd 用 `-ExecCmds="Automation RunTests NexusLink.Review+NexusLink.Runtime.Widget.ExactInteraction" -TestExit="Automation Test Queue Empty" -unattended -nullrhi` 执行。
 
 Lua 工具 L1：`NexusLinkExt.Lua.ValueToJsonStackBalance` 使用独立 Lua 状态验证 0/1/49/50/51/120 项表、嵌套表、正负索引与循环引用的栈平衡和截断结果，无需 PIE。可在 Session Frontend → Automation 运行该名称，或用 Editor-Cmd 的 `-ExecCmds="Automation RunTests NexusLinkExt.Lua.ValueToJsonStackBalance" -TestExit="Automation Test Queue Empty" -unattended -nullrhi`；宿主尚未启用已链接的可选依赖时，可在测试会话添加 `-EnablePlugins=GameFeatures,DataRegistry,GameplayTagsEditor`。
@@ -28,7 +30,7 @@ UE Automation 的 `NexusLink.AssetEdit` 覆盖接口实现图、Unicode 结构 H
 
 ## 完整工程启动验收
 
-`Script/run_e2e.py` 显式连接 `--ue-url` 或自动复用已有编辑器时，也会透传 `--uproject`；隔离宿主测试应传入实际工程路径，确保磁盘校验和清理作用于被测工程。
+`Script/run_e2e.py` 显式连接 `--ue-url` 或自动复用已有编辑器时，也会透传 `--uproject`；隔离宿主测试应传入实际工程路径，确保磁盘校验和运行前后清理作用于被测工程。清理包括 Tag 生命周期测试生成的 `Config/Tags/NexusMcpTest_<GUID>.ini`，并检查路径没有越出工程目录。
 
 修改公共 C++ 结构或基类布局后，关闭编辑器并完整重编所有引用模块，包括 NexusLink、编辑器模块、扩展及测试插件；Live Coding 不能替代这一步。不要把旧 `Intermediate` 的目标文件与新源码重新链接。`Script/build_test.py` 默认在干净目录构建完整示例工程；自行保留隔离目录作增量测试时，也必须确保依赖重编。
 

@@ -56,7 +56,7 @@ def test_manage_skeletal_mesh_socket_and_lod(mcp, require_tools):
         if isinstance(e, dict):
             assert not e.get("Error"), add
     got = cap_first(mcp.call_capability("GetAssetSkeletalMesh", AssetPath=path))
-    names = [s.get("name") for s in (got.get("Sockets") or []) if isinstance(s, dict)]
+    names = [s.get("Name") for s in (got.get("Sockets") or []) if isinstance(s, dict)]
     assert sock in names, got
     rm = mcp.call_capability(
         "ManageAssetSkeletalMesh",

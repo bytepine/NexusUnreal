@@ -21,6 +21,7 @@ int32 FNexusReliabilityTestRow::DestructionCount = 0;
 #include "NexusCapabilityRegistry.h"
 #include "NexusEditorServices.h"
 #include "Utils/NexusCapResultAdapter.h"
+#include "Utils/NexusCapabilityResultBuilder.h"
 #include "Materials/Material.h"
 #include "UObject/Package.h"
 #include "UObject/StrongObjectPtr.h"
@@ -111,6 +112,60 @@ bool FNexusProtocolContractTest::RunTest(const FString& Parameters)
 	{
 		TestTrue(FString::Printf(TEXT("代理配置字段 %s 保持原拼写"), Key), HasExactReliabilityField(ProxyConfig, Key));
 	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusPascalCasePayloadTest,
+	"NexusLink.Reliability.PascalCasePayload",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FNexusPascalCasePayloadTest::RunTest(const FString& Parameters)
+{
+	// 遍历实际注册的输入 Schema，区分业务属性名与 Schema 自身的标准键。
+	TFunction<void(const TSharedPtr<FJsonObject>&, const FString&)> CheckSchema;
+	CheckSchema = [this, &CheckSchema](const TSharedPtr<FJsonObject>& Schema, const FString& Path)
+	{
+		if (!Schema.IsValid()) return;
+		const TSharedPtr<FJsonObject>* Properties = nullptr;
+		if (Schema->TryGetObjectField(TEXT("properties"), Properties))
+		{
+			for (const auto& Pair : (*Properties)->Values)
+			{
+				const FString Name = Pair.Key;
+				bool bPascal = !Name.IsEmpty() && (FChar::IsUpper(Name[0])
+					|| (Name.Len() > 1 && Name[0] == TEXT('b') && FChar::IsUpper(Name[1])));
+				for (TCHAR Character : Name) bPascal &= FChar::IsAlnum(Character);
+				TestTrue(Path + TEXT(".") + Name, bPascal);
+				CheckSchema(Pair.Value->AsObject(), Path + TEXT(".") + Name);
+			}
+		}
+		const TSharedPtr<FJsonObject>* Items = nullptr;
+		if (Schema->TryGetObjectField(TEXT("items"), Items)) CheckSchema(*Items, Path + TEXT("[]"));
+	};
+	for (const FCapRecord& Record : FNexusCapabilityRegistry::Get().GetAllRecords())
+	{
+		CheckSchema(Record.Def.InputSchema, Record.Def.Name);
+	}
+	const auto Created = FNexusCapabilityResultBuilder::MakeCreatedEntry(GetTransientPackage());
+	TestTrue(TEXT("创建结果实际输出 Name"), HasExactReliabilityField(Created, TEXT("Name")));
+	TestFalse(TEXT("创建结果不输出旧 name"), HasExactReliabilityField(Created, TEXT("name")));
+	const auto Args = MakeShared<FJsonObject>();
+	Args->SetStringField(TEXT("AssetPath"), TEXT("/Game/_NexusTest/BP_Test"));
+	for (const TCHAR* Name : { TEXT("GetAssetBlueprint"), TEXT("ManageAssetBlueprint"),
+		TEXT("CreateAssetBlueprint"), TEXT("SearchAsset"), TEXT("SaveAsset") })
+	{
+		FCapabilityResult Result;
+		const auto Entry = MakeShared<FJsonObject>();
+		Entry->SetStringField(TEXT("Path"), TEXT("/Game/_NexusTest/BP_Test.BP_Test"));
+		Result.Entries.Add(MakeShared<FJsonValueObject>(Entry));
+		const auto Converted = FNexusCapResultAdapter::Convert(Result, Name, Args);
+		const bool bReadOrManage = FString(Name).StartsWith(TEXT("GetAsset")) || FString(Name).StartsWith(TEXT("ManageAsset"));
+		TestEqual(FString(Name) + TEXT(" 的路径回显"), Converted.StructuredContent->HasField(TEXT("Path")), !bReadOrManage);
+	}
+	const auto Other = MakeShared<FJsonObject>();
+	Other->SetStringField(TEXT("Path"), TEXT("/Game/_NexusTest/Other"));
+	FNexusCapResultAdapter::StripRedundantPathEcho(Other, Args, TEXT("GetAssetBlueprint"));
+	TestTrue(TEXT("不同资产路径保持可见"), Other->HasField(TEXT("Path")));
 	return true;
 }
 

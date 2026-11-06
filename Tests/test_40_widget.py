@@ -24,13 +24,13 @@ def test_widget_structure_move_wrap_and_unwrap(mcp, test_ns):
     assert_success_count(result, 4)
     def tree():
         return cap_first(mcp.call("GetAssetUserWidget", Sections=["Widgets"], AssetPath=path))
-    widgets = {w["name"]: w for w in tree()["Widgets"]}
+    widgets = {w["Name"]: w for w in tree()["Widgets"]}
     assert widgets["First"]["ChildIndex"] == 1 and widgets["Second"]["ChildIndex"] == 0, widgets
     wrapped = mcp.call("ManageAssetUserWidget", AssetPath=path, Operations=[
         {"Action": "Wrap", "WidgetName": "First", "WidgetClass": "Border"},
     ])
     assert_success_count(wrapped, 1)
-    widgets = {w["name"]: w for w in tree()["Widgets"]}
+    widgets = {w["Name"]: w for w in tree()["Widgets"]}
     wrapper = widgets["First"]["Parent"]
     assert widgets[wrapper]["Class"] == "Border" and widgets[wrapper]["Parent"] == "Root", widgets
     result = mcp.call("ManageAssetUserWidget", AssetPath=path, Operations=[
@@ -38,7 +38,7 @@ def test_widget_structure_move_wrap_and_unwrap(mcp, test_ns):
         {"Action": "ReplaceWithTemplate", "WidgetName": "First", "WidgetClass": "Button"},
     ])
     assert_success_count(result, 2)
-    widgets = {w["name"]: w for w in tree()["Widgets"]}
+    widgets = {w["Name"]: w for w in tree()["Widgets"]}
     assert widgets["First"]["Class"] == "Button" and widgets["First"]["Parent"] == "Root", widgets
     assert wrapper not in widgets, widgets
     mcp.call("SaveAsset", AssetPath=path)
@@ -181,9 +181,9 @@ def test_widget_animation_crud(mcp, wbp_path):
     )
     payload = cap_first(got)
     anims = payload.get("Animations") or []
-    names = [a.get("name") for a in anims if isinstance(a, dict)]
+    names = [a.get("Name") for a in anims if isinstance(a, dict)]
     assert any("FadeIn" in (n or "") for n in names), f"FadeIn missing: {payload!r}"
-    fade = next((a for a in anims if isinstance(a, dict) and "FadeIn" in (a.get("name") or "")), None)
+    fade = next((a for a in anims if isinstance(a, dict) and "FadeIn" in (a.get("Name") or "")), None)
     assert fade and fade.get("Tracks"), f"tracks missing: {payload!r}"
 
     rm = mcp.call(
@@ -204,7 +204,7 @@ def test_widget_graph_overview(mcp, wbp_path):
     assert not entry.get("Error"), entry
     graphs = entry.get("Graphs") or []
     assert isinstance(graphs, list), entry
-    names = [g.get("name") or g.get("GraphName") for g in graphs if isinstance(g, dict)]
+    names = [g.get("Name") or g.get("GraphName") for g in graphs if isinstance(g, dict)]
     joined = " ".join(n or "" for n in names)
     assert "EventGraph" in joined or graphs, f"expected EventGraph in graphOverview: {entry!r}"
 

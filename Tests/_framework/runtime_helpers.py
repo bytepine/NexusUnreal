@@ -27,7 +27,7 @@ def spawn_runtime_actors(mcp: MCPClient, specs: List[Dict[str, Any]]) -> List[st
         entry = cap_first(r)
         if entry.get("Error"):
             continue
-        name = entry.get("ActorName") or entry.get("name")
+        name = entry.get("ActorName") or entry.get("Name")
         if name:
             names.append(str(name))
     return names

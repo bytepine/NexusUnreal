@@ -14,7 +14,7 @@ ABILITY = "/Script/Nexus.NexusDiagnosticAbility"
 @pytest.fixture
 def diagnostic_actor(mcp, pie):
     result = cap_first(mcp.call_capability("SpawnRuntimeActor", ClassName="NexusDiagnosticCharacter"))
-    name = result.get("ActorName") or result["name"]
+    name = result.get("ActorName") or result["Name"]
     yield name
     mcp.call_capability("DestroyRuntimeActor", ActorName=name)
 
@@ -81,14 +81,14 @@ def test_capture_bounded_and_expired(mcp, diagnostic_actor):
 
 def test_destroyed_actor_capture_does_not_consume_limit(mcp, pie):
     spawned = cap_first(mcp.call_capability("SpawnRuntimeActor", ClassName="NexusDiagnosticCharacter"))
-    name = spawned.get("ActorName") or spawned["name"]
+    name = spawned.get("ActorName") or spawned["Name"]
     for _ in range(16):
         mcp.call_capability(INTERACT, ActorName=name, Action="StartActivationCapture")
     assert_tool_error(mcp.try_call(INTERACT, ActorName=name, Action="StartActivationCapture"))
     mcp.call_capability("DestroyRuntimeActor", ActorName=name)
     time.sleep(1.2)
     replacement = cap_first(mcp.call_capability("SpawnRuntimeActor", ClassName="NexusDiagnosticCharacter"))
-    replacement_name = replacement.get("ActorName") or replacement["name"]
+    replacement_name = replacement.get("ActorName") or replacement["Name"]
     try:
         capture = cap_first(mcp.call_capability(INTERACT, ActorName=replacement_name, Action="StartActivationCapture"))["CaptureId"]
         mcp.call_capability(INTERACT, ActorName=replacement_name, Action="StopActivationCapture", CaptureId=capture)

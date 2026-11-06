@@ -114,8 +114,8 @@ def test_paper_tile_map_create_get_manage(test_ns, mcp):
         ops.insert(2, {"Action": "SetTileset", "TileSetPath": tile_set})
         ops.extend(
             [
-                {"Action": "SetCell", "LayerIndex": 0, "x": 0, "y": 0, "TileIndex": 0},
-                {"Action": "ClearCell", "LayerIndex": 0, "x": 0, "y": 0},
+                {"Action": "SetCell", "LayerIndex": 0, "X": 0, "Y": 0, "TileIndex": 0},
+                {"Action": "ClearCell", "LayerIndex": 0, "X": 0, "Y": 0},
             ]
         )
     r = mcp.call_capability("ManageAssetPaperTileMap", AssetPath=path, Operations=ops)

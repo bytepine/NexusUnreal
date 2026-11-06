@@ -470,19 +470,22 @@ bool FNexusLinkCapabilityEditorTransactionTest::RunTest(const FString& Parameter
 	const TArray<FString> WriteRuntime = { FNexusMcpTags::Write, FNexusMcpTags::Runtime };
 
 	TestTrue(TEXT("manage 写路径应包事务"),
-		FNexusEditorTransaction::ShouldTransact(TEXT("manage_asset_blueprint"), WriteEditor));
+		FNexusEditorTransaction::ShouldTransact(TEXT("ManageAssetBlueprint"), WriteEditor));
 	TestFalse(TEXT("get 只读不包事务"),
-		FNexusEditorTransaction::ShouldTransact(TEXT("get_asset_blueprint"), ReadEditor));
-	TestFalse(TEXT("save_asset 不包事务"),
-		FNexusEditorTransaction::ShouldTransact(TEXT("save_asset"), WriteEditor));
-	TestFalse(TEXT("compile_blueprint 不包事务"),
-		FNexusEditorTransaction::ShouldTransact(TEXT("compile_blueprint"), WriteEditor));
+		FNexusEditorTransaction::ShouldTransact(TEXT("GetAssetBlueprint"), ReadEditor));
+	TestFalse(TEXT("SaveAsset 不包事务"),
+		FNexusEditorTransaction::ShouldTransact(TEXT("SaveAsset"), WriteEditor));
+	TestFalse(TEXT("CompileBlueprint 不包事务"),
+		FNexusEditorTransaction::ShouldTransact(TEXT("CompileBlueprint"), WriteEditor));
 	TestFalse(TEXT("runtime 不包事务"),
-		FNexusEditorTransaction::ShouldTransact(TEXT("list_runtime_actors"), WriteRuntime));
-	TestFalse(TEXT("control_pie 不包事务"),
-		FNexusEditorTransaction::ShouldTransact(TEXT("control_pie"), WriteEditor));
-	TestFalse(TEXT("control_movie_pipeline 不包事务"),
-		FNexusEditorTransaction::ShouldTransact(TEXT("control_movie_pipeline"), WriteEditor));
+		FNexusEditorTransaction::ShouldTransact(TEXT("ListRuntimeActors"), WriteRuntime));
+	TestFalse(TEXT("ControlPie 不包事务"),
+		FNexusEditorTransaction::ShouldTransact(TEXT("ControlPie"), WriteEditor));
+	TestFalse(TEXT("ControlMoviePipeline 不包事务"),
+		FNexusEditorTransaction::ShouldTransact(TEXT("ControlMoviePipeline"), WriteEditor));
+
+	TestFalse(TEXT("Runtime 名称兜底不包事务"),
+		FNexusEditorTransaction::ShouldTransact(TEXT("InteractRuntimeActorAI"), WriteEditor));
 
 #if WITH_EDITOR
 	if (GEditor)
@@ -528,10 +531,10 @@ bool FNexusLinkCapabilityEditorTransactionUndoTest::RunTest(const FString& Param
 		return false;
 	}
 
-	const FCapRecord* Rec = FNexusCapabilityRegistry::Get().FindRecordByName(TEXT("manage_asset_blueprint"));
+	const FCapRecord* Rec = FNexusCapabilityRegistry::Get().FindRecordByName(TEXT("ManageAssetBlueprint"));
 	if (!Rec)
 	{
-		AddError(TEXT("未注册 manage_asset_blueprint"));
+		AddError(TEXT("未注册 ManageAssetBlueprint"));
 		return false;
 	}
 
@@ -540,17 +543,17 @@ bool FNexusLinkCapabilityEditorTransactionUndoTest::RunTest(const FString& Param
 	const int32 Before = BP->NewVariables.Num();
 
 	TSharedPtr<FJsonObject> Args = MakeShared<FJsonObject>();
-	Args->SetStringField(TEXT("assetPath"), Path);
+	Args->SetStringField(TEXT("AssetPath"), Path);
 	TSharedPtr<FJsonObject> Op = MakeShared<FJsonObject>();
-	Op->SetStringField(TEXT("action"), TEXT("add_variable"));
-	Op->SetStringField(TEXT("variableName"), VarName);
-	Op->SetStringField(TEXT("variableType"), TEXT("float"));
+	Op->SetStringField(TEXT("Action"), TEXT("AddVariable"));
+	Op->SetStringField(TEXT("VariableName"), VarName);
+	Op->SetStringField(TEXT("VariableType"), TEXT("float"));
 	TArray<TSharedPtr<FJsonValue>> Ops;
 	Ops.Add(MakeShared<FJsonValueObject>(Op));
-	Args->SetArrayField(TEXT("operations"), Ops);
+	Args->SetArrayField(TEXT("Operations"), Ops);
 
 	const FCapabilityResult R = Rec->Instance->Run(Args);
-	TestTrue(TEXT("add_variable 无 Fatal"), R.FatalError.IsEmpty());
+	TestTrue(TEXT("AddVariable 无 Fatal"), R.FatalError.IsEmpty());
 	TestTrue(TEXT("Run 后变量数 +1"), BP->NewVariables.Num() == Before + 1);
 
 	TestTrue(TEXT("UndoTransaction"), GEditor->UndoTransaction());

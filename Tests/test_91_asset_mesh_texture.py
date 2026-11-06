@@ -87,7 +87,7 @@ def test_manage_static_mesh_collision_and_socket(mcp, require_tools, test_ns):
     assert not got.get("Error"), got
     col = got.get("Collision") or {}
     assert col.get("BoxElemCount", 0) >= 1, got
-    names = [s.get("name") for s in (got.get("Sockets") or []) if isinstance(s, dict)]
+    names = [s.get("Name") for s in (got.get("Sockets") or []) if isinstance(s, dict)]
     assert sock in names, got
     rm = mcp.call_capability(
         "ManageAssetStaticMesh",

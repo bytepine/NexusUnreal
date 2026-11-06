@@ -58,12 +58,13 @@
 - chore(test): e2e 文件编号去重。`test_97` 只留 StateTree；Enhanced Input、材质子类型、IK、MVVM、PCG 改为 `test_115`–`test_119`
 - chore(test): `build_test` 一次只编一套引擎，不传 `-MaxParallelActions`，并行度交给 UBT；C3859/C1076 自动改为单 action 重试；导入脚本不再注册退出清理，避免删除其他编译的隔离目录；新增调度回归测试
 - chore(plugin): NexusLink 子模块从 `Plugins/Developer/NexusLink` 迁到 `Plugins/NexusLink`；`Nexus.uproject` 启用 NexusLink / NexusLinkTestSuite
-- chore(test): 新增 `_framework/test_cleanup.py`——测试前后清理 `Saved/Logs` 下 `UE-auto-launch*` / `TestReport.xml` / `Automation-*.stdout.log`、`Content/_McpTest/`、历史 `Content/_NexusTest/` 与 `Content/__nexus_*__.uasset`；session 级 purge `/Game/_McpTest` 与 `/Game/_NexusTest`（`--keep-artifacts` 时保留）；`test_103`/`104`/`105`/`106` 写入改走 `test_ns`；`.gitignore` 忽略 `Content/_NexusTest/`
+- chore(test): 新增 `_framework/test_cleanup.py`——测试前后清理 `Saved/Logs` 下 `UE-auto-launch*` / `TestReport.xml` / `Automation-*.stdout.log`、`Content/_McpTest/`、历史 `Content/_NexusTest/`、`Content/__nexus_*__.uasset` 与生命周期测试生成的 GUID Tag INI；清理前检查路径位于被测工程内；session 级 purge `/Game/_McpTest` 与 `/Game/_NexusTest`（`--keep-artifacts` 时保留）；`test_103`/`104`/`105`/`106` 写入改走 `test_ns`；`.gitignore` 忽略 `Content/_NexusTest/`
 - chore(test): pytest / `run_e2e.py` 自动拉起 UE **默认 headless**（`UnrealEditor-Cmd -unattended -nullrhi -NoSplash -NoSound`）；headless/命令行会话跳过 `l4_runtime`/`lua`/`requires_gui`；本地观察编辑器加 `--gui`；全量 `--gui`/`--full`
 - chore(test): `ue_launcher` 会话级 `-EnableNexusMcp` 开启 MCP；示例 `bEnableMcpServer=False`，E2E 不依赖 ini
 - chore(test): `build_test` 改为对本机已装的每套引擎编整个 `Nexus.uproject`（Editor=`NexusEditor`，Game=`Nexus` / WITH_EDITOR=0）；不再 `BuildPlugin` 只编 NexusLink，也不再临时改写 UncookedOnly→Runtime；隔离目录改到工程 `Saved/NexusBuildTest`（避开 `%TEMP%` 下 Rules DLL 被应用控制策略拦截 0x800711C7）；`Source` 真实拷贝、Content/Config 仍 junction；开跑前清残留 UBT / 调用 UBT 的 `dotnet` / 相关 MSBuild / VBCSCompiler；5.1 补引擎自带 dotnet 到 PATH；仅 VS2026 时按引擎 preferred 传 `-2022 -CompilerVersion=`（5.2/5.3→14.34，5.4–5.6→14.38），不要求另装 VS2022；WARNINGS 只计自有代码（跳过引擎树 C4996 与 VS2026 `not a preferred version`）；自动发现除 `LauncherInstalled.dat` 外再扫已发现引擎的兄弟目录与常见 `Epic Games` 根（补上启动器未登记的磁盘安装）
 - docs: 仓库改为公开（NexusLink 示例工程）；README 移除私有/NexusWork 表述；测试策略——新功能补 **manage 每 action / get 每 named section**、默认 headless、全覆盖验证走 `--gui`；NexusLink 发版按本次变更选 headless 或 `--gui`
 - docs: 说明里的生造词改为日常说法
+- chore(unreal): 将 UnLua 内置 Lua 脚本加入打包目录；补充可导入的 Visual Studio C++ / Unreal 开发组件配置 `.vsconfig`。
 - chore(test): `legacy_map` 与插件 C++ 旧名表对齐（补 `get_behavior_tree`，去掉恒等 `ListRuntimeWidgets`）
 - chore(script): 插件维护脚本迁入 NexusLink `scripts/`（`audit_capability_naming` / `audit_doc_sync`）；删除会把 AI 可见文案改回中文的 `apply_*_zh`、一次性迁移脚本（`migrate_execute_phase3` / `wrap_with_editor_caps` / `register_capabilities`）及配套 `schema_descs_zh.json`；`run_e2e` 改调插件仓审计脚本；NexusLinkTestSuite 注释同步改路径
 - chore(unreal): 示例工程替换为 UE 5.7 第三人称模板（含 Combat/Platforming/SideScrolling 变体）；`EngineAssociation: 5.7`；默认关卡 `/Game/ThirdPerson/Lvl_ThirdPerson`；日常编译/E2E 跟 Association；`Nexus.uproject` 启用 ModelViewViewModel / PCG / PoseSearch / CommonUI / MoviePipeline——插件对这几个可选插件的 cap 已链接成功，不启用会让 DLL 缺 import 导致 NexusLink 加载失败
@@ -75,7 +76,9 @@
 
 ### Fixed
 
-- 完整工程回归：资产预览磁盘校验遵循 `--uproject`，显式连接或自动复用 Editor 时透传工程路径；PIE 按测试模块管理生命周期、Runtime 压缩用例显式请求 PIE、Slate 截图使用查询返回的 `Ref` 并校验不触发 ensure；MVVM 删除负例使用完整可编译绑定，避免空绑定编译弹窗阻塞后续 PIE；补充公共 C++ 布局变更后的完整重编与启动验收说明。
+- 同步 PascalCase 业务字段及 Lua 能力名的 L1 / Python 回归与行为树验收脚本；新增真实输入 Schema、创建返回字段、路径回显、Lua 类型元数据及反馈分类汇总回归。
+
+- 完整工程回归：资产预览磁盘校验及运行前后清理遵循 `--uproject`，显式连接或自动复用 Editor 时透传工程路径；PIE 按测试模块管理生命周期、Runtime 压缩用例显式请求 PIE、Slate 截图使用查询返回的 `Ref` 并校验不触发 ensure；MVVM 删除负例使用完整可编译绑定，避免空绑定编译弹窗阻塞后续 PIE；补充公共 C++ 布局变更后的完整重编与启动验收说明。
 
 - fix(test): E2E 预期业务失败同时校验 `isError` 与结构化详情；修正蓝图编译、原生字段、StateTree 类型及测试资产重名，网格、纹理与动画写入使用测试副本。
 - fix(test): E2E 覆盖审计扫描 NexusLink / NexusLinkExt 的 Runtime 与 Editor 模块，按 PascalCase 实际调用参数关联 action / section，支持列表变量、循环与参数化用例（含 `pytest.param`）；追加后的参数表保持行配对，容器别名与循环迭代值正确保留，不同用例的变更相互隔离；未知参数行仍扫描固定调用，不再将未调用的字面量或同文件其他能力误算为覆盖，空扫描直接失败；新增独立脚本回归测试

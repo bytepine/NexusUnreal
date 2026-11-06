@@ -27,7 +27,7 @@ class TestSoundClass:
         # 固定路径资产跨次运行可能已存在，视为可继续后续 get/manage
         if first.get("Error") and "already exists" in str(first.get("Error")):
             return
-        assert (not first.get("Error") and first.get("bSuccess") is not False) or first.get("name"), (
+        assert (not first.get("Error") and first.get("bSuccess") is not False) or first.get("Name"), (
             f"create_asset_sound_class 失败: {r}"
         )
 
@@ -74,7 +74,7 @@ class TestSoundAttenuation:
         first = cap_first(r)
         if first.get("Error") and "already exists" in str(first.get("Error")):
             return
-        assert (not first.get("Error") and first.get("bSuccess") is not False) or first.get("name"), (
+        assert (not first.get("Error") and first.get("bSuccess") is not False) or first.get("Name"), (
             f"create_asset_sound_attenuation 失败: {r}"
         )
 
@@ -116,7 +116,7 @@ class TestSoundConcurrency:
         first = cap_first(r)
         if first.get("Error") and "already exists" in str(first.get("Error")):
             return
-        assert (not first.get("Error") and first.get("bSuccess") is not False) or first.get("name"), (
+        assert (not first.get("Error") and first.get("bSuccess") is not False) or first.get("Name"), (
             f"create_asset_sound_concurrency 失败: {r}"
         )
 

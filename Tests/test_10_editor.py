@@ -90,7 +90,7 @@ def test_get_python_api_log(mcp, require_tools):
     assert r.get("EngineVersion"), r
     entries = r.get("Entries") or []
     assert entries, r
-    assert any("log" in (e.get("name") or "").lower() for e in entries), r
+    assert any("log" in (e.get("Name") or "").lower() for e in entries), r
 
 
 def test_get_python_api_bare_identifier_is_prefixed(mcp, require_tools):
@@ -125,7 +125,7 @@ def test_get_python_api_missing_attr_reports_version(mcp, require_tools):
     r = cap_first(assert_tool_error(mcp.try_call("GetPythonApi", Target="unreal.NexusNoSuchApi")))
     assert r.get("Error"), r
     assert r.get("EngineVersion"), r
-    assert r.get("pythonVersion"), r
+    assert r.get("PythonVersion"), r
 
 
 def test_get_python_api_offset_pagination(mcp, require_tools):
@@ -135,8 +135,8 @@ def test_get_python_api_offset_pagination(mcp, require_tools):
     page2 = cap_first(mcp.call("GetPythonApi", Target="unreal", Offset=5, Limit=5))
     assert len(page1.get("Entries") or []) == 5, page1
     assert page2.get("Offset") == 5, page2
-    names1 = {e.get("name") for e in page1["Entries"]}
-    names2 = {e.get("name") for e in page2["Entries"]}
+    names1 = {e.get("Name") for e in page1["Entries"]}
+    names2 = {e.get("Name") for e in page2["Entries"]}
     assert not (names1 & names2), (names1, names2)
 
 
@@ -146,7 +146,7 @@ def test_get_python_api_search_doc(mcp, require_tools):
     by_name = cap_first(mcp.call("GetPythonApi", Target="unreal", Query="Asset", Limit=100))
     by_doc = cap_first(mcp.call("GetPythonApi", Target="unreal", Query="Asset",
                                 bSearchDoc=True, Limit=100))
-    assert by_doc.get("totalMatched", 0) >= by_name.get("totalMatched", 0), (by_name, by_doc)
+    assert by_doc.get("TotalMatched", 0) >= by_name.get("TotalMatched", 0), (by_name, by_doc)
 
 
 def test_capture_viewport_deferred(mcp):
@@ -223,7 +223,7 @@ def test_capture_editor_panel_list(mcp, require_tools):
     require_tools("CaptureEditorPanel")
     entry = cap_first(mcp.call_capability("CaptureEditorPanel", Target="list"))
     panels = entry.get("Panels") or []
-    names = {p.get("name") for p in panels}
+    names = {p.get("Name") for p in panels}
     assert {"Viewport", "ContentBrowser", "details", "OutputLog"} <= names, entry
     assert all(p.get("TabId") for p in panels), entry
 

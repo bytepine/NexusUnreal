@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import re
 import shutil
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence
@@ -58,6 +59,9 @@ def purge_disk_test_artifacts(
     for rel in CONTENT_TEST_DIRS:
         content_tree = root / rel
         if content_tree.is_dir():
+            if root not in content_tree.resolve().parents:
+                log.warning("skip test directory outside project: %s", content_tree)
+                continue
             try:
                 shutil.rmtree(content_tree)
                 deleted.append(str(content_tree.relative_to(root)))
@@ -69,6 +73,10 @@ def purge_disk_test_artifacts(
         for path in content_dir.glob("__nexus_*__.uasset"):
             if path.is_file():
                 _unlink(path, root, deleted)
+
+    for path in (root / "Config" / "Tags").glob("NexusMcpTest_*.ini"):
+        if re.fullmatch(r"NexusMcpTest_[0-9a-f]{32}\.ini", path.name) and path.is_file():
+            _unlink(path, root, deleted)
 
     return deleted
 
@@ -113,6 +121,9 @@ def _purge_prefix(mcp: MCPClient, prefix: str) -> int:
 
 
 def _unlink(path: Path, root: Path, deleted: List[str]) -> None:
+    if root not in path.resolve().parents:
+        log.warning("skip test artifact outside project: %s", path)
+        return
     try:
         path.unlink()
         deleted.append(str(path.relative_to(root)))

@@ -21,7 +21,7 @@ class TestCreateDataLayer:
     def test_create_runtime_layer(self, mcp, dl_full):
         r = mcp.call_capability("CreateAssetDataLayer",
                                 AssetPath=dl_full,
-                                type="Runtime",
+                                Type="Runtime",
                                 DebugColor="#FF4400")
         payload = r if isinstance(r, dict) else {}
         entries = payload.get("Entries") or payload.get("Results") or []
@@ -35,7 +35,7 @@ class TestCreateDataLayer:
         """重复创建应返回 bAlreadyExists=true"""
         r = mcp.call_capability("CreateAssetDataLayer",
                                 AssetPath=dl_full,
-                                type="Runtime")
+                                Type="Runtime")
         payload = r if isinstance(r, dict) else {}
         entries = payload.get("Entries") or payload.get("Results") or []
         first = entries[0] if entries else payload
@@ -57,7 +57,7 @@ class TestGetDataLayer:
         assert isinstance(first, dict), f"get 返回格式异常: {r}"
         assert "Error" not in first, f"get 报错: {first.get('Error')}"
         assert first.get("AssetType") == "DataLayerAsset"
-        assert first.get("type") in ("Runtime", "Editor", "Unknown", None)
+        assert first.get("Type") in ("Runtime", "Editor", "Unknown", None)
 
 
 @pytest.mark.l3_asset
@@ -68,7 +68,7 @@ class TestManageDataLayer:
     def test_set_type(self, mcp, dl_full):
         r = mcp.call_capability("ManageAssetDataLayer",
                                 AssetPath=dl_full,
-                                Operations=[{"Action": "SetType", "type": "Editor"}])
+                                Operations=[{"Action": "SetType", "Type": "Editor"}])
         payload = r if isinstance(r, dict) else {}
         entries = payload.get("Entries") or payload.get("Results") or []
         first = entries[0] if entries else payload
@@ -88,7 +88,7 @@ class TestManageDataLayer:
     def test_restore_runtime(self, mcp, dl_full):
         mcp.call_capability("ManageAssetDataLayer",
                             AssetPath=dl_full,
-                            Operations=[{"Action": "SetType", "type": "Runtime"}])
+                            Operations=[{"Action": "SetType", "Type": "Runtime"}])
 
 
 @pytest.mark.l3_asset

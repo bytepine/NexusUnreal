@@ -368,7 +368,7 @@ def test_bp_promote_pin(mcp, bp_path):
     )
     vars_payload = cap_first(vars_r)
     var_names = [
-        (v.get("name") or v.get("VariableName") or "")
+        (v.get("Name") or v.get("VariableName") or "")
         for v in (vars_payload.get("Variables") or vars_payload.get("variable") or [])
     ]
     assert any(str(n).startswith("PromotedMsg") for n in var_names), f"PromotedMsg not in variables: {vars_payload!r}"
@@ -413,7 +413,7 @@ def test_bp_interface_create_function_and_implement(mcp, test_ns):
     )
     fn_first = cap_first(fn_get)
     assert fn_first.get("BlueprintType") == "interface", fn_get
-    fn_names = [f.get("name") for f in (fn_first.get("functions") or [])]
+    fn_names = [f.get("Name") for f in (fn_first.get("Functions") or [])]
     assert "DoThing" in fn_names, fn_get
 
     actor_path = f"{test_ns}/BP_IfaceUser"
@@ -610,7 +610,7 @@ def test_calls_batch_memory_rollback(test_ns, mcp):
     batch = response["structuredContent"]
     assert batch.get("FailureCount", 0) > 0, batch
     got = mcp.call_capability("GetAssetBlueprint", AssetPath=path, Sections=["variable"])
-    names = [v.get("name") for v in (cap_first(got).get("Variables") or [])]
+    names = [v.get("Name") for v in (cap_first(got).get("Variables") or [])]
     assert "UndoMe" not in names, got
 
 

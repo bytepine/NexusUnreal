@@ -56,7 +56,7 @@ def test_manage_metasound_add_input(mcp, test_ns):
     r = mcp.call_capability(
         "ManageAssetMetaSound",
         AssetPath=asset_path,
-        Operations=[{"Action": "AddInput", "name": "TestInput", "TypeName": "float"}],
+        Operations=[{"Action": "AddInput", "Name": "TestInput", "TypeName": "float"}],
     )
     entries = r if isinstance(r, list) else [r]
     entry = next((e for e in entries if isinstance(e, dict) and e.get("Action") == "AddInput"), None)
@@ -71,12 +71,12 @@ def test_manage_metasound_graph_ops(mcp, test_ns):
         "ManageAssetMetaSound",
         AssetPath=asset_path,
         Operations=[
-            {"Action": "AddOutput", "name": "TestOutput", "TypeName": "float"},
+            {"Action": "AddOutput", "Name": "TestOutput", "TypeName": "float"},
             {"Action": "AddNode", "ClassId": "Add"},
             {"Action": "AddEdge", "FromNodeId": "TestInput", "ToNodeId": "TestOutput"},
             {"Action": "RemoveEdge", "FromNodeId": "TestInput", "ToNodeId": "TestOutput"},
             {"Action": "RemoveNode", "NodeId": "0"},
-            {"Action": "RemoveOutput", "name": "TestOutput"},
+            {"Action": "RemoveOutput", "Name": "TestOutput"},
         ],
     )["structuredContent"]
     for e in (r.get("Results") or []):

@@ -81,7 +81,7 @@ def test_manage_level_spawn_and_remove_actor(test_ns, mcp, scratch_level, requir
     actor_name = (
         spawn_entry.get("ActorName")
         or spawn_entry.get("Label")
-        or spawn_entry.get("name")
+        or spawn_entry.get("Name")
     )
     assert actor_name, spawn_entry
 
@@ -148,7 +148,7 @@ def test_manage_level_properties(mcp, scratch_level):
     name = None
     for a in actors:
         if isinstance(a, dict):
-            name = a.get("ActorName") or a.get("name") or a.get("Label")
+            name = a.get("ActorName") or a.get("Name") or a.get("Label")
             if name:
                 break
     if not name:

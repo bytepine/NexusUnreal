@@ -128,7 +128,7 @@ def test_gap_bone_pose_sampling(mcp, require_tools):
     skeleton = cap_first(mcp.call("GetAssetSkeleton", AssetPath=metadata["Skeleton"]))
     bones = skeleton.get("Bones") or skeleton.get("Hierarchy") or []
     # 从实际骨架发现根骨骼，不依赖模板骨骼名称。
-    bone = (bones[0].get("Name") or bones[0].get("name") or bones[0].get("BoneName")) if bones else None
+    bone = (bones[0].get("Name") or bones[0].get("BoneName")) if bones else None
     assert bone, skeleton
     sample = cap_first(mcp.call("GetAssetAnimSequence", AssetPath=path, BoneNames=[bone], SampleTimes=[0, 0.01]))
     assert sample["SampleSpace"] == "Local" and len(sample["BoneSamples"]) == 2, sample
