@@ -44,6 +44,7 @@ public class NexusLinkTests : ModuleRules
 				{
 					// NexusLinkEditor：EditorOnly cap 测试
 					"NexusLinkEditor",
+					"HTTPServer",
 					"TraceServices",
 					"TraceAnalysis",
 					"UnrealEd",

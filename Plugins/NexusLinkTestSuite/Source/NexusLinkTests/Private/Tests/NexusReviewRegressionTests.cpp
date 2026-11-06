@@ -3,6 +3,8 @@
 
 #if WITH_EDITOR
 #include "NexusCapabilityRegistry.h"
+#include "Server/NexusMcpServer.h"
+#include "Async/TaskGraphInterfaces.h"
 #include "Utils/NexusVersionCompat.h"
 #include "Components/SceneComponent.h"
 #include "Engine/Blueprint.h"
@@ -18,6 +20,9 @@
 #include "Editor.h"
 #include "FileHelpers.h"
 #include "Misc/ScopeExit.h"
+#include "ScopedTransaction.h"
+#include "UObject/StrongObjectPtr.h"
+#include "UObject/UObjectGlobals.h"
 
 static FCapabilityResult ReviewCall(const TCHAR* Name, const TSharedPtr<FJsonObject>& Args)
 {
@@ -99,6 +104,121 @@ bool FNexusReviewScsTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Child override copied"), CastChecked<USceneComponent>(Copied->ComponentTemplate)->GetRelativeLocation().Equals(OverrideLocation));
 	}
 	for (UBlueprint* Blueprint : {Parent, Child, Dest}) Blueprint->GetOutermost()->SetDirtyFlag(false);
+	return true;
+}
+
+#if NEXUSLINK_WITH_SERVER
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusFrameRequestDispatchTest, "NexusLink.Review.FrameRequestDispatch",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusFrameRequestDispatchTest::RunTest(const FString& Parameters)
+{
+	auto Server = MakeShared<FNexusMcpServer>();
+	Server->bRunning = true;
+	ON_SCOPE_EXIT { Server->bRunning = false; };
+	const TWeakPtr<FNexusMcpServer> WeakServer = Server;
+	int32 ExecutionCount = 0;
+	FNexusMcpServer::QueueRequest(WeakServer, [&]()
+	{
+		++ExecutionCount;
+		FNexusMcpServer::QueueRequest(WeakServer, [&]() { ++ExecutionCount; });
+		// 模拟编译/渲染等待处理 TaskGraph，新请求不得重入本次派发。
+		FTaskGraphInterface::Get().ProcessThreadUntilIdle(ENamedThreads::GameThread);
+		TestEqual(TEXT("等待期间不重入新请求"), ExecutionCount, 1);
+	});
+	FTaskGraphInterface::Get().ProcessThreadUntilIdle(ENamedThreads::GameThread);
+	TestEqual(TEXT("TaskGraph 只入队，不执行请求"), ExecutionCount, 0);
+	Server->ProcessPendingRequests();
+	TestEqual(TEXT("首帧只执行队列快照"), ExecutionCount, 1);
+	Server->ProcessPendingRequests();
+	TestEqual(TEXT("下一帧处理等待期间收到的请求"), ExecutionCount, 2);
+	bool bRejectedStoppedRequest = false;
+	FNexusMcpServer::QueueRequest(WeakServer, [&]() { bRejectedStoppedRequest = !Server->IsRunning(); });
+	FTaskGraphInterface::Get().ProcessThreadUntilIdle(ENamedThreads::GameThread);
+	Server->bRunning = false;
+	Server->ProcessPendingRequests();
+	TestTrue(TEXT("停止后挂起请求观察到停止状态"), bRejectedStoppedRequest);
+	bool bRejectedExpiredRequest = false;
+	FNexusMcpServer::QueueRequest(TWeakPtr<FNexusMcpServer>(), [&]() { bRejectedExpiredRequest = true; });
+	FTaskGraphInterface::Get().ProcessThreadUntilIdle(ENamedThreads::GameThread);
+	TestTrue(TEXT("失效服务器仍完成请求拒绝回调"), bRejectedExpiredRequest);
+	return true;
+}
+#endif
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusComponentBatchCompileTest, "NexusLink.Review.ComponentBatchCompile",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusComponentBatchCompileTest::RunTest(const FString& Parameters)
+{
+	TStrongObjectPtr<UBlueprint> Blueprint(ReviewBlueprint(AActor::StaticClass()));
+	if (!TestNotNull(TEXT("测试蓝图"), Blueprint.Get())) return false;
+	int32 GarbageCollectCount = 0;
+	bool bCollectedDuringTransaction = false;
+	const FDelegateHandle GarbageCollectHandle = FCoreUObjectDelegates::GetPreGarbageCollectDelegate().AddLambda([&]()
+	{
+		++GarbageCollectCount;
+		bCollectedDuringTransaction |= GEditor->IsTransactionActive();
+	});
+	ON_SCOPE_EXIT
+	{
+		FCoreUObjectDelegates::GetPreGarbageCollectDelegate().Remove(GarbageCollectHandle);
+		Blueprint->GetOutermost()->SetDirtyFlag(false);
+	};
+	TArray<TSharedPtr<FJsonValue>> Operations;
+	auto ComponentOperation = [&](const TCHAR* Action, const TCHAR* Name)
+	{
+		auto Operation = MakeShared<FJsonObject>();
+		Operation->SetStringField(TEXT("Action"), Action);
+		Operation->SetStringField(TEXT("ComponentName"), Name);
+		Operations.Add(MakeShared<FJsonValueObject>(Operation));
+		return Operation;
+	};
+	for (const TCHAR* Name : {TEXT("BatchRoot"), TEXT("BatchBody"), TEXT("BatchRemoved")})
+	{
+		auto Operation = ComponentOperation(TEXT("AddComponent"), Name);
+		Operation->SetStringField(TEXT("ComponentClass"), TEXT("SceneComponent"));
+	}
+	ComponentOperation(TEXT("ReattachComponent"), TEXT("BatchBody"))->SetStringField(TEXT("AttachTo"), TEXT("BatchRoot"));
+	auto Property = ComponentOperation(TEXT("SetComponentProperty"), TEXT("BatchBody"));
+	Property->SetStringField(TEXT("PropertyPath"), TEXT("RelativeLocation"));
+	Property->SetStringField(TEXT("Value"), TEXT("(X=1,Y=2,Z=3)"));
+	ComponentOperation(TEXT("RemoveComponent"), TEXT("BatchRemoved"));
+	auto Copy = ComponentOperation(TEXT("CopyComponent"), TEXT("BatchCopy"));
+	Copy->SetStringField(TEXT("SourceAssetPath"), Blueprint->GetPathName());
+	Copy->SetStringField(TEXT("SourceComponentName"), TEXT("BatchBody"));
+	auto Args = MakeShared<FJsonObject>();
+	Args->SetStringField(TEXT("AssetPath"), Blueprint->GetPathName());
+	Args->SetBoolField(TEXT("bCompile"), true);
+	Args->SetArrayField(TEXT("Operations"), Operations);
+	const FCapRecord* Record = FNexusCapabilityRegistry::Get().FindRecordByName(TEXT("ManageAssetBlueprint"));
+	if (!TestNotNull(TEXT("蓝图编辑能力"), Record)) return false;
+	FCapabilityResult Result = Record->Instance->Run(Args, false);
+	TestFalse(TEXT("批量组件操作成功"), Result.HasErrors());
+	TestEqual(TEXT("组件操作阶段不触发 GC"), GarbageCollectCount, 0);
+	Record->Instance->Finalize(Args, Result);
+	TestFalse(TEXT("集中编译成功"), Result.HasErrors());
+	TestEqual(TEXT("单次收尾只触发一次 GC"), GarbageCollectCount, 1);
+	TestFalse(TEXT("GC 位于事务之外"), bCollectedDuringTransaction);
+	USimpleConstructionScript* Script = Blueprint->SimpleConstructionScript;
+	TestNull(TEXT("组件已移除"), Script->FindSCSNode(TEXT("BatchRemoved")));
+	TestNotNull(TEXT("组件已复制"), Script->FindSCSNode(TEXT("BatchCopy")));
+	USCS_Node* Root = Script->FindSCSNode(TEXT("BatchRoot"));
+	USCS_Node* Body = Script->FindSCSNode(TEXT("BatchBody"));
+	if (TestNotNull(TEXT("根组件"), Root) && TestNotNull(TEXT("子组件"), Body))
+	{
+		TestTrue(TEXT("挂接关系保留"), Root->GetChildNodes().Contains(Body));
+		TestTrue(TEXT("组件属性保留"), CastChecked<USceneComponent>(Body->ComponentTemplate)->GetRelativeLocation().Equals(FVector(1, 2, 3)));
+	}
+	Args->SetArrayField(TEXT("Operations"), {MakeShared<FJsonValueObject>(Property)});
+	Args->SetBoolField(TEXT("bCompile"), false);
+	GarbageCollectCount = 0;
+	TestFalse(TEXT("不编译的组件编辑成功"), Record->Instance->Run(Args).HasErrors());
+	TestEqual(TEXT("bCompile=false 不隐式完整编译"), GarbageCollectCount, 0);
+	{
+		FScopedTransaction Transaction(NSLOCTEXT("NexusLinkTests", "ComponentBatch", "Component batch"));
+		Args->SetBoolField(TEXT("bCompile"), true);
+		TestFalse(TEXT("外层事务内编译成功"), Record->Instance->Run(Args).HasErrors());
+		TestEqual(TEXT("外层事务仍活动时跳过 GC"), GarbageCollectCount, 0);
+	}
 	return true;
 }
 
