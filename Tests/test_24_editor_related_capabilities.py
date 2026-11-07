@@ -35,6 +35,32 @@ def test_related_dataasset_preview(mcp, require_tools, test_ns):
     assert mcp.try_call("ManageAssetDataAsset", AssetPath=path, bVerify=True, Operations=[operation]).get("isError")
 
 
+def test_related_struct_type_metadata(mcp, require_tools, test_ns):
+    require_tools("CreateAssetStruct", "GetAssetStruct")
+    path = f"{test_ns}/ST_TypeMetadata"
+    mcp.call("CreateAssetStruct", AssetPath=path)
+    mcp.call("SearchAsset", AssetType="UserDefinedStruct", PathFilter=test_ns)
+    fields = cap_first(mcp.call("GetAssetStruct", AssetPath=path))["Fields"]
+    assert fields, fields
+    assert all(field["ContainerType"] == "None" and field["CanonicalType"] and field["Guid"] for field in fields), fields
+
+
+def test_related_scientific_numeric_text(mcp, require_tools, test_ns):
+    require_tools("CreateAssetDataAsset", "GetAssetEditPreview", "ManageAssetDataAsset")
+    path = f"{test_ns}/DA_NumericText"
+    mcp.call("CreateAssetDataAsset", AssetPath=path, ParentClass="NexusRelatedDataAsset")
+    operation = {"Action": "Set", "PropertyName": "Location.X", "Value": "1e3", "ExpectedValue": "0e0"}
+    preview = cap_first(mcp.call("GetAssetEditPreview", AssetPath=path, Capability="ManageAssetDataAsset", Operations=[operation]))
+    assert preview["bValid"] and float(preview["CurrentValue"]) == 0 and float(preview["TargetValue"]) == 1000, preview
+    written = cap_first(mcp.call("ManageAssetDataAsset", AssetPath=path, bVerify=True, Operations=[operation]))
+    assert written["bVerified"] and float(written["ReadbackValue"]) == 1000, written
+    invalid = {"Action": "Set", "PropertyName": "Location.X", "Value": "1e3junk"}
+    assert mcp.try_call("ManageAssetDataAsset", AssetPath=path, Operations=[invalid]).get("isError")
+    preview = cap_first(mcp.call("GetAssetEditPreview", AssetPath=path, Capability="ManageAssetDataAsset",
+                                Operations=[{**invalid, "Value": "2e3"}]))
+    assert preview["bValid"] and float(preview["CurrentValue"]) == 1000, preview
+
+
 def test_related_export_discovery_and_dry_run(mcp, require_tools, test_ns, tmp_path):
     require_tools("GetAssetExportOptions", "ExportAsset", "CreateAssetDataAsset")
     path = f"{test_ns}/DA_Export"

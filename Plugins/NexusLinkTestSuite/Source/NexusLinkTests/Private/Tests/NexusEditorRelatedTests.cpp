@@ -10,6 +10,12 @@
 #include "Utils/NexusJsonUtils.h"
 #include "Engine/Blueprint.h"
 #include "Engine/BlueprintGeneratedClass.h"
+#include "Engine/SimpleConstructionScript.h"
+#include "Engine/SCS_Node.h"
+#include "Engine/InheritableComponentHandler.h"
+#include "Engine/StaticMesh.h"
+#include "Components/SceneComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Engine/DataTable.h"
@@ -36,7 +42,15 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "EdGraphSchema_K2.h"
 #include "Utils/NexusAssetEditorUtils.h"
+#include "Utils/NexusPinTypeUtils.h"
+#include "Kismet2/StructureEditorUtils.h"
+#if NX_UE_HAS_STRUCT_UTILS_HEADER
+#include "StructUtils/UserDefinedStruct.h"
+#else
+#include "Engine/UserDefinedStruct.h"
+#endif
 #include "Misc/PackageName.h"
+#include "Editor.h"
 
 static FCapabilityResult RelatedCall(const TCHAR* Name, const TSharedPtr<FJsonObject>& Args)
 {
@@ -238,6 +252,136 @@ bool FNexusRelatedSpecializedTest::RunTest(const FString& Parameters)
 		TestFalse(TEXT("Native GameplayAbilityBlueprint reparent"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
 	}
 #endif
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusRelatedStructMetadataTest, "NexusLink.EditorRelated.StructTypeMetadata", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusRelatedStructMetadataTest::RunTest(const FString& Parameters)
+{
+	const FString Path = TEXT("/Game/_McpTest/StructMetadata_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+	UUserDefinedStruct* Struct = FStructureEditorUtils::CreateUserDefinedStruct(CreatePackage(*Path), *FPackageName::GetShortName(Path), RF_Public | RF_Standalone);
+	if (!TestNotNull(TEXT("Struct fixture"), Struct)) return false;
+	ON_SCOPE_EXIT { Struct->GetOutermost()->SetDirtyFlag(false); };
+	FEdGraphPinType MapType;
+	FString Error;
+	if (!TestTrue(TEXT("Map type fixture"), FNexusPinTypeUtils::ParsePinType(TEXT("Map<name,vector>"), MapType, Error))) return false;
+	if (!TestTrue(TEXT("Add struct map field"), FStructureEditorUtils::AddVariable(Struct, MapType))) return false;
+	auto Args = MakeShared<FJsonObject>(); Args->SetStringField(TEXT("AssetPath"), Struct->GetPathName());
+	const auto Result = RelatedCall(TEXT("GetAssetStruct"), Args);
+	if (!TestFalse(TEXT("Read struct fields"), Result.HasErrors())) return false;
+	const auto Fields = Result.Entries[0]->AsObject()->GetArrayField(TEXT("Fields"));
+	TestEqual(TEXT("Scalar and map fields returned"), Fields.Num(), 2);
+	bool bFoundMap = false;
+	for (const auto& Field : Fields)
+	{
+		const auto Metadata = Field->AsObject();
+		if (!TestTrue(TEXT("Type metadata remains alive through iteration"), Metadata->HasField(TEXT("ContainerType")) && Metadata->HasField(TEXT("CanonicalType")))) continue;
+		if (Metadata->GetStringField(TEXT("ContainerType")) == TEXT("Map"))
+		{
+			bFoundMap = true;
+			TestEqual(TEXT("Map key retained"), Metadata->GetStringField(TEXT("KeyType")), FString(TEXT("name")));
+			TestTrue(TEXT("Map value path retained"), Metadata->GetStringField(TEXT("ValueTypeObjectPath")).EndsWith(TEXT(".Vector")));
+		}
+	}
+	TestTrue(TEXT("Map metadata returned"), bFoundMap);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusRelatedNumericTextTest, "NexusLink.EditorRelated.NumericTextCompatibility", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusRelatedNumericTextTest::RunTest(const FString& Parameters)
+{
+	UPackage* Package = CreatePackage(*(TEXT("/Game/_McpTest/NumericText_") + FGuid::NewGuid().ToString(EGuidFormats::Digits)));
+	TStrongObjectPtr<UNexusRelatedDataAsset> Data(NewObject<UNexusRelatedDataAsset>(Package, TEXT("Data"), RF_Public | RF_Standalone));
+	ON_SCOPE_EXIT { Package->SetDirtyFlag(false); };
+	FString Previous, Actual, Error;
+	for (const TCHAR* Text : {TEXT("1e3"), TEXT("-2.5E-2"), TEXT("+3.0e+2"), TEXT("0e0"), TEXT("2.5f")})
+	{
+		TestTrue(TEXT("Complete numeric text accepted"), FNexusPropertyUtils::WritePropertyAndEcho(Data.Get(), {TEXT("Location.X")}, 0, Text, Previous, Actual, Error));
+		TestTrue(TEXT("Scientific value converted correctly"), FMath::Abs(static_cast<double>(Data->Location.X) - FCString::Atod(Text)) < 0.00001);
+	}
+	Data->Location.X = 17;
+	for (const TCHAR* Text : {TEXT("."), TEXT("1e"), TEXT("1e3junk"), TEXT("nan"), TEXT("1e9999"), TEXT("--1")})
+	{
+		TestFalse(TEXT("Invalid numeric text rejected"), FNexusPropertyUtils::WritePropertyAndEcho(Data.Get(), {TEXT("Location.X")}, 0, Text, Previous, Actual, Error));
+		TestEqual(TEXT("Invalid input never writes"), static_cast<double>(Data->Location.X), 17.0);
+	}
+	FProperty* FloatProperty = FindFProperty<FProperty>(AActor::StaticClass(), TEXT("InitialLifeSpan"));
+	if (!TestNotNull(TEXT("Float range fixture"), FloatProperty)) return false;
+	FDefaultConstructedPropertyElement Storage(FloatProperty);
+	TestFalse(TEXT("Finite double outside float range rejected"), FNexusPropertyUtils::ParsePropertyValue(FloatProperty, TEXT("1e40"), Storage.GetObjAddress(), nullptr, Error));
+	auto Operation = RelatedOperation(TEXT("Set")); Operation->SetStringField(TEXT("PropertyName"), TEXT("Location.X"));
+	Operation->SetStringField(TEXT("Value"), TEXT("1e3")); Operation->SetStringField(TEXT("ExpectedValue"), TEXT("1.7e1"));
+	auto Args = RelatedArgs(Data.Get(), Operation); Args->SetStringField(TEXT("Capability"), TEXT("ManageAssetDataAsset"));
+	TestFalse(TEXT("Scientific preview and precondition"), RelatedCall(TEXT("GetAssetEditPreview"), Args).HasErrors());
+	TestEqual(TEXT("Preview stays read-only"), static_cast<double>(Data->Location.X), 17.0);
+	Args->RemoveField(TEXT("Capability")); Args->SetBoolField(TEXT("bVerify"), true);
+	TestFalse(TEXT("Scientific verified write"), RelatedCall(TEXT("ManageAssetDataAsset"), Args).HasErrors());
+	TestEqual(TEXT("Verified exponent value"), static_cast<double>(Data->Location.X), 1000.0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusRelatedInheritedUndoTest, "NexusLink.EditorRelated.InheritedComponentUndo", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusRelatedInheritedUndoTest::RunTest(const FString& Parameters)
+{
+	TStrongObjectPtr<UBlueprint> Parent(RelatedBlueprint(AActor::StaticClass()));
+	ON_SCOPE_EXIT { Parent->GetOutermost()->SetDirtyFlag(false); };
+	auto Operation = RelatedOperation(TEXT("AddComponent")); Operation->SetStringField(TEXT("ComponentName"), TEXT("Probe")); Operation->SetStringField(TEXT("ComponentClass"), TEXT("SceneComponent"));
+	if (!TestFalse(TEXT("Add parent component"), RelatedCall(TEXT("ManageAssetBlueprint"), RelatedArgs(Parent.Get(), Operation)).HasErrors())) return false;
+	FKismetEditorUtilities::CompileBlueprint(Parent.Get());
+	TStrongObjectPtr<UBlueprint> Child(RelatedBlueprint(Parent->GeneratedClass));
+	ON_SCOPE_EXIT { Child->GetOutermost()->SetDirtyFlag(false); };
+	USCS_Node* Node = Parent->SimpleConstructionScript->FindSCSNode(TEXT("Probe"));
+	USceneComponent* Override = Cast<USceneComponent>(Child->GetInheritableComponentHandler(true)->CreateOverridenComponentTemplate(FComponentKey(Node)));
+	if (!TestNotNull(TEXT("Inherited override fixture"), Override)) return false;
+	Override->SetRelativeLocation(FVector(10,0,0)); Override->ClearFlags(RF_Transactional);
+	Operation = RelatedOperation(TEXT("SetComponentProperty")); Operation->SetStringField(TEXT("ComponentName"), TEXT("Probe")); Operation->SetStringField(TEXT("PropertyPath"), TEXT("RelativeLocation.X")); Operation->SetStringField(TEXT("Value"), TEXT("20"));
+	auto Args = RelatedArgs(Child.Get(), Operation);
+	if (!TestFalse(TEXT("Default unverified inherited write"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors())) return false;
+	TestEqual(TEXT("Inherited value written"), static_cast<double>(Override->GetRelativeLocation().X), 20.0);
+	GEditor->UndoTransaction();
+	TestEqual(TEXT("Undo restores inherited value"), static_cast<double>(Override->GetRelativeLocation().X), 10.0);
+	Override->SetRelativeLocation(FVector(30,0,0)); Override->ClearFlags(RF_Transactional);
+	Operation->SetStringField(TEXT("Action"), TEXT("ResetComponentPropertyToDefault"));
+	if (!TestFalse(TEXT("Reset inherited value"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors())) return false;
+	TestEqual(TEXT("Parent default restored"), static_cast<double>(Override->GetRelativeLocation().X), 0.0);
+	GEditor->UndoTransaction();
+	TestEqual(TEXT("Undo restores pre-reset value"), static_cast<double>(Override->GetRelativeLocation().X), 30.0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusRelatedResetBoundaryTest, "NexusLink.EditorRelated.ComponentResetBoundaries", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusRelatedResetBoundaryTest::RunTest(const FString& Parameters)
+{
+	TStrongObjectPtr<UBlueprint> Parent(RelatedBlueprint(AActor::StaticClass()));
+	ON_SCOPE_EXIT { Parent->GetOutermost()->SetDirtyFlag(false); };
+	auto Operation = RelatedOperation(TEXT("AddComponent")); Operation->SetStringField(TEXT("ComponentName"), TEXT("Probe")); Operation->SetStringField(TEXT("ComponentClass"), TEXT("StaticMeshComponent"));
+	if (!TestFalse(TEXT("Add parent component"), RelatedCall(TEXT("ManageAssetBlueprint"), RelatedArgs(Parent.Get(), Operation)).HasErrors())) return false;
+	USCS_Node* Node = Parent->SimpleConstructionScript->FindSCSNode(TEXT("Probe"));
+	UStaticMeshComponent* ParentComponent = CastChecked<UStaticMeshComponent>(Node->ComponentTemplate);
+	TStrongObjectPtr<UStaticMesh> ParentMesh(NewObject<UStaticMesh>()), ChildMesh(NewObject<UStaticMesh>());
+	FIntProperty* Resolution = FindFProperty<FIntProperty>(UStaticMesh::StaticClass(), TEXT("LightMapResolution"));
+	if (!TestNotNull(TEXT("Mesh resolution fixture"), Resolution)) return false;
+	Resolution->SetPropertyValue_InContainer(ParentMesh.Get(), 64); Resolution->SetPropertyValue_InContainer(ChildMesh.Get(), 128);
+	ParentComponent->SetStaticMesh(ParentMesh.Get());
+	FKismetEditorUtilities::CompileBlueprint(Parent.Get());
+	TStrongObjectPtr<UBlueprint> Child(RelatedBlueprint(Parent->GeneratedClass));
+	ON_SCOPE_EXIT { Child->GetOutermost()->SetDirtyFlag(false); };
+	UStaticMeshComponent* Override = CastChecked<UStaticMeshComponent>(Child->GetInheritableComponentHandler(true)->CreateOverridenComponentTemplate(FComponentKey(Node)));
+	Override->SetStaticMesh(ChildMesh.Get());
+	Operation = RelatedOperation(TEXT("ResetComponentPropertyToDefault")); Operation->SetStringField(TEXT("ComponentName"), TEXT("Probe")); Operation->SetStringField(TEXT("PropertyPath"), TEXT("StaticMesh.LightMapResolution"));
+	auto Args = RelatedArgs(Child.Get(), Operation);
+	TestTrue(TEXT("External baseline traversal rejected"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	TestEqual(TEXT("External target stays unchanged"), Resolution->GetPropertyValue_InContainer(ChildMesh.Get()), 128);
+	UStaticMesh* OwnedParentMesh = NewObject<UStaticMesh>(ParentComponent);
+	Resolution->SetPropertyValue_InContainer(OwnedParentMesh, 64); ParentComponent->SetStaticMesh(OwnedParentMesh);
+	TestTrue(TEXT("External target traversal rejected"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	TestEqual(TEXT("External target still unchanged"), Resolution->GetPropertyValue_InContainer(ChildMesh.Get()), 128);
+	UStaticMesh* OwnedChildMesh = NewObject<UStaticMesh>(Override);
+	Resolution->SetPropertyValue_InContainer(OwnedChildMesh, 128); Override->SetStaticMesh(OwnedChildMesh);
+	TestFalse(TEXT("Owned subobject reset allowed"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	TestEqual(TEXT("Owned subobject value restored"), Resolution->GetPropertyValue_InContainer(OwnedChildMesh), 64);
+	GEditor->UndoTransaction();
+	TestEqual(TEXT("Undo snapshots the actual owned object"), Resolution->GetPropertyValue_InContainer(OwnedChildMesh), 128);
 	return true;
 }
 #endif
