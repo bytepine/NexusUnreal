@@ -31,10 +31,7 @@ NAME_RE = re.compile(r'Out\.Name\s*=\s*TEXT\(\s*"([^"]+)"\s*\)')
 HANDLER_RE = re.compile(r'OutHandlers\.Add\(\s*TEXT\(\s*"([^"]+)"\s*\)')
 SECTION_RE = re.compile(r'GetSectionNames\(\)[^{]*\{([^}]+)\}', re.S)
 TEXT_RE = re.compile(r'TEXT\(\s*"([^"]+)"\s*\)')
-ENUM_BLOCK_RE = re.compile(
-    r'FNexusSchema::Enum\(\s*(?:TEXT\("[^"]*"\)\s*,\s*)?\{\s*((?:TEXT\("[^"]+"\)\s*,?\s*)+)\}',
-    re.S,
-)
+ACTION_ENUM_RE = re.compile(r'TEXT\("Action"\)\s*,\s*FNexusSchema::Enum\([^{}]*\{([^}]+)\}', re.S)
 
 
 def _read(p: Path) -> str:
@@ -57,11 +54,9 @@ def collect_cpp(roots=CAP_ROOTS) -> tuple[dict[str, list[str]], dict[str, list[s
             txt += "\n" + _read(p.with_suffix(".h"))
         if cap.startswith("Manage"):
             actions = HANDLER_RE.findall(txt)
-            if not actions:
-                # pose_search 等无 Enum / 仅 handler 名写在 HandlePS_*
-                for blk in ENUM_BLOCK_RE.findall(txt):
-                    actions.extend(TEXT_RE.findall(blk))
-                actions = [a for a in actions if a not in ("Action", "Action type", "Operation type", "Write operation")]
+            # Action 枚举同时覆盖循环注册；其他参数的枚举不能算作操作。
+            for blk in ACTION_ENUM_RE.findall(txt):
+                actions.extend(TEXT_RE.findall(blk))
             # 去重保序
             seen = set()
             uniq = []
@@ -102,6 +97,11 @@ def _freeze(node, bindings):
     """固定当前变量值；已绑定容器保留引用，新建容器捕获当次迭代值。"""
     if isinstance(node, ast.Name) and node.id in bindings:
         return bindings[node.id]
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "dict":
+        return _freeze(ast.Dict(
+            keys=[None] * len(node.args) + [ast.Constant(k.arg) if k.arg else None for k in node.keywords],
+            values=[*node.args, *(k.value for k in node.keywords)],
+        ), bindings)
     if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
         return type(node)(elts=[_freeze(item, bindings) for item in node.elts])
     if isinstance(node, ast.Dict):
@@ -123,14 +123,22 @@ def _fields(node, key, bindings):
 
 
 class CoverageVisitor(ast.NodeVisitor):
-    def __init__(self, aliases):
+    def __init__(self, aliases, functions=None):
         self.aliases = aliases
+        self.functions = dict(functions or {})
+        self.call_stack = set()
         self.bindings = {}
         self.actions = defaultdict(set)
         self.sections = defaultdict(set)
         self.mentioned = set()
 
+    def visit_Module(self, node):
+        self.functions.update({stmt.name: stmt for stmt in node.body if isinstance(stmt, ast.FunctionDef)})
+        self.generic_visit(node)
+
     def visit_FunctionDef(self, node):
+        if not node.name.startswith("test_"):
+            return
         previous = self.bindings
         contexts = [dict(previous)]
         for decorator in node.decorator_list:
@@ -221,6 +229,24 @@ class CoverageVisitor(ast.NodeVisitor):
             self.visit(stmt)
 
     def visit_Call(self, node):
+        if isinstance(node.func, ast.Name) and node.func.id in self.functions and node.func.id not in self.call_stack:
+            function = self.functions[node.func.id]
+            previous = self.bindings
+            arguments = {param.arg: _freeze(value, previous) for param, value in zip(function.args.args, node.args)}
+            keywords = ast.Dict(keys=[ast.Constant(k.arg) if k.arg else None for k in node.keywords],
+                                values=[_freeze(k.value, previous) for k in node.keywords])
+            for param in (*function.args.args, *function.args.kwonlyargs):
+                values = list(_fields(keywords, param.arg, previous))
+                if values:
+                    arguments[param.arg] = _freeze(values[-1], previous)
+            if function.args.kwarg:
+                arguments[function.args.kwarg.arg] = keywords
+            self.bindings = dict(previous) | arguments
+            self.call_stack.add(node.func.id)
+            for stmt in function.body:
+                self.visit(stmt)
+            self.call_stack.remove(node.func.id)
+            self.bindings = previous
         # Operations 常先建列表，再按可用资产 append / extend / insert。
         if (isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name)
                 and node.func.value.id in self.bindings and node.args
@@ -243,7 +269,7 @@ class CoverageVisitor(ast.NodeVisitor):
                 and node.func.attr in {"call", "call_capability", "try_call"} and node.args):
             params = ast.Dict(
                 keys=[ast.Constant(k.arg) if k.arg else None for k in node.keywords],
-                values=[k.value for k in node.keywords],
+                values=[_freeze(k.value, self.bindings) for k in node.keywords],
             )
             if len(node.args) > 1:
                 params.keys.append(None)
@@ -251,10 +277,14 @@ class CoverageVisitor(ast.NodeVisitor):
             for cap in _strings(node.args[0], self.bindings):
                 cap = self.aliases.get(cap, cap)
                 if cap == "CallCapability":
-                    for name in _fields(params, "Capability", self.bindings):
-                        for nested_cap in _strings(name, self.bindings):
-                            for arguments in _fields(params, "Arguments", self.bindings):
-                                self._record(nested_cap, arguments)
+                    requests = [params]
+                    for calls in _fields(params, "Calls", self.bindings):
+                        requests.extend(_expand(calls, self.bindings))
+                    for request in requests:
+                        for name in _fields(request, "Capability", self.bindings):
+                            for nested_cap in _strings(name, self.bindings):
+                                for arguments in _fields(request, "Arguments", self.bindings):
+                                    self._record(self.aliases.get(nested_cap, nested_cap), arguments)
                 else:
                     self._record(cap, params)
         self.generic_visit(node)
@@ -273,8 +303,16 @@ def collect_tests(tests=TESTS) -> tuple[dict[str, set[str]], dict[str, set[str]]
     aliases = json.loads(_read(aliases_path)) if aliases_path.is_file() else {}
     actions, sections, mentioned = defaultdict(set), defaultdict(set), set()
     for p in sorted(tests.rglob("test_*.py")):
-        visitor = CoverageVisitor(aliases)
-        visitor.visit(ast.parse(_read(p), filename=str(p)))
+        tree = ast.parse(_read(p), filename=str(p))
+        functions = {}
+        for stmt in tree.body:
+            if isinstance(stmt, ast.ImportFrom) and stmt.module:
+                source = tests / (stmt.module.replace(".", "/") + ".py")
+                if source.is_file():
+                    definitions = {node.name: node for node in ast.parse(_read(source)).body if isinstance(node, ast.FunctionDef)}
+                    functions.update({name.asname or name.name: definitions[name.name] for name in stmt.names if name.name in definitions})
+        visitor = CoverageVisitor(aliases, functions)
+        visitor.visit(tree)
         for cap, values in visitor.actions.items():
             actions[cap].update(values)
         for cap, values in visitor.sections.items():

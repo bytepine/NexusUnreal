@@ -80,7 +80,7 @@ unreal.ToolsetRegistry.register_toolset_class({classname})
 """
     mcp.call("ExecPython", Code=code)
     try:
-        listed = cap_first(mcp.call("GetProjectToolsets", NameFilter=classname))
+        listed = cap_first(mcp.call("GetProjectToolsets", Sections=["Toolsets"], NameFilter=classname))
         items = merge_with_defaults(listed["Toolsets"], listed.get("Toolsets_defaults", {}))
         assert len(items) == 1, listed
         name = items[0]["Name"]

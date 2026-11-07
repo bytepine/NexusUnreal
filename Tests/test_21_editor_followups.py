@@ -26,7 +26,7 @@ def test_widget_variable_event_rename(mcp,require_tools,test_ns):
     mcp.call("ManageAssetUserWidget",AssetPath=path,bCompile=True,Operations=[dict(Action="SetVariable",WidgetName="ActionButton",bIsVariable=True)])
     edit(mcp,"ManageAssetUserWidget",path,Action="BindEvent",WidgetName="ActionButton",EventName="OnClicked")
     edit(mcp,"ManageAssetUserWidget",path,Action="Rename",WidgetName="ActionButton",NewWidgetName="RenamedButton")
-    data=cap_first(mcp.call("GetAssetUserWidget",AssetPath=path))
+    data=cap_first(mcp.call("GetAssetUserWidget",AssetPath=path,Sections=["Widgets"]))
     assert "RenamedButton" in json.dumps(data),data
     mcp.call("ExecPython",Code=f"import unreal\nbp=unreal.load_asset('{path}')\nassert bp is not None")
     bad=mcp.try_call("ManageAssetUserWidget",AssetPath=path,Operations=[dict(Action="Rename",WidgetName="RenamedButton",NewWidgetName="Root")])
@@ -44,6 +44,9 @@ def test_widget_ui_components(mcp,require_tools,test_ns):
     edit(mcp,"ManageAssetUserWidget",path,Action="AddUIComponent",WidgetName="Target",ComponentClass=component)
     data=cap_first(mcp.call("GetAssetUserWidget",AssetPath=path,Sections=["UIComponents"]))
     assert data["UIComponentCount"]==1,data
+    bad=mcp.try_call("ManageAssetUserWidget",AssetPath=path,Operations=[dict(Action="MoveUIComponent",WidgetName="Target",ComponentClass=component,RelativeComponentClass=component)])
+    assert bad.get("isError") and "different component" in str(bad),bad
+    assert cap_first(mcp.call("GetAssetUserWidget",AssetPath=path,Sections=["UIComponents"]))["UIComponentCount"]==1
     edit(mcp,"ManageAssetUserWidget",path,Action="RemoveUIComponent",WidgetName="Target",ComponentClass=component)
     assert cap_first(mcp.call("GetAssetUserWidget",AssetPath=path,Sections=["UIComponents"]))["UIComponentCount"]==0
 
@@ -85,8 +88,33 @@ def test_typed_project_settings_persistence_and_validation(mcp,require_tools):
         current=cap_first(mcp.call("GetProjectSettings",**selector,Sections=["Values"],PropertyNames=["ProjectName"]))
         assert current["Values"][0]["JsonValue"]==value,current
         manage(mcp,"ManageProjectSettings",selector,dict(Action="Save"))
+        reset=mcp.try_call("ManageProjectSettings",**selector,Operations=[dict(Action="Reset")])
+        assert reset.get("isError") and "does not support resetting defaults" in str(reset),reset
+        unchanged=cap_first(mcp.call("GetProjectSettings",**selector,Sections=["Values"],PropertyNames=["ProjectName"]))
+        assert unchanged["Values"][0]["JsonValue"]==value,unchanged
     finally:
         manage(mcp,"ManageProjectSettings",selector,dict(Action="SetProperties",Properties={"ProjectName":previous}))
+
+
+def test_editor_settings_reset_roundtrip(mcp,require_tools):
+    isolated_edits();require_tools("GetProjectSettings","ManageProjectSettings")
+    selector=dict(Container="Editor",Category="General",Section="LoadingSaving")
+    before=cap_first(mcp.call("GetProjectSettings",**selector,Sections=["Values"],PropertyNames=["bAutoSaveEnable"]))
+    previous=before["Values"][0]["JsonValue"]
+    try:
+        manage(mcp,"ManageProjectSettings",selector,dict(Action="Reset"))
+        defaults=cap_first(mcp.call("GetProjectSettings",**selector,Sections=["Values"],PropertyNames=["bAutoSaveEnable"]))
+        default=defaults["Values"][0]["JsonValue"]
+        assert isinstance(default,bool),defaults
+        manage(mcp,"ManageProjectSettings",selector,dict(Action="SetProperties",Properties={"bAutoSaveEnable":not default}))
+        changed=cap_first(mcp.call("GetProjectSettings",**selector,Sections=["Values"],PropertyNames=["bAutoSaveEnable"]))
+        assert changed["Values"][0]["JsonValue"] is not default,changed
+        reset=manage(mcp,"ManageProjectSettings",selector,dict(Action="Reset"))
+        assert reset["bSavedToDisk"],reset
+        restored=cap_first(mcp.call("GetProjectSettings",**selector,Sections=["Values"],PropertyNames=["bAutoSaveEnable"]))
+        assert restored["Values"][0]["JsonValue"]==default,restored
+    finally:
+        manage(mcp,"ManageProjectSettings",selector,dict(Action="SetProperties",Properties={"bAutoSaveEnable":previous}))
 
 
 def test_project_plugin_content_lifecycle(mcp,require_tools):

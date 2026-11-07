@@ -3,6 +3,65 @@
 import pytest
 from _framework.mcp_client import cap_first
 from _framework.runtime_helpers import spawn_runtime_actors, destroy_runtime_actors
+from test_15_editor_operations import operation_result
+
+
+def test_related_blueprint_renames_and_component_reset(mcp, require_tools, test_ns):
+    require_tools("CreateAssetBlueprint", "ManageAssetBlueprint", "GetAssetBlueprint")
+    parent, child = f"{test_ns}/BP_ResetParent", f"{test_ns}/BP_ResetChild"
+    mcp.call("CreateAssetBlueprint", AssetPath=parent, ParentClass="Actor")
+    mcp.call("ManageAssetBlueprint", AssetPath=parent, bCompile=True, Operations=[
+        {"Action": "AddVariable", "VariableName": "Original", "VariableType": "int", "DefaultValue": "17"},
+        {"Action": "AddFunction", "FunctionName": "Compute"},
+        {"Action": "AddComponent", "ComponentName": "Probe", "ComponentClass": "SceneComponent"},
+    ])
+    mcp.call("ManageAssetBlueprint", AssetPath=parent, bCompile=True, Operations=[
+        {"Action": "AddLocalVariable", "FunctionName": "Compute", "VariableName": "LocalValue", "VariableType": "int"},
+        {"Action": "SetComponentProperty", "ComponentName": "Probe", "PropertyPath": "RelativeLocation.X", "Value": "31"},
+    ])
+    before = cap_first(mcp.call("GetAssetBlueprint", AssetPath=parent, Sections=["Variable", "Function"]))
+    member = next(item for item in before["Variables"] if item["Name"] == "Original")
+    local = next(item for item in before["Functions"] if item["Name"] == "Compute")["LocalVariables"][0]
+    mcp.call("ManageAssetBlueprint", AssetPath=parent, bCompile=True, Operations=[
+        {"Action": "RenameVariable", "VariableName": "Original", "NewVariableName": "Renamed"},
+        {"Action": "RenameLocalVariable", "FunctionName": "Compute", "VariableName": "LocalValue", "NewVariableName": "RenamedLocal"},
+    ])
+    after = cap_first(mcp.call("GetAssetBlueprint", AssetPath=parent, Sections=["Variable", "Function"]))
+    renamed = next(item for item in after["Variables"] if item["Name"] == "Renamed")
+    renamed_local = next(item for item in after["Functions"] if item["Name"] == "Compute")["LocalVariables"][0]
+    assert renamed["Guid"] == member["Guid"] and renamed_local["Guid"] == local["Guid"], after
+    assert renamed_local["Name"] == "RenamedLocal" and all(item["Name"] != "Original" for item in after["Variables"]), after
+    mcp.call("CreateAssetBlueprint", AssetPath=child, ParentClass=parent)
+    mcp.call("ManageAssetBlueprint", AssetPath=child, bVerify=True, Operations=[
+        {"Action": "SetComponentProperty", "ComponentName": "Probe", "PropertyPath": "RelativeLocation.X", "Value": "72", "ExpectedValue": "31"},
+    ])
+    mcp.call("ManageAssetBlueprint", AssetPath=child, Operations=[
+        {"Action": "ResetComponentPropertyToDefault", "ComponentName": "Probe", "PropertyPath": "RelativeLocation.X", "Baseline": "ParentTemplate"},
+    ])
+    reset = cap_first(mcp.call("GetAssetBlueprint", AssetPath=child, Sections=["Component"], ComponentName="Probe",
+                               Baseline="ParentTemplate", PropertyPaths=["RelativeLocation.X"]))["Properties"][0]
+    assert float(reset["Value"]) == 31 and not reset["bDiffersFromDefault"], reset
+
+
+def test_related_level_actor_properties_and_reset(mcp, require_tools, test_ns):
+    require_tools("CreateAssetLevel", "ManageAssetLevel", "GetAssetLevel")
+    path = f"{test_ns}/LV_ActorDefaults"
+    mcp.call("CreateAssetLevel", AssetPath=path)
+    mcp.call("ManageAssetLevel", AssetPath=path, Operations=[{"Action": "SpawnActor", "ClassName": "Actor"}])
+    actor = cap_first(mcp.call("GetAssetLevel", AssetPath=path, Sections=["Actors"]))["Actors"]
+    name = next(item["Name"] for item in actor if item["Class"] == "Actor")
+    mcp.call("ManageAssetLevel", AssetPath=path, bVerify=True, Operations=[
+        {"Action": "SetActorProperty", "ActorName": name, "PropertyPath": "InitialLifeSpan", "Value": "12"},
+    ])
+    changed = cap_first(mcp.call("GetAssetLevel", AssetPath=path, Sections=["ActorProperties"], ActorName=name,
+                                 PropertyPaths=["InitialLifeSpan"]))["Properties"][0]
+    assert float(changed["Value"]) == 12 and changed["bDiffersFromDefault"], changed
+    mcp.call("ManageAssetLevel", AssetPath=path, Operations=[
+        {"Action": "ResetActorPropertyToDefault", "ActorName": name, "PropertyPath": "InitialLifeSpan"},
+    ])
+    reset = cap_first(mcp.call("GetAssetLevel", AssetPath=path, Sections=["ActorProperties"], ActorName=name,
+                               PropertyPaths=["InitialLifeSpan"]))["Properties"][0]
+    assert reset["Value"] == reset["DefaultValue"] and not reset["bDiffersFromDefault"], reset
 
 
 def test_related_variable_type_roundtrip(mcp, require_tools, test_ns):
@@ -72,6 +131,17 @@ def test_related_export_discovery_and_dry_run(mcp, require_tools, test_ns, tmp_p
     preview = cap_first(mcp.call("ExportAsset", AssetPath=path, OutputPath=str(destination), bValidateOnly=True))
     assert preview["bValidateOnly"] and not preview["bWritten"], preview
     assert not destination.parent.exists()
+    destination.parent.mkdir()
+    destination.write_bytes(b"original")
+    failed = mcp.try_call("ExportAsset", AssetPath=path, OutputPath=str(destination), ConflictPolicy="Fail")
+    assert failed.get("isError") and destination.read_bytes() == b"original", failed
+    unique = cap_first(mcp.call("ExportAsset", AssetPath=path, OutputPath=str(destination), ConflictPolicy="Unique"))
+    unique_path = destination.with_stem(destination.stem + "_1")
+    assert unique["bWritten"] and unique_path.is_file() and destination.read_bytes() == b"original", unique
+    expected = unique_path.read_bytes()
+    assert b"Begin Object" in expected
+    replaced = cap_first(mcp.call("ExportAsset", AssetPath=path, OutputPath=str(destination), ConflictPolicy="Replace"))
+    assert replaced["bWritten"] and destination.read_bytes() == expected, replaced
 
 
 def test_related_navigation_point(mcp, require_tools):
@@ -85,6 +155,10 @@ def test_related_navigation_point(mcp, require_tools):
 def test_related_editor_list_and_safe_close(mcp, require_tools, test_ns):
     require_tools("ControlEditorAssetEditor", "GetEditorContext", "CreateAssetBlueprint", "ManageAssetBlueprint", "SaveAsset")
     path = f"{test_ns}/BP_Lifecycle"
+    other = f"{test_ns}/BP_UnrelatedEditor"
+    mcp.call("CreateAssetBlueprint", AssetPath=other, ParentClass="Actor")
+    mcp.call("CompileBlueprint", AssetPath=other, bSaveToDisk=True)
+    assert cap_first(mcp.call("ControlEditorAssetEditor", AssetPath=other))["bIsOpen"]
     mcp.call("CreateAssetBlueprint", AssetPath=path, ParentClass="Actor")
     mcp.call("ManageAssetBlueprint", AssetPath=path, Operations=[{"Action": "AddVariable", "VariableName": "Probe", "VariableType": "int"}])
     opened = cap_first(mcp.call("ControlEditorAssetEditor", AssetPath=path))
@@ -96,6 +170,16 @@ def test_related_editor_list_and_safe_close(mcp, require_tools, test_ns):
     mcp.call("CompileBlueprint", AssetPath=path, bSaveToDisk=True)
     closed = cap_first(mcp.call("ControlEditorAssetEditor", AssetPath=path, Action="Close"))
     assert not closed["bIsOpen"], closed
+    assert cap_first(mcp.call("ControlEditorAssetEditor", AssetPath=other, Action="Status"))["bIsOpen"]
+    assert not cap_first(mcp.call("ControlEditorAssetEditor", AssetPath=other, Action="Close"))["bIsOpen"]
+
+
+@pytest.mark.requires_gui
+def test_related_shared_editor_protection(mcp, require_tools):
+    require_tools("ControlEditorAutomation")
+    operation_result(mcp, mcp.call("ControlEditorAutomation", Action="Discover"))
+    result = operation_result(mcp, mcp.call("ControlEditorAutomation", Action="Run", TestNames=["NexusLink.EditorGaps.SharedEditorProtection"]))
+    assert result["Tests"][0]["Outcome"] == "Passed", result
 
 
 @pytest.mark.requires_gui

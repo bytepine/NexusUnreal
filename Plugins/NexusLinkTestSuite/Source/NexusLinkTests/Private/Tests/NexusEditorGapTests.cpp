@@ -21,6 +21,30 @@
 #include "Subsystems/AssetEditorSubsystem.h"
 #include "UObject/StrongObjectPtr.h"
 
+/** 通过原生子系统注册共享窗口，避免依赖特定资产编辑器的多标签策略。 */
+struct FNexusTestAssetEditor final : IAssetEditorInstance
+{
+	UAssetEditorSubsystem* Subsystem;
+	bool bRegistered = true;
+	int32 CloseCount = 0;
+	explicit FNexusTestAssetEditor(UAssetEditorSubsystem* InSubsystem) : Subsystem(InSubsystem) {}
+	virtual FName GetEditorName() const override { return TEXT("NexusTestAssetEditor"); }
+	virtual void FocusWindow(UObject* ObjectToFocusOn = nullptr) override {}
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3)
+	virtual bool CloseWindow(EAssetEditorCloseReason Reason) override { ++CloseCount; Subsystem->NotifyEditorClosed(this); bRegistered = false; return true; }
+#else
+	virtual bool CloseWindow() override { ++CloseCount; Subsystem->NotifyEditorClosed(this); bRegistered = false; return true; }
+#endif
+	virtual bool IsPrimaryEditor() const override { return true; }
+	virtual void InvokeTab(const FTabId& TabId) override {}
+#if ENGINE_MAJOR_VERSION < 5
+	virtual FName GetToolbarTabId() const override { return NAME_None; }
+#endif
+	virtual TSharedPtr<FTabManager> GetAssociatedTabManager() override { return nullptr; }
+	virtual double GetLastActivationTime() override { return 0; }
+	virtual void RemoveEditingAsset(UObject* Asset) override { Subsystem->NotifyAssetClosed(Asset, this); }
+};
+
 static FCapabilityResult EditorGapCall(const TCHAR* Name, const TSharedPtr<FJsonObject>& Args)
 {
 	const FCapRecord* Record = FNexusCapabilityRegistry::Get().FindRecordByName(Name);
@@ -167,6 +191,39 @@ bool FNexusEditorGapAssetEditorTest::RunTest(const FString& Parameters)
 	Args->SetStringField(TEXT("Action"), TEXT("Focus"));
 	TestFalse(TEXT("Focus existing editor"), EditorGapCall(TEXT("ControlEditorAssetEditor"), Args).HasErrors());
 	TestEqual(TEXT("Focus does not duplicate editor"), Editors->GetAllEditedAssets().Num(), Count);
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusSharedAssetEditorTest, "NexusLink.EditorGaps.SharedEditorProtection", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusSharedAssetEditorTest::RunTest(const FString& Parameters)
+{
+	UAssetEditorSubsystem* Editors = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>();
+	if (!TestNotNull(TEXT("Editor subsystem"), Editors)) return false;
+	TStrongObjectPtr<UBlueprint> Target(EditorGapBlueprint(AActor::StaticClass()));
+	TStrongObjectPtr<UBlueprint> Shared(EditorGapBlueprint(AActor::StaticClass()));
+	TStrongObjectPtr<UBlueprint> Unrelated(EditorGapBlueprint(AActor::StaticClass()));
+	FNexusTestAssetEditor SharedEditor(Editors), UnrelatedEditor(Editors);
+	for (UBlueprint* Blueprint : {Target.Get(), Shared.Get(), Unrelated.Get()}) Blueprint->GetOutermost()->SetDirtyFlag(false);
+	Editors->NotifyAssetOpened(Target.Get(), &SharedEditor); Editors->NotifyAssetOpened(Shared.Get(), &SharedEditor); Editors->NotifyAssetOpened(Unrelated.Get(), &UnrelatedEditor);
+	ON_SCOPE_EXIT { if (SharedEditor.bRegistered) Editors->NotifyEditorClosed(&SharedEditor); Editors->NotifyEditorClosed(&UnrelatedEditor); };
+	auto Args = MakeShared<FJsonObject>(); Args->SetStringField(TEXT("AssetPath"), Target->GetPathName()); Args->SetStringField(TEXT("Action"), TEXT("Close")); Args->SetBoolField(TEXT("bValidateOnly"), true);
+	const auto Preview = EditorGapCall(TEXT("ControlEditorAssetEditor"), Args);
+	if (!TestFalse(TEXT("Shared close preview"), Preview.HasErrors())) return false;
+	TestFalse(TEXT("Shared instance cannot be closed safely"), Preview.Entries[0]->AsObject()->GetBoolField(TEXT("bCanClose")));
+	TestEqual(TEXT("Validation never closes shared editor"), SharedEditor.CloseCount, 0);
+	if (FApp::CanEverRender())
+	{
+		Args->SetBoolField(TEXT("bValidateOnly"), false);
+		const auto Rejected = EditorGapCall(TEXT("ControlEditorAssetEditor"), Args);
+		TestTrue(TEXT("Real shared close rejected"), Rejected.HasErrors());
+		TestTrue(TEXT("Rejection identifies unrelated assets"), Rejected.FatalError.Contains(TEXT("other assets")));
+		TestEqual(TEXT("Rejected close never calls shared window"), SharedEditor.CloseCount, 0);
+		Editors->NotifyAssetClosed(Shared.Get(), &SharedEditor);
+		TestFalse(TEXT("Single-target close succeeds"), EditorGapCall(TEXT("ControlEditorAssetEditor"), Args).HasErrors());
+		TestEqual(TEXT("Only target window closes"), SharedEditor.CloseCount, 1);
+		TestNull(TEXT("Target editor removed"), Editors->FindEditorForAsset(Target.Get(), false));
+	}
+	TestEqual(TEXT("Unrelated editor never closes"), UnrelatedEditor.CloseCount, 0);
+	TestTrue(TEXT("Unrelated asset remains open"), Editors->FindEditorForAsset(Unrelated.Get(), false) == &UnrelatedEditor);
 	return true;
 }
 #endif

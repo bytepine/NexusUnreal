@@ -187,24 +187,26 @@ def test_remove_curve(anim_seq_path, test_ns, mcp):
     ), entry
 
 
-def test_manage_anim_sequence_notify_root_motion(anim_seq_path, mcp):
-    # add_notify / set_root_motion / remove_notify 字面量供 audit 扫描。
-    # 4.26 对项目样本 AnimSequence 执行 add_notify 会触发 UObjectGlobals Ensure。
-    remaining_ops = [
-        {"Action": "AddNotify", "NotifyName": "NxE2ENotify", "Time": 0.1},
-        {"Action": "SetRootMotion", "RootMotion": "RootMotionFromEverything"},
-        {"Action": "RemoveNotify", "NotifyIndex": 0},
-    ]
-    try:
-        r = mcp.call_capability(
-            "ManageAssetAnimSequence",
-            AssetPath=anim_seq_path,
-            bSaveToDisk=False,
-            Operations=[{"Action": "SetFrameRate", "FrameRate": 30}],
-        )
-    except MCPError as e:
-        pytest.skip(f"anim_sequence remaining 跳过: {e}")
-    for e in (r.get("Results") or [cap_first(r)]):
-        if isinstance(e, dict) and e.get("Error"):
-            pytest.skip(f"anim_sequence remaining 跳过: {e}")
-    assert remaining_ops
+@pytest.mark.parametrize("action, message", [
+    ("AddNotify", "requires NotifyName"),
+    ("RemoveNotify", "requires NotifyIndex or NotifyName"),
+    ("SetRootMotion", "requires RootMotion"),
+])
+def test_manage_anim_sequence_notify_root_motion_validation(anim_seq_path, mcp, action, message):
+    # 每个操作都实际经过 MCP，并断言缺参原因及拒绝后资产未发生变化。
+    before = cap_first(mcp.call("GetAssetAnimSequence", AssetPath=anim_seq_path))
+    rejected = mcp.try_call("ManageAssetAnimSequence", AssetPath=anim_seq_path,
+                            Operations=[{"Action": action}])
+    assert rejected.get("isError") and message in str(rejected), rejected
+    after = cap_first(mcp.call("GetAssetAnimSequence", AssetPath=anim_seq_path))
+    assert after == before, (before, after)
+
+
+def test_manage_anim_sequence_frame_rate(anim_seq_path, test_ns, mcp):
+    path = f"{test_ns}/AS_FrameRate"
+    mcp.call("DuplicateAsset", AssetPath=anim_seq_path, DestAssetPath=path)
+    result = cap_first(mcp.call("ManageAssetAnimSequence", AssetPath=path,
+                                Operations=[{"Action": "SetFrameRate", "FrameRate": 30}]))
+    assert not result.get("Error") and result["FrameRate"] == 30, result
+    readback = cap_first(mcp.call("GetAssetAnimSequence", AssetPath=path))
+    assert readback["FrameRate"] == 30, readback

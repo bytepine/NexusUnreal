@@ -51,6 +51,23 @@ def test_ga_get_tags(test_ns, mcp):
     assert isinstance(r, dict), r
 
 
+def test_ga_set_tags_roundtrip(test_ns, mcp):
+    path = f"{test_ns}/GA_TagRoundtrip"
+    mcp.call("CreateAssetGameplayAbility", AssetPath=path)
+    mcp.call("ManageAssetGameplayAbility", AssetPath=path, Operations=[{
+        "Action": "SetTags", "TagContainer": "ActivationOwnedTags", "Mode": "Set", "Tags": ["Nexus.Diagnostics.Required"],
+    }])
+    tags = cap_first(mcp.call("GetAssetGameplayAbility", AssetPath=path, Sections=["Tags"]))
+    assert tags["ActivationOwnedTags"] == ["Nexus.Diagnostics.Required"], tags
+    bad = mcp.try_call("ManageAssetGameplayAbility", AssetPath=path, Operations=[{
+        "Action": "SetTags", "TagContainer": "MissingContainer", "Tags": [],
+    }])
+    error = bad.get("structuredContent", {})
+    assert bad.get("isError") and error.get("ErrorKind") == "ArgInvalid" and "Operations[0].TagContainer" in error.get("Error", ""), bad
+    unchanged = cap_first(mcp.call("GetAssetGameplayAbility", AssetPath=path, Sections=["Tags"]))
+    assert unchanged["ActivationOwnedTags"] == tags["ActivationOwnedTags"], unchanged
+
+
 def test_ga_manage_set_policy(test_ns, mcp):
     path = f"{test_ns}/GA_TestAbility"
     r = mcp.call(

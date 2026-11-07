@@ -105,7 +105,13 @@ py Script/gas_regression.py --ue-root <UE_5.7-directory>
 | **全量回归 / 全覆盖验证** | **必须 GUI**：`py Script/run_e2e.py --gui` 或 `--full`（含 PIE、UnLua、视口/RHI 等） |
 | **发版验证（NexusLink）** | **按本次变更选**（不改日常默认）：仅编辑器资产 / manage-get / schema → headless；含 PIE / UnLua / 视口 / `l4_runtime`/`lua`/`requires_gui` / `interact_runtime_*` → `--gui`；混合或不清 → `--gui` |
 
-覆盖审计使用 Python AST 静态关联每次调用的 `Operations[].Action` 与 `Sections`，支持局部列表、append/extend/insert/`+=`、循环和参数化用例（含 `pytest.param`，忽略 `id` / `marks` 元数据）。追加后的参数表保持行配对，容器别名和循环迭代值正确保留，不同用例的变更相互隔离；无法静态展开的参数行仍扫描不依赖参数的固定调用。未传入调用的字面量不计入覆盖；它只证明源码中存在调用，不证明该分支执行、没有 skip 或断言通过，运行覆盖仍须执行 E2E。审计器自身的回归无需 UE：`py -m unittest discover -s Script/tests -p test_audit_e2e_coverage.py`。
+`run_e2e.py` 在清理测试资产和连接/启动引擎前执行覆盖审计，缺项立即退出。C++ 操作从显式注册与 `Action` 枚举合并发现，包含循环注册，不把其他参数枚举误算为操作。Python AST 关联每次调用的 `Operations[].Action` 与 `Sections`，支持 `dict(...)`、局部/导入的直接封装、`CallCapability(Calls=[...])`、容器别名、列表追加、循环和参数化行配对。未传入调用的字面量及未调用的辅助函数不计入覆盖；不导入或执行被审计的测试模块。
+
+静态审计只证明源码存在调用，不证明成功路径、实际执行或断言覆盖，也不能把 skip 计为通过。`test_100` 的 Notify/RootMotion 缺参用例、DataRegistry 未知类型用例是拒绝路径；DataRegistry 正向行值仍由原生内存夹具验证。需要分别检查原生报告、pytest 的 passed/skipped/failed 和可选插件条件；当前未生成 C++ 行/分支覆盖率报告。审计器回归无需 UE：`py -m unittest discover -s Script/tests -p test_audit_e2e_coverage.py`。
+
+待发布关联能力的原生 `NexusLink.EditorRelated` / `NexusLink.EditorGaps` 断言类型变更的复制限制、后代保护、图引用重建和 GUID、局部重命名冲突与引用、专用重设父类的类型/骨架/成员冲突、真实 Recast Filter/WorldName 选择、AI 到达/拒绝/连续请求隔离、共享编辑器关闭保护，以及真实导出 Unique/Replace 写入和拒绝后的文件保留。`test_24` 补相应 MCP 重命名、组件和关卡默认值回读、导出文件内容与无关窗口保留；共享编辑器用原生子系统注册多资产窗口，并在 GUI 下经 MCP 运行断言。
+
+`test_25_trace_readback.py` 经 MCP 回读 Summary/Frames/Timers/Bookmarks 并验证帧、CPU 截断和 Bookmark。先在隔离生产进程运行原生 `NexusLink.Trace.GetTrace.Readback`，等待进程退出，再把生成的 `Saved/Profiling/NexusLinkTraceReadTest.utrace` 绝对路径放入 `NEXUS_STOPPED_TRACE`；读取用例不启动/停止录制，异步分析通过分帧查询等待。未提供停录夹具则明确 skip；此用例目前使用 UE5+ 生产夹具，UE4 Trace 接入见前面的独立验收脚本。
 
 ### Marker 选用
 

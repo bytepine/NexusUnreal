@@ -263,6 +263,11 @@ def main() -> int:
     args, forwarded = parser.parse_known_args()
 
     _ensure_deps()
+    coverage_audit = NEXUS_UNREAL_DIR / "Script/audit_e2e_coverage.py"
+    print(f"[audit] {coverage_audit}", flush=True)
+    audit_rc = subprocess.call([sys.executable, str(coverage_audit)])
+    if audit_rc != 0:
+        return audit_rc
     project_root = Path(args.uproject).resolve().parent if args.uproject else NEXUS_UNREAL_DIR
     _purge_disk_artifacts("pre", project_root=project_root)
 

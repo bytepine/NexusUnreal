@@ -39,6 +39,7 @@
 #include "NavigationSystem.h"
 #include "K2Node_CallFunction.h"
 #include "K2Node_FunctionEntry.h"
+#include "K2Node_VariableGet.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "EdGraphSchema_K2.h"
 #include "Utils/NexusAssetEditorUtils.h"
@@ -111,6 +112,87 @@ bool FNexusRelatedTypesTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusRelatedVariableSafetyTest, "NexusLink.EditorRelated.VariableSafety", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusRelatedVariableSafetyTest::RunTest(const FString& Parameters)
+{
+	TStrongObjectPtr<UBlueprint> Blueprint(RelatedBlueprint(AActor::StaticClass()));
+	ON_SCOPE_EXIT { Blueprint->GetOutermost()->SetDirtyFlag(false); };
+	FEdGraphPinType Integer; Integer.PinCategory = UEdGraphSchema_K2::PC_Int;
+	FBlueprintEditorUtils::AddMemberVariable(Blueprint.Get(), TEXT("Value"), Integer, TEXT("17"));
+	FBPVariableDescription& Variable = Blueprint->NewVariables[0];
+	FGuid OriginalGuid = Variable.VarGuid;
+	UEdGraph* Graph = Blueprint->UbergraphPages[0];
+	UK2Node_VariableGet* Reference = NewObject<UK2Node_VariableGet>(Graph);
+	Reference->VariableReference.SetSelfMember(TEXT("Value"), OriginalGuid);
+	Graph->AddNode(Reference); Reference->CreateNewGuid(); Reference->AllocateDefaultPins();
+	auto Operation = RelatedOperation(TEXT("ChangeVariableType"));
+	Operation->SetStringField(TEXT("VariableName"), TEXT("Value")); Operation->SetStringField(TEXT("VariableType"), TEXT("float")); Operation->SetBoolField(TEXT("bAllowPotentialDataLoss"), true);
+	auto Args = RelatedArgs(Blueprint.Get(), Operation);
+	Variable.RepNotifyFunc = TEXT("OnRep_Value");
+	TestTrue(TEXT("RepNotify function blocks a type change"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	TestEqual(TEXT("Rejected type preserves default"), Variable.DefaultValue, FString(TEXT("17")));
+	Variable.RepNotifyFunc = NAME_None; Variable.PropertyFlags |= CPF_RepNotify;
+	TestTrue(TEXT("RepNotify flag blocks a type change"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	Variable.PropertyFlags &= ~CPF_RepNotify; Variable.PropertyFlags |= CPF_Net;
+	Operation->SetStringField(TEXT("VariableType"), TEXT("Set<int>"));
+	TestTrue(TEXT("Replicated set rejected"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	Operation->SetStringField(TEXT("VariableType"), TEXT("Map<name,int>"));
+	TestTrue(TEXT("Replicated map rejected"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	TestTrue(TEXT("All rejected changes preserve type and GUID"), Variable.VarType == Integer && Variable.VarGuid == OriginalGuid);
+	Variable.PropertyFlags &= ~CPF_Net; Operation->SetStringField(TEXT("VariableType"), TEXT("float"));
+	if (!TestFalse(TEXT("Owned type change succeeds"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors())) return false;
+	TestTrue(TEXT("Type change clears the incompatible default"), Blueprint->NewVariables[0].DefaultValue.IsEmpty());
+	TestTrue(TEXT("Member GUID retained"), Blueprint->NewVariables[0].VarGuid == OriginalGuid);
+	TestTrue(TEXT("Reference GUID retained"), Reference->VariableReference.GetMemberGuid() == OriginalGuid);
+	UEdGraphPin* ValuePin = Reference->FindPin(TEXT("Value"));
+	if (!TestNotNull(TEXT("Reconstructed variable pin"), ValuePin)) return false;
+	FEdGraphPinType Float; FString TypeError; FNexusPinTypeUtils::ParsePinType(TEXT("float"), Float, TypeError);
+	TestTrue(TEXT("Graph pin receives the new type"), ValuePin->PinType == Float);
+	FKismetEditorUtilities::CompileBlueprint(Blueprint.Get());
+	TStrongObjectPtr<UBlueprint> Child(RelatedBlueprint(Blueprint->GeneratedClass));
+	ON_SCOPE_EXIT { Child->GetOutermost()->SetDirtyFlag(false); };
+	const FEdGraphPinType Before = Blueprint->NewVariables[0].VarType;
+	Operation->SetStringField(TEXT("VariableType"), TEXT("int"));
+	TestTrue(TEXT("Descendant prevents parent type change"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	TestTrue(TEXT("Parent and child remain compatible"), Blueprint->NewVariables[0].VarType == Before && Child->ParentClass == Blueprint->GeneratedClass);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusRelatedLocalRenameTest, "NexusLink.EditorRelated.LocalRenameReferences", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusRelatedLocalRenameTest::RunTest(const FString& Parameters)
+{
+	TStrongObjectPtr<UBlueprint> Blueprint(RelatedBlueprint(AActor::StaticClass()));
+	ON_SCOPE_EXIT { Blueprint->GetOutermost()->SetDirtyFlag(false); };
+	auto Operation = RelatedOperation(TEXT("AddFunction")); Operation->SetStringField(TEXT("FunctionName"), TEXT("Compute"));
+	auto Args = RelatedArgs(Blueprint.Get(), Operation); Args->SetBoolField(TEXT("bCompile"), true);
+	if (!TestFalse(TEXT("Function fixture"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors())) return false;
+	Operation->SetStringField(TEXT("Action"), TEXT("AddLocalVariable")); Operation->SetStringField(TEXT("VariableType"), TEXT("int"));
+	Operation->SetStringField(TEXT("VariableName"), TEXT("LocalValue"));
+	if (!TestFalse(TEXT("Local fixture"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors())) return false;
+	Operation->SetStringField(TEXT("VariableName"), TEXT("Occupied"));
+	if (!TestFalse(TEXT("Collision fixture"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors())) return false;
+	UEdGraph* Graph = nullptr;
+	for (UEdGraph* Candidate : Blueprint->FunctionGraphs) if (Candidate && Candidate->GetName() == TEXT("Compute")) Graph = Candidate;
+	if (!TestNotNull(TEXT("Local function graph"), Graph)) return false;
+	FBPVariableDescription* Local = FBlueprintEditorUtils::FindLocalVariable(Blueprint.Get(), Graph, TEXT("LocalValue"));
+	if (!TestNotNull(TEXT("Original local"), Local)) return false;
+	const FGuid Guid = Local->VarGuid;
+	UK2Node_VariableGet* Reference = NewObject<UK2Node_VariableGet>(Graph);
+	Reference->VariableReference.SetLocalMember(TEXT("LocalValue"), Graph->GetName(), Guid);
+	Graph->AddNode(Reference); Reference->CreateNewGuid(); Reference->AllocateDefaultPins();
+	Operation->SetStringField(TEXT("Action"), TEXT("RenameLocalVariable")); Operation->SetStringField(TEXT("VariableName"), TEXT("LocalValue")); Operation->SetStringField(TEXT("NewVariableName"), TEXT("Occupied"));
+	TestTrue(TEXT("Local name collision rejected"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	TestEqual(TEXT("Collision preserves graph reference"), Reference->GetVarName(), FName(TEXT("LocalValue")));
+	Operation->SetStringField(TEXT("NewVariableName"), TEXT("RenamedLocal"));
+	if (!TestFalse(TEXT("Rename succeeds"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors())) return false;
+	Local = FBlueprintEditorUtils::FindLocalVariable(Blueprint.Get(), Graph, TEXT("RenamedLocal"));
+	if (TestNotNull(TEXT("Renamed local exists"), Local)) TestTrue(TEXT("Local GUID retained"), Local->VarGuid == Guid);
+	TestNull(TEXT("Old local removed"), FBlueprintEditorUtils::FindLocalVariable(Blueprint.Get(), Graph, TEXT("LocalValue")));
+	TestEqual(TEXT("Graph reference renamed"), Reference->GetVarName(), FName(TEXT("RenamedLocal")));
+	TestTrue(TEXT("Graph reference GUID retained"), Reference->VariableReference.GetMemberGuid() == Guid);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusRelatedScalarTest, "NexusLink.EditorRelated.ScalarPreviewAndLevel", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FNexusRelatedScalarTest::RunTest(const FString& Parameters)
 {
@@ -167,6 +249,11 @@ bool FNexusRelatedComponentsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Parent is baseline"), FCString::Atod(*Property->GetStringField(TEXT("DefaultValue"))), 31.0);
 	Operation->SetStringField(TEXT("Action"), TEXT("ResetComponentPropertyToDefault")); Operation->RemoveField(TEXT("ExpectedValue")); Args->SetBoolField(TEXT("bVerify"), false);
 	TestFalse(TEXT("Reset child to parent template"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	const auto Reset = RelatedCall(TEXT("GetAssetBlueprint"), Read);
+	if (!TestFalse(TEXT("Read reset value"), Reset.HasErrors())) return false;
+	const auto ResetProperty = Reset.Entries[0]->AsObject()->GetArrayField(TEXT("Properties"))[0]->AsObject();
+	TestEqual(TEXT("Reset writes actual parent value"), FCString::Atod(*ResetProperty->GetStringField(TEXT("Value"))), 31.0);
+	TestFalse(TEXT("Reset removes the difference"), ResetProperty->GetBoolField(TEXT("bDiffersFromDefault")));
 	return true;
 }
 
@@ -205,20 +292,43 @@ bool FNexusRelatedCompileTest::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusRelatedExportTest, "NexusLink.EditorRelated.ExportPreflight", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FNexusRelatedExportTest::RunTest(const FString& Parameters)
 {
-	TStrongObjectPtr<UBlueprint> Blueprint(RelatedBlueprint(AActor::StaticClass()));
-	ON_SCOPE_EXIT { Blueprint->GetOutermost()->SetDirtyFlag(false); };
-	auto Args = MakeShared<FJsonObject>(); Args->SetStringField(TEXT("AssetPath"), Blueprint->GetPathName());
+	UPackage* Package = CreatePackage(*(TEXT("/Game/_McpTest/Export_") + FGuid::NewGuid().ToString(EGuidFormats::Digits)));
+	TStrongObjectPtr<UNexusRelatedDataAsset> Asset(NewObject<UNexusRelatedDataAsset>(Package, TEXT("Export"), RF_Public | RF_Standalone));
+	ON_SCOPE_EXIT { Package->SetDirtyFlag(false); };
+	auto Args = MakeShared<FJsonObject>(); Args->SetStringField(TEXT("AssetPath"), Asset->GetPathName());
 	TestFalse(TEXT("Export formats query"), RelatedCall(TEXT("GetAssetExportOptions"), Args).HasErrors());
 	const FString Directory = FPaths::ProjectSavedDir() / TEXT("RelatedExports") / FGuid::NewGuid().ToString(EGuidFormats::Digits);
 	const FString Output = Directory / TEXT("test.t3d"); Args->SetStringField(TEXT("OutputPath"), Output); Args->SetBoolField(TEXT("bValidateOnly"), true);
 	TestFalse(TEXT("Dry run"), RelatedCall(TEXT("ExportAsset"), Args).HasErrors());
 	TestFalse(TEXT("Dry run creates no directory"), IFileManager::Get().DirectoryExists(*Directory));
 	IFileManager::Get().MakeDirectory(*Directory, true); FFileHelper::SaveStringToFile(TEXT("existing"), *Output);
-	ON_SCOPE_EXIT { IFileManager::Get().Delete(*Output); IFileManager::Get().DeleteDirectory(*Directory); };
+	const FString UniqueOutput = Directory / TEXT("test_1.t3d");
+	ON_SCOPE_EXIT { IFileManager::Get().Delete(*Output); IFileManager::Get().Delete(*UniqueOutput); IFileManager::Get().DeleteDirectory(*Directory); };
 	Args->SetStringField(TEXT("ConflictPolicy"), TEXT("Fail")); TestTrue(TEXT("Fail policy protects file"), RelatedCall(TEXT("ExportAsset"), Args).HasErrors());
 	Args->SetStringField(TEXT("ConflictPolicy"), TEXT("Unique")); const auto Unique = RelatedCall(TEXT("ExportAsset"), Args);
 	TestFalse(TEXT("Unique policy plans another path"), Unique.HasErrors());
 	if (!Unique.HasErrors()) TestTrue(TEXT("Unique suffix"), Unique.Entries[0]->AsObject()->GetStringField(TEXT("OutputPath")).EndsWith(TEXT("test_1.t3d")));
+	Args->SetBoolField(TEXT("bValidateOnly"), false);
+	Args->SetStringField(TEXT("ConflictPolicy"), TEXT("Fail"));
+	TestTrue(TEXT("Real Fail policy rejects overwrite"), RelatedCall(TEXT("ExportAsset"), Args).HasErrors());
+	FString Original; FFileHelper::LoadFileToString(Original, *Output);
+	TestEqual(TEXT("Rejected export keeps original bytes"), Original, FString(TEXT("existing")));
+	Args->SetStringField(TEXT("ConflictPolicy"), TEXT("Unique"));
+	const auto Written = RelatedCall(TEXT("ExportAsset"), Args);
+	if (!TestFalse(TEXT("Unique actually exports"), Written.HasErrors())) return false;
+	TestTrue(TEXT("Unique reports a write"), Written.Entries[0]->AsObject()->GetBoolField(TEXT("bWritten")));
+	FString Exported; FFileHelper::LoadFileToString(Exported, *UniqueOutput);
+	TestTrue(TEXT("Unique contains serialized asset"), Exported.Contains(TEXT("Begin Object")) && Exported.Contains(TEXT("NexusRelatedDataAsset")));
+	FFileHelper::LoadFileToString(Original, *Output);
+	TestEqual(TEXT("Unique preserves original"), Original, FString(TEXT("existing")));
+	Args->SetStringField(TEXT("ConflictPolicy"), TEXT("Replace"));
+	TestFalse(TEXT("Replace actually exports"), RelatedCall(TEXT("ExportAsset"), Args).HasErrors());
+	FFileHelper::LoadFileToString(Original, *Output);
+	TestEqual(TEXT("Replace writes same serialized content"), Original, Exported);
+	Args->SetStringField(TEXT("AssetPath"), TEXT("/Game/_McpTest/MissingExportAsset"));
+	TestTrue(TEXT("Missing asset rejects replacement"), RelatedCall(TEXT("ExportAsset"), Args).HasErrors());
+	FString AfterFailure; FFileHelper::LoadFileToString(AfterFailure, *Output);
+	TestEqual(TEXT("Failure preserves exported file"), AfterFailure, Original);
 	return true;
 }
 
@@ -252,6 +362,40 @@ bool FNexusRelatedSpecializedTest::RunTest(const FString& Parameters)
 		TestFalse(TEXT("Native GameplayAbilityBlueprint reparent"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
 	}
 #endif
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusRelatedReparentGuardsTest, "NexusLink.EditorRelated.ReparentGuards", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusRelatedReparentGuardsTest::RunTest(const FString& Parameters)
+{
+	TStrongObjectPtr<UBlueprint> Widget(RelatedBlueprint(UUserWidget::StaticClass(), UWidgetBlueprint::StaticClass(), UWidgetBlueprintGeneratedClass::StaticClass()));
+	TStrongObjectPtr<UBlueprint> Animation(RelatedBlueprint(UAnimInstance::StaticClass(), UAnimBlueprint::StaticClass(), UAnimBlueprintGeneratedClass::StaticClass()));
+	TStrongObjectPtr<UBlueprint> AnimationParent(RelatedBlueprint(UAnimInstance::StaticClass(), UAnimBlueprint::StaticClass(), UAnimBlueprintGeneratedClass::StaticClass()));
+	TStrongObjectPtr<UBlueprint> Asset(RelatedBlueprint(AActor::StaticClass()));
+	TStrongObjectPtr<UBlueprint> Parent(RelatedBlueprint(AActor::StaticClass()));
+	ON_SCOPE_EXIT { for (UBlueprint* Blueprint : {Widget.Get(), Animation.Get(), AnimationParent.Get(), Asset.Get(), Parent.Get()}) Blueprint->GetOutermost()->SetDirtyFlag(false); };
+	auto Operation = RelatedOperation(TEXT("Reparent")); Operation->SetStringField(TEXT("ParentClass"), TEXT("Actor"));
+	auto Args = RelatedArgs(Widget.Get(), Operation);
+	TestTrue(TEXT("Widget rejects Actor parent"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	TestTrue(TEXT("Widget rejection leaves parent intact"), Widget->ParentClass == UUserWidget::StaticClass());
+	Args->SetStringField(TEXT("AssetPath"), Animation->GetPathName());
+	TestTrue(TEXT("Animation rejects Actor parent"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+	CastChecked<UAnimBlueprint>(Animation.Get())->TargetSkeleton = NewObject<USkeleton>(Animation.Get());
+	CastChecked<UAnimBlueprint>(AnimationParent.Get())->TargetSkeleton = NewObject<USkeleton>(AnimationParent.Get());
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+	Operation->SetStringField(TEXT("ParentClass"), AnimationParent->GetPathName());
+	const auto Incompatible = RelatedCall(TEXT("ManageAssetBlueprint"), Args);
+	TestTrue(TEXT("Different animation skeleton rejected"), Incompatible.HasErrors());
+	TestTrue(TEXT("Animation rejection leaves parent intact"), Animation->ParentClass == UAnimInstance::StaticClass());
+	FEdGraphPinType Integer; Integer.PinCategory = UEdGraphSchema_K2::PC_Int;
+	FBlueprintEditorUtils::AddMemberVariable(Asset.Get(), TEXT("Collision"), Integer, TEXT("17"));
+	FBlueprintEditorUtils::AddMemberVariable(Parent.Get(), TEXT("Collision"), Integer, TEXT("42"));
+	FKismetEditorUtilities::CompileBlueprint(Parent.Get());
+	const FGuid Guid = Asset->NewVariables[0].VarGuid;
+	Args->SetStringField(TEXT("AssetPath"), Asset->GetPathName()); Operation->SetStringField(TEXT("ParentClass"), Parent->GetPathName());
+	TestTrue(TEXT("Inherited member conflict rejected"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	TestTrue(TEXT("Conflict preserves parent and owned member"), Asset->ParentClass == AActor::StaticClass() && Asset->NewVariables[0].VarGuid == Guid && Asset->NewVariables[0].DefaultValue == TEXT("17"));
 	return true;
 }
 

@@ -43,6 +43,17 @@ def test_main_cleans_selected_project_only(tmp_path, monkeypatch):
     assert not (selected / "Content/_McpTest").exists()
 
 
+def test_coverage_failure_stops_before_cleanup_and_launch(monkeypatch):
+    commands = []
+    monkeypatch.setattr(runner, "_ensure_deps", lambda: None)
+    monkeypatch.setattr(runner.subprocess, "call", lambda command: commands.append(command) or 1)
+    monkeypatch.setattr(runner, "_purge_disk_artifacts", lambda *args, **kwargs: pytest.fail("must not clean on audit failure"))
+    monkeypatch.setattr(runner, "_resolve_connection", lambda args: pytest.fail("must not launch on audit failure"))
+    monkeypatch.setattr(sys, "argv", ["run_e2e.py"])
+    assert runner.main() == 1
+    assert len(commands) == 1 and Path(commands[0][1]).name == "audit_e2e_coverage.py"
+
+
 def test_cleanup_removes_only_generated_tag_sources(tmp_path, monkeypatch):
     monkeypatch.syspath_prepend(str(runner.TESTS_DIR))
     from _framework.test_cleanup import purge_disk_test_artifacts

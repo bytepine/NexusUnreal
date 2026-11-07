@@ -557,14 +557,13 @@ def test_interact_runtime_actor_ai_no_controller(mcp, pie, spawned_actors):
     from _framework.capability_probe import is_capability_available
     if not is_capability_available(mcp, "InteractRuntimeActorAI"):
         pytest.skip("interact_runtime_actor_ai 未编入")
-    r = assert_tool_error(mcp.try_call(
+    r = mcp.try_call(
         "InteractRuntimeActorAI",
         Action="MoveTo",
         ActorName=spawned_actors[0],
-        x=0, y=0, z=0,
-    ))
-    entry = cap_first(r)
-    assert entry.get("Error"), r
+        X=0, Y=0, Z=0,
+    )
+    assert r.get("isError") and "no AIController" in str(r), r
 
 
 def test_interact_runtime_actor_behavior_tree(mcp, pie, spawned_actors):

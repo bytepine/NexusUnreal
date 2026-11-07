@@ -22,6 +22,54 @@ class CoverageAuditTests(unittest.TestCase):
         visitor.visit(ast.parse(source))
         return visitor
 
+    def test_loop_registered_actions_come_from_action_enum_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "Manage.cpp").write_text('''
+Out.Name = TEXT("ManageExample");
+Schema.Prop(TEXT("Action"), FNexusSchema::Enum(TEXT("Operation"), {TEXT("Explicit"), TEXT("Loop")}));
+Schema.Prop(TEXT("Mode"), FNexusSchema::Enum({TEXT("NotAnAction")}));
+OutHandlers.Add(TEXT("Explicit"), &Handler);
+for (auto Name : {TEXT("Loop")}) OutHandlers.Add(Name, &Handler);
+''', encoding="utf-8")
+            actions, _ = audit.collect_cpp([root])
+            self.assertEqual(actions, {"ManageExample": ["Explicit", "Loop"]})
+
+    def test_called_wrappers_dict_constructor_and_unused_helpers(self):
+        visitor = self.parse('''
+def unused(mcp):
+    mcp.call("ManageUnused", Operations=[{"Action": "NeverCalled"}])
+def edit(mcp, cap, **op):
+    return mcp.call(cap, Operations=[op])
+def manage(mcp, cap, selector, operation):
+    return mcp.call(cap, **selector, Operations=[operation])
+def test_wrappers(mcp):
+    edit(mcp, "ManageOne", Action="Add")
+    manage(mcp, "ManageTwo", dict(AssetPath="fixture"), dict(Action="Remove"))
+''')
+        self.assertEqual(dict(visitor.actions), {"ManageOne": {"Add"}, "ManageTwo": {"Remove"}})
+        self.assertNotIn("ManageUnused", visitor.mentioned)
+
+    def test_imported_wrapper_and_nested_batches(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "helpers.py").write_text('''
+def edit(mcp, cap, **operation):
+    return mcp.call(cap, Operations=[operation])
+''', encoding="utf-8")
+            (root / "test_example.py").write_text('''
+from helpers import edit as change
+def test_calls(mcp):
+    change(mcp, "ManageWrapped", Action="Update")
+    mcp.call("CallCapability", Calls=[
+        dict(Capability="ManageFirst", Arguments=dict(Operations=[dict(Action="Add")])),
+        dict(Capability="GetSecond", Arguments=dict(Sections=["Details"])),
+    ])
+''', encoding="utf-8")
+            actions, sections, _ = audit.collect_tests(root)
+            self.assertEqual(dict(actions), {"ManageWrapped": {"Update"}, "ManageFirst": {"Add"}})
+            self.assertEqual(dict(sections), {"GetSecond": {"Details"}})
+
     def test_modules_and_inline_sections(self):
         with tempfile.TemporaryDirectory() as tmp:
             roots = []

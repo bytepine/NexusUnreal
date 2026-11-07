@@ -45,6 +45,32 @@ def test_blueprint_graph_plan_and_function_parameters(mcp, require_tools, test_n
     edit(mcp, "ManageAssetBlueprint", path, Action="RemoveFunctionParameter", GraphName="PlanFunction", ParameterName="InputValue", bInput=True)
 
 
+def test_blueprint_component_copy_and_reattach(mcp, require_tools, test_ns):
+    require_tools("CreateAssetBlueprint", "ManageAssetBlueprint", "GetAssetBlueprint")
+    path = f"{test_ns}/BP_ComponentCopy"
+    mcp.call("CreateAssetBlueprint", AssetPath=path, ParentClass="Actor")
+    edit(mcp, "ManageAssetBlueprint", path, Action="AddComponent", ComponentName="Anchor", ComponentClass="SceneComponent")
+    edit(mcp, "ManageAssetBlueprint", path, Action="AddComponent", ComponentName="Probe", ComponentClass="SceneComponent")
+    edit(mcp, "ManageAssetBlueprint", path, Action="SetComponentProperty", ComponentName="Probe", PropertyPath="RelativeLocation.X", Value="19")
+    edit(mcp, "ManageAssetBlueprint", path, Action="CopyComponent", SourceAssetPath=path, SourceComponentName="Probe", ComponentName="Copy")
+    edit(mcp, "ManageAssetBlueprint", path, Action="ReattachComponent", ComponentName="Copy", AttachTo="Anchor")
+    copied = cap_first(mcp.call("GetAssetBlueprint", AssetPath=path, Sections=["Component"], ComponentName="Copy", PropertyPaths=["RelativeLocation.X"]))
+    assert float(copied["Properties"][0]["Value"]) == 19, copied
+    bad = mcp.try_call("ManageAssetBlueprint", AssetPath=path, Operations=[{"Action": "ReattachComponent", "ComponentName": "Anchor", "AttachTo": "Copy"}])
+    assert bad.get("isError") and "descendant" in str(bad), bad
+
+
+def test_blueprint_graph_dsl_validation(mcp, require_tools, test_ns):
+    require_tools("CreateAssetBlueprint", "ManageAssetBlueprint", "GetAssetBlueprint")
+    path = f"{test_ns}/BP_DSLValidation"
+    mcp.call("CreateAssetBlueprint", AssetPath=path, ParentClass="Actor")
+    before = cap_first(mcp.call("GetAssetBlueprint", AssetPath=path, Sections=["GraphOverview"]))
+    bad = mcp.try_call("ManageAssetBlueprint", AssetPath=path, Operations=[{"Action": "WriteGraphDSL", "GraphName": "EventGraph", "Code": ""}])
+    assert bad.get("isError") and "1-65536 characters" in str(bad), bad
+    after = cap_first(mcp.call("GetAssetBlueprint", AssetPath=path, Sections=["GraphOverview"]))
+    assert before == after, (before, after)
+
+
 def test_static_mesh_generated_lods_and_convex(mcp, require_tools, test_ns):
     require_tools("DuplicateAsset", "ManageAssetStaticMesh", "GetAssetStaticMesh")
     path = f"{test_ns}/SM_Generation"
@@ -57,6 +83,20 @@ def test_static_mesh_generated_lods_and_convex(mcp, require_tools, test_ns):
     edit(mcp, "ManageAssetStaticMesh", path, Action="GenerateConvexCollision", HullCount=2, MaxHullVertices=16, HullPrecision=10000)
     edit(mcp, "ManageAssetStaticMesh", path, Action="RemoveLODs")
     assert cap_first(mcp.call("GetAssetStaticMesh", AssetPath=path))["LODCount"] == 1
+
+
+@pytest.mark.skipif_ue_below("5.0")
+def test_static_mesh_nanite_switch(mcp, require_tools, test_ns):
+    require_tools("DuplicateAsset", "ManageAssetStaticMesh", "ExecPython")
+    path = f"{test_ns}/SM_Nanite"
+    mcp.call("DuplicateAsset", AssetPath="/Engine/BasicShapes/Cube", DestAssetPath=path)
+    edit(mcp, "ManageAssetStaticMesh", path, Action="SetNaniteEnabled", bEnabled=True)
+    read_code = f"import unreal\nprint(unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem).get_nanite_settings(unreal.load_asset('{path}')).enabled)"
+    enabled = cap_first(mcp.call("ExecPython", Code=read_code))
+    assert enabled["Output"].strip() == "True", enabled
+    edit(mcp, "ManageAssetStaticMesh", path, Action="SetNaniteEnabled", bEnabled=False)
+    disabled = cap_first(mcp.call("ExecPython", Code=read_code))
+    assert disabled["Output"].strip() == "False", disabled
 
 
 def test_scene_folders_and_selection(mcp, require_tools):

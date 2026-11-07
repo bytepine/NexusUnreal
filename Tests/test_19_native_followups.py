@@ -124,8 +124,10 @@ def test_data_registry_discovery_and_values(mcp, require_tools):
     operation_result(mcp, mcp.call("ControlEditorAutomation", Action="Discover"))
     result = operation_result(mcp, mcp.call("ControlEditorAutomation", Action="Run", TestNames=["NexusLink.DataRegistry.Query"]))
     assert result["Tests"][0]["Outcome"] == "Passed", result
-    missing = mcp.try_call("GetProjectDataRegistry", RegistryName="__NexusUnknownRegistry__", Sections=["Info"])
-    assert missing.get("isError") or "Error" in str(missing), missing
+    # 正向数据回读由上面的原生夹具验证；MCP 边界逐节验证未知 Registry 的明确拒绝。
+    for section in ["Info", "Schema", "Items", "DataSources", "RuntimeSources", "Values"]:
+        missing = mcp.try_call("GetProjectDataRegistry", RegistryName="__NexusUnknownRegistry__", Sections=[section], ItemNames=["Missing"])
+        assert missing.get("isError") and "Registry" in str(missing), missing
 
 
 @pytest.mark.skipif_ue_below("5.8")
