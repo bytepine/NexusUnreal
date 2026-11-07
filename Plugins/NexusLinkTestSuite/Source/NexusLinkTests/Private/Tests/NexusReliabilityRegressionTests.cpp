@@ -131,7 +131,7 @@ bool FNexusPascalCasePayloadTest::RunTest(const FString& Parameters)
 		{
 			for (const auto& Pair : (*Properties)->Values)
 			{
-				const FString Name = Pair.Key;
+				const FString Name(Pair.Key.Len(), *Pair.Key);
 				bool bPascal = !Name.IsEmpty() && (FChar::IsUpper(Name[0])
 					|| (Name.Len() > 1 && Name[0] == TEXT('b') && FChar::IsUpper(Name[1])));
 				for (TCHAR Character : Name) bPascal &= FChar::IsAlnum(Character);

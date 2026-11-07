@@ -72,7 +72,7 @@ bool FNexusLuaValueToJsonStackTest::RunTest(const FString& Parameters)
 		bool bHasExactType = false;
 		for (const auto& Pair : Entry->Values)
 		{
-			bHasExactType |= Pair.Key.Equals(TEXT("Type"), ESearchCase::CaseSensitive);
+			bHasExactType |= FString(Pair.Key.Len(), *Pair.Key).Equals(TEXT("Type"), ESearchCase::CaseSensitive);
 		}
 		TestTrue(TEXT("Type 元数据大小写精确匹配"), bHasExactType);
 	}
