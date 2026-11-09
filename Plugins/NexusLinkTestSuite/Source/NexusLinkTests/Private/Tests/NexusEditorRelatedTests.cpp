@@ -5,6 +5,7 @@
 #include "NexusRelatedDataAsset.h"
 #include "NexusNavigationTestData.h"
 #include "Utils/NexusAssetUtils.h"
+#include "Utils/NexusArgs.h"
 #include "Utils/NexusPropertyUtils.h"
 #include "Utils/NexusVersionCompat.h"
 #include "Utils/NexusJsonUtils.h"
@@ -18,6 +19,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Engine/Level.h"
 #include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Character.h"
@@ -31,6 +33,12 @@
 #include "Animation/AnimBlueprintGeneratedClass.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/Skeleton.h"
+#include "Animation/AnimSequence.h"
+#include "AnimGraphNode_SequencePlayer.h"
+#include "ReferenceSkeleton.h"
+#if NX_UE_HAS_ANIM_SEQUENCE_DATA_MODEL
+#include "Animation/AnimData/IAnimationDataController.h"
+#endif
 #include "Misc/ScopeExit.h"
 #include "Misc/Paths.h"
 #include "Misc/FileHelper.h"
@@ -73,6 +81,130 @@ static TSharedPtr<FJsonObject> RelatedArgs(UObject* Asset, const TSharedPtr<FJso
 static TSharedPtr<FJsonObject> RelatedOperation(const TCHAR* Action)
 {
 	auto Operation = MakeShared<FJsonObject>(); Operation->SetStringField(TEXT("Action"), Action); return Operation;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusFeedbackDefaultsTest, "NexusLink.EditorRelated.FeedbackDefaultsAndReferences", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusFeedbackDefaultsTest::RunTest(const FString& Parameters)
+{
+	TStrongObjectPtr<UBlueprint> Parent(RelatedBlueprint(AActor::StaticClass()));
+	FKismetEditorUtilities::CompileBlueprint(Parent.Get());
+	TStrongObjectPtr<UBlueprint> Child(RelatedBlueprint(Parent->GeneratedClass));
+	FKismetEditorUtilities::CompileBlueprint(Child.Get());
+	ON_SCOPE_EXIT { Parent->GetOutermost()->SetDirtyFlag(false); Child->GetOutermost()->SetDirtyFlag(false); };
+	auto Existing = RelatedOperation(TEXT("SetDefaults")); Existing->SetStringField(TEXT("PropertyPath"), TEXT("InitialLifeSpan")); Existing->SetStringField(TEXT("Value"), TEXT("99"));
+	auto ExistingArgs = RelatedArgs(Child.Get(), Existing); ExistingArgs->SetBoolField(TEXT("bCompile"), true);
+	if (!TestFalse(TEXT("Existing child override fixture"), RelatedCall(TEXT("ManageAssetBlueprint"), ExistingArgs).HasErrors())) return false;
+	UPackage* WorldPackage = CreatePackage(*(TEXT("/Game/_McpTest/DefaultsWorld_") + FGuid::NewGuid().ToString(EGuidFormats::Digits)));
+	UWorld* World = UWorld::CreateWorld(EWorldType::Editor, false, TEXT("DefaultsWorld"), WorldPackage);
+	ON_SCOPE_EXIT { WorldPackage->SetDirtyFlag(false); World->DestroyWorld(false); };
+	AActor* Placed = World->SpawnActor<AActor>(Child->GeneratedClass);
+	if (!TestNotNull(TEXT("Placed child fixture"), Placed)) return false;
+	const FString ActorName = Placed->GetName();
+	auto Operation = RelatedOperation(TEXT("AddVariable"));
+	Operation->SetStringField(TEXT("VariableName"), TEXT("Distance"));
+	Operation->SetStringField(TEXT("VariableType"), TEXT("float"));
+	Operation->SetStringField(TEXT("DefaultValue"), TEXT("120"));
+	Operation->SetBoolField(TEXT("bIsPublic"), true);
+	auto Args = RelatedArgs(Parent.Get(), Operation); Args->SetBoolField(TEXT("bCompile"), true);
+	if (!TestFalse(TEXT("Add configured inherited variable"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors())) return false;
+	FKismetEditorUtilities::CompileBlueprint(Child.Get());
+	FProperty* Property = FindFProperty<FProperty>(Parent->GeneratedClass, TEXT("Distance"));
+	TestTrue(TEXT("Instance editable"), Property && !Property->HasAnyPropertyFlags(CPF_DisableEditOnInstance));
+	FString Value, Error;
+	void* ChildValue = nullptr; FProperty* ChildProperty = nullptr;
+	if (TestTrue(TEXT("Child reads parent default"), FNexusPropertyUtils::ResolvePropertyWrite(Child->GeneratedClass->GetDefaultObject(), {TEXT("Distance")}, 0, ChildProperty, ChildValue, Error)))
+		FNexusPropertyUtils::ExportText(ChildProperty, Value, ChildValue);
+	TestEqual(TEXT("Default propagated"), FCString::Atod(*Value), 120.0);
+	const auto ReadNumber = [&](UObject* Object, const TCHAR* Name) {
+		FProperty* Field = nullptr; void* Address = nullptr; FString Text, ReadError;
+		if (!FNexusPropertyUtils::ResolvePropertyWrite(Object, {Name}, 0, Field, Address, ReadError)) { AddError(ReadError); return -1.0; }
+		FNexusPropertyUtils::ExportText(Field, Text, Address); return FCString::Atod(*Text);
+	};
+	AActor* CurrentActor = FindObject<AActor>(World->PersistentLevel, *ActorName);
+	TestEqual(TEXT("Placed instance inherits new default"), ReadNumber(CurrentActor, TEXT("Distance")), 120.0);
+	TestEqual(TEXT("Existing CDO override retained"), ReadNumber(Child->GeneratedClass->GetDefaultObject(), TEXT("InitialLifeSpan")), 99.0);
+	TestEqual(TEXT("Existing actor override retained"), ReadNumber(CurrentActor, TEXT("InitialLifeSpan")), 99.0);
+	auto Editable = RelatedOperation(TEXT("SetVariableEditable")); Editable->SetStringField(TEXT("VariableName"), TEXT("Distance")); Editable->SetBoolField(TEXT("bEditable"), false);
+	TestFalse(TEXT("Disable instance editing"), RelatedCall(TEXT("ManageAssetBlueprint"), RelatedArgs(Parent.Get(), Editable)).HasErrors());
+	auto Read = MakeShared<FJsonObject>(); Read->SetStringField(TEXT("AssetPath"), Parent->GetPathName()); Read->SetArrayField(TEXT("Sections"), {MakeShared<FJsonValueString>(TEXT("Variable"))});
+	const auto Variables = RelatedCall(TEXT("GetAssetBlueprint"), Read);
+	if (!TestFalse(TEXT("Read editable flag"), Variables.HasErrors())) return false;
+	TestFalse(TEXT("Getter reports actual instance editability"), FNexusArgs(Variables.Entries[0]->AsObject()->GetArrayField(TEXT("Variables"))[0]->AsObject()).Bool(TEXT("bIsPublic")));
+	Operation->SetStringField(TEXT("VariableName"), TEXT("ActorClass"));
+	Operation->SetStringField(TEXT("VariableType"), TEXT("ClassReference</Script/Engine.Actor>"));
+	Operation->RemoveField(TEXT("DefaultValue"));
+	Args = RelatedArgs(Child.Get(), Operation); Args->SetBoolField(TEXT("bCompile"), true);
+	if (!TestFalse(TEXT("Class property fixture"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors())) return false;
+	auto Edit = RelatedOperation(TEXT("SetDefaults"));
+	Edit->SetStringField(TEXT("PropertyPath"), TEXT("ActorClass"));
+	Edit->SetStringField(TEXT("Value"), TEXT("Class'/Script/Engine.Character'"));
+	auto PreviewArgs = RelatedArgs(Child.Get(), Edit); PreviewArgs->SetStringField(TEXT("Capability"), TEXT("ManageAssetBlueprint"));
+	const auto Preview = RelatedCall(TEXT("GetAssetEditPreview"), PreviewArgs);
+	TestFalse(TEXT("Class reference preview"), Preview.HasErrors());
+	Args = RelatedArgs(Child.Get(), Edit); Args->SetBoolField(TEXT("bCompile"), true); Args->SetBoolField(TEXT("bVerify"), true);
+	Edit->SetStringField(TEXT("ExpectedValue"), TEXT("None"));
+	TestFalse(TEXT("Class reference verified write"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	Edit->SetStringField(TEXT("Value"), TEXT("Class'/Script/CoreUObject.Object'"));
+	Edit->RemoveField(TEXT("ExpectedValue"));
+	TestTrue(TEXT("Incompatible class rejected"), RelatedCall(TEXT("GetAssetEditPreview"), PreviewArgs).HasErrors());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusFeedbackRetargetTest, "NexusLink.EditorRelated.FeedbackRetarget", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusFeedbackRetargetTest::RunTest(const FString& Parameters)
+{
+	UPackage* Package = CreatePackage(*(TEXT("/Game/_McpTest/Retarget_") + FGuid::NewGuid().ToString(EGuidFormats::Digits)));
+	TStrongObjectPtr<USkeleton> Source(NewObject<USkeleton>(Package, TEXT("Source"), RF_Public | RF_Standalone));
+	TStrongObjectPtr<USkeleton> Target(NewObject<USkeleton>(Package, TEXT("Target"), RF_Public | RF_Standalone));
+	for (USkeleton* Skeleton : {Source.Get(), Target.Get()})
+	{
+		FReferenceSkeletonModifier Modifier(const_cast<FReferenceSkeleton&>(Skeleton->GetReferenceSkeleton()), Skeleton);
+		Modifier.Add(FMeshBoneInfo(TEXT("root"), TEXT("root"), INDEX_NONE), FTransform::Identity);
+	}
+	TStrongObjectPtr<UAnimSequence> Sequence(NewObject<UAnimSequence>(Package, TEXT("Sequence"), RF_Public | RF_Standalone));
+	Sequence->SetSkeleton(Source.Get());
+#if NX_UE_HAS_ANIM_SEQUENCE_DATA_MODEL
+	auto& Controller = Sequence->GetController(); Controller.InitializeModel();
+	Controller.SetFrameRate(FFrameRate(30, 1)); Controller.SetNumberOfFrames(FFrameNumber(1));
+	Controller.AddBoneCurve(TEXT("root"));
+	Controller.SetBoneTrackKeys(TEXT("root"), {FVector3f::ZeroVector, FVector3f::ZeroVector}, {FQuat4f::Identity, FQuat4f::Identity}, {FVector3f::OneVector, FVector3f::OneVector});
+#else
+	FRawAnimSequenceTrack Track; Track.PosKeys.Add(FVector::ZeroVector); Track.RotKeys.Add(FQuat::Identity); Track.ScaleKeys.Add(FVector::OneVector);
+	Sequence->AddNewRawTrack(TEXT("root"), &Track); Sequence->SetRawNumberOfFrame(1); Sequence->SequenceLength = 1.f / 30.f;
+	Sequence->PostProcessSequence();
+#endif
+	ON_SCOPE_EXIT { Package->SetDirtyFlag(false); };
+	auto Operation = RelatedOperation(TEXT("Retarget")); Operation->SetStringField(TEXT("TargetSkeleton"), Target->GetPathName());
+	Operation->SetBoolField(TEXT("bValidateOnly"), true);
+	auto Args = RelatedArgs(Sequence.Get(), Operation);
+	TestFalse(TEXT("Sequence retarget preflight"), RelatedCall(TEXT("ManageAssetAnimSequence"), Args).HasErrors());
+	TestTrue(TEXT("Preflight keeps source skeleton"), Sequence->GetSkeleton() == Source.Get());
+	Operation->SetBoolField(TEXT("bValidateOnly"), false);
+	TestTrue(TEXT("Retarget requires acknowledgment"), RelatedCall(TEXT("ManageAssetAnimSequence"), Args).HasErrors());
+	Operation->SetBoolField(TEXT("bAllowPotentialDataLoss"), true);
+	TestFalse(TEXT("Sequence retarget"), RelatedCall(TEXT("ManageAssetAnimSequence"), Args).HasErrors());
+	TestTrue(TEXT("Sequence uses target skeleton"), Sequence->GetSkeleton() == Target.Get());
+	TStrongObjectPtr<UBlueprint> Blueprint(RelatedBlueprint(UAnimInstance::StaticClass(), UAnimBlueprint::StaticClass(), UAnimBlueprintGeneratedClass::StaticClass()));
+	CastChecked<UAnimBlueprint>(Blueprint.Get())->TargetSkeleton = Source.Get();
+	FKismetEditorUtilities::CompileBlueprint(Blueprint.Get());
+	ON_SCOPE_EXIT { Blueprint->GetOutermost()->SetDirtyFlag(false); };
+	Args = RelatedArgs(Blueprint.Get(), Operation); Args->SetBoolField(TEXT("bCompile"), true);
+	TStrongObjectPtr<UAnimSequence> Original(DuplicateObject<UAnimSequence>(Sequence.Get(), Package, TEXT("Original")));
+	Original->SetSkeleton(Source.Get());
+	auto AddNode = RelatedOperation(TEXT("AddNode")); AddNode->SetStringField(TEXT("GraphName"), TEXT("AnimGraph"));
+	AddNode->SetStringField(TEXT("NodeClass"), TEXT("SequencePlayer")); AddNode->SetStringField(TEXT("SequencePath"), Original->GetPathName());
+	const auto Added = RelatedCall(TEXT("ManageAssetAnimBlueprint"), RelatedArgs(Blueprint.Get(), AddNode));
+	if (!TestFalse(TEXT("Animation reference fixture"), Added.HasErrors())) return false;
+	TestTrue(TEXT("Unmapped animation rejected"), RelatedCall(TEXT("ManageAssetAnimBlueprint"), Args).HasErrors());
+	auto Remap = MakeShared<FJsonObject>(); Remap->SetStringField(TEXT("SourceAssetPath"), Original->GetPathName()); Remap->SetStringField(TEXT("TargetAssetPath"), Sequence->GetPathName());
+	Operation->SetArrayField(TEXT("AnimationRemaps"), {MakeShared<FJsonValueObject>(Remap)});
+	TestFalse(TEXT("Blueprint retarget"), RelatedCall(TEXT("ManageAssetAnimBlueprint"), Args).HasErrors());
+	TestTrue(TEXT("Blueprint uses target skeleton"), CastChecked<UAnimBlueprint>(Blueprint.Get())->TargetSkeleton == Target.Get());
+	TArray<UAnimGraphNode_SequencePlayer*> Players;
+	FBlueprintEditorUtils::GetAllNodesOfClass(Blueprint.Get(), Players);
+	TestTrue(TEXT("Animation node remapped"), Players.Num() == 1 && Players[0]->GetAnimationAsset() == Sequence.Get());
+	TestTrue(TEXT("Source animation is unchanged"), Original->GetSkeleton() == Source.Get());
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusRelatedTypesTest, "NexusLink.EditorRelated.VariableTypes", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

@@ -254,3 +254,5 @@ C++ `NexusLink.EditorOperations` 覆盖操作归属、最终压缩输出 Schema�
 `test_19_native_followups.py` 覆盖 PCG 参数/子图/实例覆盖及读回、PhysicsAsset 创建和精细编辑、Tag INI 生命周期，以及 DataRegistry 真实表行/缓存缺失。Tag 写入回归必须使用独立 Config 副本，避免引擎重命名 Redirect 写回用户配置；DataRegistry 使用临时内存夹具并只注销本用例对象。
 
 `test_21_editor_followups.py` 覆盖 UMG 重命名/变量/委托与 UIComponent、材质及函数图整理、类型化设置、内容插件生命周期、Sequence 文件夹/条件/FBX 和原生 AnimMixer。持久化工程设置与插件用例仅在显式设置 `NEXUS_PERSISTENT_EDIT_FIXTURE=1` 的隔离可写宿主运行；Outliner/自定义绑定转换用例需 `--gui` 与 UE5.8。
+
+`test_25_feedback_nov09.py` 覆盖变量默认值继承、ClassReference 预览/验证、旧式动画与 ABP Retarget，以及导航体积几何与异步构建/保存；地图写入使用测试地图，原地图存在未保存更改时跳过切换。L1 的 `NexusLink.EditorRelated.Feedback*` 和 `NexusLink.Utils.PinType.ParsePrimitives` 覆盖对应引擎行为。

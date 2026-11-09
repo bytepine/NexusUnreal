@@ -77,6 +77,19 @@ bool FNexusLinkPinTypeUtilsTest::RunTest(const FString& Parameters)
 
 	// 失败路径
 	{
+		FEdGraphPinType Pin; FString Error;
+		for (const TCHAR* Type : {TEXT("ClassReference</Script/Engine.Actor>"), TEXT("Array<ClassReference</Script/Engine.Actor>>"), TEXT("Map<name,ClassReference</Script/Engine.Actor>>")})
+		{
+			if (!TestTrue(Type, FNexusPinTypeUtils::ParsePinType(Type, Pin, Error))) continue;
+			TestEqual(TEXT("Class pin"), Pin.IsMap() ? Pin.PinValueType.TerminalCategory : Pin.PinCategory, UEdGraphSchema_K2::PC_Class);
+			const FString Canonical = FNexusPinTypeUtils::DescribePinType(Pin)->GetStringField(TEXT("CanonicalType"));
+			FEdGraphPinType RoundTrip;
+			TestTrue(TEXT("Class reference round trip"), FNexusPinTypeUtils::ParsePinType(Canonical, RoundTrip, Error) && RoundTrip == Pin);
+		}
+		for (const TCHAR* Unsafe : {TEXT("/Script/CoreUObject.Class"), TEXT("Array</Script/CoreUObject.Class>"), TEXT("ClassReference<ClassReference<Actor>>")})
+			TestFalse(Unsafe, FNexusPinTypeUtils::ParsePinType(Unsafe, Pin, Error));
+	}
+	{
 		FEdGraphPinType Pin; FString Err;
 		TestTrue(TEXT("Native struct array"), FNexusPinTypeUtils::ParsePinType(TEXT("/Script/CoreUObject.Vector[]"), Pin, Err));
 		TestTrue(TEXT("Array container"), Pin.ContainerType == EPinContainerType::Array);
