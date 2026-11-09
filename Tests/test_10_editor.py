@@ -253,12 +253,18 @@ def test_manage_asset_lua_binding(test_ns, mcp):
     r = mcp.call_capability(
         "ManageAssetLuaBinding",
         AssetPath=bp,
+        bCompile=True,
         Operations=[{"Action": "Bind", "ModuleName": "Script.BP_LuaBind"}],
     )
     entry = cap_first(r)
-    assert not entry.get("Error"), r
+    assert entry.get("bModuleNameWritten"), r
     got = cap_first(mcp.call_capability("GetAssetLuaBinding", AssetPath=bp))
-    assert not got.get("Error"), got
+    assert got.get("bBound") and got.get("ModuleName") == "Script.BP_LuaBind", got
+    # 重复绑定更新常量，不重复添加接口。
+    mcp.call_capability("ManageAssetLuaBinding", AssetPath=bp, bCompile=True,
+                        Operations=[{"Action": "Bind", "ModuleName": "Script.BP_LuaRebind"}])
+    got = cap_first(mcp.call_capability("GetAssetLuaBinding", AssetPath=bp))
+    assert got.get("ModuleName") == "Script.BP_LuaRebind", got
     with pytest.raises(MCPError):
         mcp.call_capability(
             "ManageAssetLuaBinding",
@@ -268,6 +274,7 @@ def test_manage_asset_lua_binding(test_ns, mcp):
     unbind = mcp.call_capability(
         "ManageAssetLuaBinding",
         AssetPath=bp,
+        bCompile=True,
         Operations=[{"Action": "Unbind"}],
     )
     assert isinstance(cap_first(unbind), dict), unbind

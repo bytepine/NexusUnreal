@@ -359,11 +359,11 @@ bool FNexusLinkFeedbackProxyTest::RunTest(const FString& /*Parameters*/)
 
 		TestTrue(TEXT("Report has proxy section"), MdContent.Contains(TEXT("## §9 代理层错误")));
 		TestTrue(TEXT("Report mentions vscode proxy_timeout"),
-			MdContent.Contains(TEXT("vscode")) && MdContent.Contains(TEXT("proxy_timeout")));
+			MdContent.Contains(TEXT("| `vscode` | `ProxyTimeout` | 1 |")));
 		TestTrue(TEXT("Report mentions rider proxy_disconnect"),
-			MdContent.Contains(TEXT("rider")) && MdContent.Contains(TEXT("proxy_disconnect")));
+			MdContent.Contains(TEXT("| `rider` | `ProxyDisconnect` | 1 |")));
 		TestTrue(TEXT("Report mentions desktop proxy_connect_fail"),
-			MdContent.Contains(TEXT("desktop")) && MdContent.Contains(TEXT("proxy_connect_fail")));
+			MdContent.Contains(TEXT("| `desktop` | `ProxyConnectFail` | 1 |")));
 	}
 
 	return true;
