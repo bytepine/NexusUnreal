@@ -1,5 +1,5 @@
 # Copyright byteyang. All Rights Reserved.
-"""原生 Toolset / 引擎兼容实现：参数、结构、读写回环与拒绝后无额外写入。"""
+"""独立引擎实现：参数、结构、读写回环与拒绝后无额外写入。"""
 import json
 import uuid
 import pytest
@@ -9,8 +9,10 @@ from test_19_remaining_toolsets import reference
 
 
 def editor(mcp, capability, **arguments):
-    result = operation_result(mcp, mcp.call(capability, **arguments))
-    return result.get("OfficialResult", result.get("CompatibilityResult", result))
+    response = cap_first(mcp.call(capability, **arguments))
+    assert response["Backend"] == "Independent", response
+    result = operation_result(mcp, response)
+    return result.get("CompatibilityResult", result.get("OfficialResult", result))
 
 
 def edit(mcp, capability, path, **operation):
@@ -66,9 +68,42 @@ def test_blueprint_graph_dsl_validation(mcp, require_tools, test_ns):
     mcp.call("CreateAssetBlueprint", AssetPath=path, ParentClass="Actor")
     before = cap_first(mcp.call("GetAssetBlueprint", AssetPath=path, Sections=["GraphOverview"]))
     bad = mcp.try_call("ManageAssetBlueprint", AssetPath=path, Operations=[{"Action": "WriteGraphDSL", "GraphName": "EventGraph", "Code": ""}])
-    assert bad.get("isError") and "1-65536 characters" in str(bad), bad
+    assert bad.get("isError") and "UnrealGraphText" in str(bad), bad
     after = cap_first(mcp.call("GetAssetBlueprint", AssetPath=path, Sections=["GraphOverview"]))
     assert before == after, (before, after)
+
+
+def test_blueprint_graph_text_roundtrip_and_rejected_format(mcp, require_tools, test_ns):
+    require_tools("CreateAssetBlueprint", "ManageAssetBlueprint", "GetAssetBlueprint")
+    path = f"{test_ns}/BP_GraphTextRoundtrip"
+    mcp.call("CreateAssetBlueprint", AssetPath=path, ParentClass="Actor")
+    edit(mcp, "ManageAssetBlueprint", path, Action="AddVariable", VariableName="RoundtripValue", VariableType="float")
+    for graph in ("CopySource", "CopyTarget"):
+        edit(mcp, "ManageAssetBlueprint", path, Action="AddFunction", FunctionName=graph)
+    edit(mcp, "ManageAssetBlueprint", path, Action="WriteGraphPlan", GraphName="CopySource",
+         GraphNodes=[{"Id": "Read", "NodeClass": "K2Node_VariableGet", "VariableName": "RoundtripValue"},
+                     {"Id": "Write", "NodeClass": "K2Node_VariableSet", "VariableName": "RoundtripValue"}],
+         GraphLinks=[{"From": "Read", "FromPin": "RoundtripValue", "To": "Write", "ToPin": "RoundtripValue"}])
+    source = cap_first(mcp.call("GetAssetBlueprint", AssetPath=path, Sections=["GraphDSL"], GraphName="CopySource"))["GraphDSL"]
+    assert source["Format"] == "UnrealGraphText" and source["NodeCount"] == 2 and source["bAppendOnly"], source
+    assert source["Code"].lstrip().startswith("Begin Object"), source
+    target_before = cap_first(mcp.call("GetAssetBlueprint", AssetPath=path, Sections=["GraphDSL"], GraphName="CopyTarget"))["GraphDSL"]
+    imported = edit(mcp, "ManageAssetBlueprint", path, Action="WriteGraphDSL", GraphName="CopyTarget", Code=source["Code"])
+    assert imported["Backend"] == "Independent" and imported["Format"] == "UnrealGraphText", imported
+    assert len(imported["Nodes"]) == 2 and len({node["NodeId"] for node in imported["Nodes"]}) == 2, imported
+    after = cap_first(mcp.call("GetAssetBlueprint", AssetPath=path, Sections=["GraphDSL"], GraphName="CopyTarget"))["GraphDSL"]
+    assert after["NodeCount"] == target_before["NodeCount"] + source["NodeCount"], after
+    assert "RoundtripValue" in after["Code"], after
+    node = imported["Nodes"][0]["NodeId"]
+    connected = cap_first(mcp.call("GetAssetBlueprint", AssetPath=path, Sections=["Subgraph"], GraphName="CopyTarget", NodeId=node))
+    assert len(connected["Subgraph"]) == 2, connected
+    for invalid in ("(event UnsupportedLegacyDsl)", "Begin Object ThisIsNotValidGraphText"):
+        rejected = mcp.try_call("ManageAssetBlueprint", AssetPath=path,
+                                Operations=[{"Action": "WriteGraphDSL", "GraphName": "CopyTarget", "Code": invalid}])
+        assert rejected.get("isError"), rejected
+        unchanged = cap_first(mcp.call("GetAssetBlueprint", AssetPath=path, Sections=["GraphDSL"], GraphName="CopyTarget"))["GraphDSL"]
+        assert unchanged == after, (after, unchanged)
+
 
 
 def test_static_mesh_generated_lods_and_convex(mcp, require_tools, test_ns):

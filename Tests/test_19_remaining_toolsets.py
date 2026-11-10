@@ -1,5 +1,5 @@
 # Copyright byteyang. All Rights Reserved.
-"""动画分段/关键帧闭环、Niagara 深层写入、Game Features 与自定义工具发现。"""
+"""动画分段/关键帧闭环、Niagara 深层写入、Game Features 与自有能力发现。"""
 import json
 import os
 import uuid
@@ -62,46 +62,44 @@ def test_sequencer_section_and_typed_keys(mcp, require_tools, test_ns):
     assert "section" in str(error.value).lower(), str(error.value)
 
 
-@pytest.mark.skipif_ue_below("5.8")
-def test_custom_toolset_discovery_and_unregister(mcp, require_tools):
-    native_domain(mcp, require_tools, "GetProjectToolsets", "ToolsetRegistry")
-    require_tools("ExecPython")
-    suffix = uuid.uuid4().hex[:8]
-    classname = "NexusDiscoveryFixture_" + suffix
-    code = f"""import unreal, toolset_registry
-@unreal.uclass()
-class {classname}(unreal.ToolsetDefinition):
-    @toolset_registry.tool_call
-    @staticmethod
-    def inspect_value(input_name: str) -> str:
-        \"\"\"Return the fixture input.\"\"\"
-        return input_name
-unreal.ToolsetRegistry.register_toolset_class({classname})
-"""
-    mcp.call("ExecPython", Code=code)
-    try:
-        listed = cap_first(mcp.call("GetProjectToolsets", Sections=["Toolsets"], NameFilter=classname))
-        items = merge_with_defaults(listed["Toolsets"], listed.get("Toolsets_defaults", {}))
-        assert len(items) == 1, listed
-        name = items[0]["Name"]
-        tools = cap_first(mcp.call("GetProjectToolsets", Sections=["Tools"], ToolsetName=name))
-        tool = tools["Tools"][0]["Name"]
-        schema = cap_first(mcp.call("GetProjectToolsets", Sections=["Schema"], ToolsetName=name, ToolName=tool))["Schema"]
-        assert "input_name" in schema["inputSchema"]["properties"], schema
-        denied = mcp.try_call("ControlEditorAnimation", Action=tool, Parameters={"input_name": "no arbitrary execution"})
-        assert denied.get("isError"), denied
-        routes = cap_first(mcp.call("GetProjectToolsets", Sections=["AnimationRoutes"], Limit=100))
-        assert routes["Total"] >= 59, routes
-        for route in merge_with_defaults(routes["AnimationRoutes"], routes.get("AnimationRoutes_defaults", {})):
-            assert route["bAvailable"], route
-            schema = cap_first(mcp.call("GetProjectToolsets", Sections=["Schema"], ToolsetName=route["ToolsetName"], ToolName=route["ToolName"]))["Schema"]
-            assert schema["name"] == route["ToolName"], route
-    finally:
-        mcp.call("ExecPython", Code=f"unreal.ToolsetRegistry.unregister_toolset_class({classname})")
-    listed = cap_first(mcp.call("GetProjectToolsets", NameFilter=classname))
-    assert listed["Total"] == 0, listed
-    invalid = mcp.try_call("GetProjectToolsets", Sections=["Schema"], ToolsetName=name, ToolName=tool)
-    assert invalid.get("isError"), invalid
+def test_independent_capability_groups_and_action_schemas(mcp, require_tools):
+    require_tools("GetProjectToolsets", "GetProjectSettings", "GetEditorAnimation", "ControlEditorAnimation")
+    listed = cap_first(mcp.call("GetProjectToolsets", Sections=["Toolsets"], Limit=500))
+    assert listed["Backend"] == "Independent" and listed["Total"] > 0, listed
+    groups = merge_with_defaults(listed["Toolsets"], listed.get("Toolsets_defaults", {}))
+    assert len(groups) == listed["Total"], listed
+    assert all(group["Name"].startswith("NexusLink.") and group["ToolCount"] > 0 for group in groups), groups
+    found = None
+    for group in groups:
+        response = cap_first(mcp.call("GetProjectToolsets", Sections=["Tools"], ToolsetName=group["Name"], Limit=500))
+        assert response["Backend"] == "Independent" and response["Total"] == group["ToolCount"], response
+        tools = merge_with_defaults(response["Tools"], response.get("Tools_defaults", {}))
+        assert all(tool["Backend"] == "Independent" for tool in tools), tools
+        if any(tool["Name"] == "GetProjectSettings" for tool in tools):
+            found = group["Name"]
+            break
+    assert found is not None, groups
+    schema = cap_first(mcp.call("GetProjectToolsets", Sections=["Schema"],
+                                ToolsetName=found, ToolName="GetProjectSettings"))["Schema"]
+    assert schema["Name"] == "GetProjectSettings" and schema["Backend"] == "Independent", schema
+    assert schema["InputSchema"]["type"] == "object" and "Sections" in schema["InputSchema"]["properties"], schema
+    for arguments in ({"Sections": ["Tools"], "ToolsetName": "__UnknownIndependentGroup__"},
+                      {"Sections": ["Schema"], "ToolsetName": found, "ToolName": "__UnknownCapability__"},
+                      {"Sections": ["Schema"], "ToolsetName": "ToolsetRegistry.AgentSkillToolset", "ToolName": "GetProjectSkills"}):
+        invalid = mcp.try_call("GetProjectToolsets", **arguments)
+        assert invalid.get("isError"), invalid
+    denied = mcp.try_call("ControlEditorAnimation", Action="GetProjectSettings", Parameters={})
+    assert denied.get("isError"), denied
+    routes = cap_first(mcp.call("GetProjectToolsets", Sections=["AnimationRoutes"], Limit=500))
+    rows = merge_with_defaults(routes["AnimationRoutes"], routes.get("AnimationRoutes_defaults", {}))
+    assert routes["Total"] >= 59 and len(rows) == routes["Total"], routes
+    key = next(row for row in rows if row["Capability"] == "ControlEditorAnimation" and row["Name"] == "AddFloatKey")
+    assert key["Backend"] == "Independent" and key["bSupported"], key
+    assert {"section", "channel_name", "frame", "value"} <= key["InputSchema"]["properties"].keys(), key
+    for row in rows:
+        assert row["Backend"] == "Independent" and isinstance(row["bSupported"], bool) and row["Reason"], row
+        if row["bSupported"]:
+            assert row["InputSchema"]["type"] == "object", row
 
 
 @pytest.mark.skipif_ue_below("5.8")
@@ -143,11 +141,10 @@ def test_niagara_deep_system_write_and_variable_readback(mcp, require_tools, tes
         official(mcp, "GetEditorNiagara", Action="RendererData", AssetPath=system["refPath"], EmitterName=emitter["emitterName"], RendererIndex=renderer["rendererIndex"])
 
 
-@pytest.mark.skipif_ue_below("5.8")
-def test_toolset_registry_filters(mcp, require_tools):
+def test_independent_discovery_contract(mcp, require_tools):
     native_domain(mcp, require_tools, "GetProjectToolsets", "ToolsetRegistry")
     operation_result(mcp, mcp.call("ControlEditorAutomation", Action="Discover"))
-    result = operation_result(mcp, mcp.call("ControlEditorAutomation", Action="Run", TestNames=["NexusLink.Toolsets.DiscoveryFilters"]))
+    result = operation_result(mcp, mcp.call("ControlEditorAutomation", Action="Run", TestNames=["NexusLink.Independent.DiscoveryContract"]))
     assert result["Tests"][0]["Outcome"] == "Passed", result
 
 
@@ -205,7 +202,8 @@ def test_control_rig_bake_and_control_key(mcp, require_tools, test_ns):
         assert animation(mcp, "OpenSequence", {"sequence": sequence}, write=True)["bApplied"]
         assert animation(mcp, "BakeToControlRig", {"sequence": sequence, "binding": binding, "control_rig_asset_path": rig_path,
                         "reduce_keys": False, "tolerance": 0.001, "reset_controls": True}, write=True)["bApplied"]
-        controls = animation(mcp, "Controls", {"sequence": sequence, "control_rig_asset_path": rig_path})["Items"]
+        controls_result = animation(mcp, "Controls", {"sequence": sequence, "control_rig_asset_path": rig_path})
+        controls = merge_with_defaults(controls_result["Items"], controls_result.get("Items_defaults", {}))
         name = next(control["name"] for control in controls if control["type"] == "EULER_TRANSFORM")
         control = {"sequence": sequence, "control_rig_asset_path": rig_path, "control_name": name, "frame": 0}
         assert animation(mcp, "SetRigTransform", dict(control, location_x=12.5, location_y=3.0, location_z=2.0,

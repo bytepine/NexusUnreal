@@ -11,6 +11,7 @@ from _framework.asset_helpers import first_asset_path
 from _framework.mcp_client import cap_first, cap_entries
 from _framework.assertions import merge_with_defaults
 from test_15_editor_operations import operation_result
+from test_17_native_toolsets import assert_pcg_grid_points, pcg_actor_path
 from test_20_editor_compatibility import editor
 
 
@@ -20,7 +21,7 @@ def test_gap_action_schema_discovery(mcp, require_tools):
                              Capability="ControlEditorAnimation", Action="AddFloatKey"))["Actions"]
     assert len(rows) == 1, rows
     action = rows[0]
-    assert action["bSupported"] and action["Backend"] in ("EngineCompatibility", "OfficialToolset"), action
+    assert action["bSupported"] and action["Backend"] == "Independent", action
     schema = action["InputSchema"]
     assert {"section", "channel_name", "frame", "value"} <= schema["properties"].keys(), schema
     assert action["MinimumVersion"] and action["Prerequisites"], action
@@ -29,7 +30,7 @@ def test_gap_action_schema_discovery(mcp, require_tools):
     assert len(rows) == 1 and isinstance(rows[0]["bSupported"], bool) and rows[0]["Reason"], rows
     for name, compatibility_minimum in (("SetSectionCondition", "5.5"), ("MixerAddMixerLayer", "5.8")):
         row = cap_first(mcp.call("GetProjectToolsets", Sections=["Actions"], Capability="ControlEditorAnimation", Action=name))["Actions"][0]
-        assert row["MinimumVersion"] == ("5.8" if row["Backend"] == "OfficialToolset" else compatibility_minimum), row
+        assert row["Backend"] == "Independent" and row["MinimumVersion"] == compatibility_minimum, row
 
 
 def test_gap_widget_sequential_plan_and_preconditions(mcp, require_tools, test_ns):
@@ -225,14 +226,12 @@ def test_gap_compat_pcg_execute_and_points(mcp, require_tools, test_ns):
         "Action": "AddEdge", "FromNodeId": grid["Id"], "FromPin": grid["OutputPins"][0],
         "ToNodeId": graph["OutputNode"]["Id"], "ToPin": graph["OutputNode"]["InputPins"][0]}])
     spawned = editor(mcp, "ControlEditorPCG", Action="Spawn", AssetPath=path, ActorName="NexusPcgGapProbe")
-    actor = spawned.get("ActorPath")
-    if not actor:
-        pytest.skip("Native backend has a different actor-reference envelope; covered by native PCG tests")
+    actor = pcg_actor_path(spawned)
     try:
-        editor(mcp, "ControlEditorPCG", Action="Execute", ActorPath=actor)
+        executed = editor(mcp, "ControlEditorPCG", Action="Execute", ActorPath=actor)
+        assert executed["bGenerationFinished"] is True and executed["ActorPath"] == actor, executed
         data = editor(mcp, "GetEditorPCG", Action="NodeData", ActorPath=actor, NodePath=grid["Path"], PinLabel=grid["OutputPins"][0], Limit=2)
-        assert 0 < data["Returned"] <= 2 and data["Total"] >= data["Returned"], data
-        assert "Density" in merge_with_defaults(data["Items"], data.get("Items_defaults", {}))[0], data
+        assert_pcg_grid_points(data, 2)
     finally:
         mcp.call("ExecPython", Code=f"import unreal\na=unreal.find_object(None,{actor!r})\nif a: unreal.EditorLevelLibrary.destroy_actor(a)")
 

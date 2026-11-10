@@ -149,7 +149,7 @@ def test_sequence_folder_lifecycle(mcp,require_tools,test_ns):
 def test_sequence_fbx_export(mcp,require_tools,test_ns,pytestconfig):
     isolated_edits();require_tools("ControlEditorAnimation","GetEditorAnimation","ExecPython")
     path=f"{test_ns}/LS_Fbx";mcp.call("CreateAssetLevelSequence",AssetPath=path)
-    fixture=cap_first(mcp.call("ExecPython",Code=f"import unreal,json\nfbx_actor=unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.CameraActor,unreal.Vector())\nfbx_sequence=unreal.load_asset('{path}')\nfbx_binding=fbx_sequence.add_possessable(fbx_actor)\nprint(json.dumps({{'world':unreal.EditorLevelLibrary.get_editor_world().get_path_name(),'guid':fbx_binding.get_id().to_string()}}))"))
+    fixture=cap_first(mcp.call("ExecPython",Code=f"import unreal,json\nfbx_actor=unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.CameraActor,unreal.Vector())\nfbx_sequence=unreal.load_asset('{path}')\nfbx_sequence.set_playback_start(0)\nfbx_sequence.set_playback_end(24)\nfbx_binding=fbx_sequence.add_possessable(fbx_actor)\nprint(json.dumps({{'world':unreal.EditorLevelLibrary.get_editor_world().get_path_name(),'guid':fbx_binding.get_id().to_string()}}))"))
     data=json.loads(fixture["Output"].strip().splitlines()[-1])
     output=Path(pytestconfig.getoption("--uproject")).resolve().parent/"Saved"/("NexusFbx_"+uuid.uuid4().hex+".fbx")
     try:

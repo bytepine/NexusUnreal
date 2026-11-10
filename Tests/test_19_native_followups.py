@@ -1,28 +1,15 @@
 # Copyright byteyang. All Rights Reserved.
 """PCG 参数闭环、PhysicsAsset 精细编辑、Tag 配置与 DataRegistry 查询。"""
 import uuid
-import json
 import pytest
 from _framework.mcp_client import cap_first, MCPError
 from _framework.assertions import merge_with_defaults
-from test_17_native_toolsets import native_domain, official
+from test_17_native_toolsets import assert_pcg_grid_points, native_domain, official, pcg_actor_path
 from test_15_editor_operations import operation_result
 
 
 def object_path(path):
     return path + "." + path.rsplit("/", 1)[1]
-
-
-def refs(value):
-    if isinstance(value, dict):
-        if isinstance(value.get("refPath"), str):
-            yield value["refPath"]
-        for item in value.values():
-            yield from refs(item)
-    elif isinstance(value, list):
-        for item in value:
-            yield from refs(item)
-
 
 
 def test_physics_asset_create_edit_and_readback(mcp, require_tools, test_ns):
@@ -142,7 +129,9 @@ def test_pcg_parameter_subgraph_instance_roundtrip(mcp, require_tools, test_ns):
                                             {"Name": "ProbeFlag", "Type": "Boolean", "DefaultValueJson": "true"}])
     assert result.get("bApplied", True), result
     schema = official(mcp, "GetEditorPCG", Action="GraphSchema", AssetPath=graph)
-    assert {key.lower() for key in json.loads(schema["graphParamsSchema"])} >= {"density", "probeflag"}, schema
+    parameters = merge_with_defaults(schema["Parameters"], schema.get("Parameters_defaults", {}))
+    assert {row["Name"] for row in parameters} == {"Density", "ProbeFlag"}, schema
+    assert schema["density"] == pytest.approx(1.5) and schema["probeFlag"] is True, schema
     available = official(mcp, "GetEditorPCG", Action="AvailableSubgraphs")
     assert isinstance(available, dict)
     subgraph = official(mcp, "ControlEditorPCG", Action="AddSubgraph", AssetPath=graph,
@@ -154,15 +143,15 @@ def test_pcg_parameter_subgraph_instance_roundtrip(mcp, require_tools, test_ns):
     node_info = official(mcp, "GetEditorPCG", Action="NodeInfo", NodePath=node_path)
     assert node_info, node_info
     spawned = official(mcp, "ControlEditorPCG", Action="Spawn", AssetPath=graph, ActorName="NexusPcgParams")
-    actor = next(path for path in refs(spawned) if ":PersistentLevel." in path)
+    actor = pcg_actor_path(spawned)
     changed = official(mcp, "ControlEditorPCG", Action="SetInstanceParameters", ActorPath=actor, Parameters={"Density": 3.25})
     assert changed.get("bApplied", True), changed
     read = official(mcp, "GetEditorPCG", Action="InstanceParameters", ActorPath=actor)
-    assert "3.25" in str(read), read
+    assert read["density"] == pytest.approx(3.25), read
     reset = official(mcp, "ControlEditorPCG", Action="ResetInstanceParameters", ActorPath=actor, ParameterNames=["Density"])
     assert reset.get("bApplied", True), reset
     read = official(mcp, "GetEditorPCG", Action="InstanceParameters", ActorPath=actor)
-    assert "1.5" in str(read), read
+    assert read["density"] == pytest.approx(1.5), read
     removed = official(mcp, "ControlEditorPCG", Action="RemoveGraphParameters", AssetPath=graph, ParameterNames=["ProbeFlag"])
     assert removed.get("bApplied", True), removed
     assert "probeflag" not in str(official(mcp, "GetEditorPCG", Action="GraphSchema", AssetPath=graph)).lower()
@@ -179,7 +168,7 @@ def test_pcg_parameter_subgraph_instance_roundtrip(mcp, require_tools, test_ns):
     mcp.call("SaveAsset", AssetPath=parent)
 
 
-@pytest.mark.skipif_ue_below("5.8")
+@pytest.mark.skipif_ue_below("5.4")
 def test_pcg_node_settings_readback(mcp, require_tools, test_ns):
     native_domain(mcp, require_tools, "ControlEditorPCG", "PCGToolset")
     path = f"{test_ns}/PCG_NodeEdit"
@@ -190,13 +179,14 @@ def test_pcg_node_settings_readback(mcp, require_tools, test_ns):
     output = graph_info["OutputNode"]
     mcp.call("ManageAssetPCGGraph", AssetPath=path, Operations=[{"Action": "AddEdge", "FromNodeId": node["Id"], "FromPin": node["OutputPins"][0], "ToNodeId": output["Id"], "ToPin": output["InputPins"][0]}])
     spawned = official(mcp, "ControlEditorPCG", Action="Spawn", AssetPath=object_path(path), ActorName="NexusPcgNodeEdit")
-    actor = next(value for value in refs(spawned) if ":PersistentLevel." in value)
+    actor = pcg_actor_path(spawned)
     try:
         official(mcp, "GetEditorPCG", Action="NodeData", ActorPath=actor, NodePath=node["Path"], PinLabel=node["OutputPins"][0], Limit=1)
     except MCPError as error:
         assert "inspection" in str(error).lower(), str(error)
     official(mcp, "ControlEditorPCG", Action="Execute", ActorPath=actor)
     before = official(mcp, "GetEditorPCG", Action="NodeData", ActorPath=actor, NodePath=node["Path"], PinLabel=node["OutputPins"][0], Limit=1)
+    assert_pcg_grid_points(before, 1)
 
     result = official(mcp, "ControlEditorPCG", Action="UpdateNode", NodePath=node["Path"],
                       Parameters={"CellSize": {"x": 123, "y": 234, "z": 345}}, NodeTitle="AdjustedGrid")
@@ -205,7 +195,8 @@ def test_pcg_node_settings_readback(mcp, require_tools, test_ns):
     assert "123" in str(info) and "234" in str(info) and "345" in str(info), info
     official(mcp, "ControlEditorPCG", Action="Execute", ActorPath=actor)
     after = official(mcp, "GetEditorPCG", Action="NodeData", ActorPath=actor, NodePath=node["Path"], PinLabel=node["OutputPins"][0], Limit=1)
-    assert before["totalElements"] > 0 and after["totalElements"] > 0 and before["totalElements"] != after["totalElements"], (before, after)
+    assert_pcg_grid_points(after, 1)
+    assert before["Total"] != after["Total"], (before, after)
 
     invalid = mcp.try_call("ControlEditorPCG", Action="UpdateNode", NodePath=node["Path"], Parameters={})
     assert invalid.get("isError"), invalid

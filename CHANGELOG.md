@@ -10,16 +10,16 @@
 
 - 增补蓝图变量/组件批量编辑、按需集中编译与事务中跳过 GC、标量及子对象校验、原生/继承组件覆盖、结构体容器类型与成员重命名、重设父类与 Undo/循环拒绝、只读导航路径/真实 Recast 多 Agent/AI 状态与停止、资产编辑器打开/聚焦/安全关闭及行为树联动、完整类型回读/局部重命名/类型变更/专用重设父类、DataAsset/关卡标量验证/组件默认值恢复、导出预检与冲突策略、编译失败磁盘保护、UDS 类型元数据生命周期、继承组件写入/恢复及实际子对象 Undo、组件恢复拒绝外部资产路径、科学计数法预览/验证与非法输入无写入、关卡 Actor 默认值比较、反馈趋势分类与搜索命中统计回归；补类型复制/后代限制、图与局部引用 GUID、骨架/成员冲突、真实 Filter/多世界/AI 到达与连续请求隔离、共享窗口关闭保护、实际导出覆盖及失败文件保留，并通过 MCP 回读重命名与组件/关卡恢复结果；验证 MCP 请求在帧边界派发、任务等待期间只入队。
 - 增补功能缺口首批回归：动作级 Schema、BP/UMG/PCG 结构计划与过期前置条件、首次导入冲突策略、多人 PIE 世界、兼容 PCG 点输出、骨骼姿态采样、所属任务历史/取消隔离与源控预检；结构行为测试覆盖接口实现图、Unicode Hash、控件引用节点清理及部分成功后的验证失败禁止保存。
-- 增补编辑器兼容回归：蓝图结构化图计划和函数参数、UMG 结构、静态网格生成、场景文件夹，以及 PCG/Niagara/Sequencer 的原生与兼容读写闭环；补充 UMG 变量/事件/组件、材质函数图整理、设置/插件持久化、Sequencer 条件/文件夹/FBX 和原生 Mixer/Outliner 用例；覆盖 42 项变量类别批量写入、ToolTip、复制/通知函数与 CallInEditor 回读、Lua 绑定与重复绑定模块名验证、关卡继承 SCS 默认值比较/恢复/Undo，以及代理反馈分类明细；补充 ClassReference/容器与危险 UClass 类型拒绝、实例可编辑标志/已有子类及实例默认值、对象/类引用预览、旧式 Skeleton 重定向，以及导航体积几何和异步构建/保存回归。
+- 增补编辑器兼容回归：蓝图结构化图计划和函数参数、UnrealGraphText 节点导出/追加与连线回读及非法格式不改图、UMG 结构、静态网格生成、场景文件夹，以及 PCG/Niagara/Sequencer 的原生与兼容读写闭环；补充 UMG 变量/事件/组件、材质函数图整理、设置/插件持久化、Sequencer 条件/文件夹/FBX 和原生 Mixer/Outliner 用例；覆盖 42 项变量类别批量写入、ToolTip、复制/通知函数与 CallInEditor 回读、Lua 绑定与重复绑定模块名验证、关卡继承 SCS 默认值比较/恢复/Undo，以及代理反馈分类明细；补充 ClassReference/容器与危险 UClass 类型拒绝、实例可编辑标志/已有子类及实例默认值、对象/类引用预览、旧式 Skeleton 重定向，以及导航体积几何和异步构建/保存回归。
 
-- 增补 Sequencer/Control Rig、Niagara 深层写入、Game Features 与自定义 Toolset 发现回归；Registry 原生 Handler 过滤、禁用与注销验证，以及旧入口同步契约、官方后端选择和过滤后拒绝兼容重试。
+- 增补 Sequencer/Control Rig、Niagara 深层写入、Game Features 与独立能力发现回归；严格验证 `Backend=Independent`、自有分组/工具/Schema、未知及外部 Registry 标识拒绝、设置/插件同步查询契约，以及 SKILL.md 列表/详情、精确路径限制和临时文件清理；测试套件移除对官方 Toolset/Registry 的直接链接要求，领域插件的传递依赖遵循引擎，并按实际 API 门控。
 - 新增 PCG 参数/子图/实例覆盖、PhysicsAsset 精细编辑、Tag INI 生命周期及 DataRegistry 真实缓存行与缺失状态的回归用例。
 
 
 
 
 
-- 扩充编辑器 MCP 回归：长操作会话隔离、终态、压缩输出、批次预检与进度/取消；Slate 中文输入、表单/下拉框/拖拽、失效 Ref 和 Automation 执行；项目设置/插件、UE 5.8 技能/语义搜索/PCG 执行采样/Niagara 诊断及 UMG 结构/继承命名槽；PNG/JPEG 标准图片、可信附件、数量/字节限制与批量返回。自动启动按编辑器 PID 绑定实例端口。
+- 扩充编辑器 MCP 回归：长操作会话隔离、终态、压缩输出、批次预检与进度/取消；Slate 中文输入、表单/下拉框/拖拽、失效 Ref 和 Automation 执行；项目设置/插件、独立 SKILL.md 技能发现/语义搜索/PCG 执行采样/Niagara 诊断及 UMG 结构/继承命名槽；PNG/JPEG 标准图片、可信附件、数量/字节限制与批量返回。自动启动按编辑器 PID 绑定实例端口。
 
 - test(widget): `NexusLink.Runtime.Widget.ExactInteraction` 验证同名歧义无副作用、列表路径精确点击、缓存与脱离层级实例拒绝、嵌套 UserWidget、隐藏父级、禁用按钮及 Switcher 活动页；补充 WidgetComponent 路径交互/属性读写及隐藏、注销后的拒绝。
 - test(review): `NexusLink.Review` 覆盖脏关卡/外部 Actor 包切换保护、组件循环拒绝和重挂载根节点一致性、复制继承覆盖值，以及错误变换参数不产生部分写入。

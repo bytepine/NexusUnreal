@@ -14,7 +14,7 @@ PascalCase 契约回归：`NexusLink.Reliability.PascalCasePayload` 验证实际
 
 Lua 工具 L1：`NexusLinkExt.Lua.ValueToJsonStackBalance` 使用独立 Lua 状态验证 0/1/49/50/51/120 项表、嵌套表、正负索引与循环引用的栈平衡和截断结果，无需 PIE。可在 Session Frontend → Automation 运行该名称，或用 Editor-Cmd 的 `-ExecCmds="Automation RunTests NexusLinkExt.Lua.ValueToJsonStackBalance" -TestExit="Automation Test Queue Empty" -unattended -nullrhi`；宿主尚未启用已链接的可选依赖时，可在测试会话添加 `-EnablePlugins=GameFeatures,DataRegistry,GameplayTagsEditor`。
 
-UE5.8 的 NexusLinkTestSuite 若已链接 ToolsetRegistry，也须在测试会话启用该插件（`-EnablePlugins=ToolsetRegistry`），以便加载其 DLL；无需修改工程默认配置。
+NexusLink 与 NexusLinkTestSuite 自身不直接链接或调用官方 Toolset/Registry。PCG、Niagara、ControlRig、SemanticSearch 等用例检查实际领域插件和当前 API，标准领域插件依赖遵循引擎要求，例如 UE 5.9 PCG 须保留 Registry；详见[传递依赖边界](../Plugins/NexusLink/docs/toolset-backends.md)。语义检索另需有效索引与 Embedding Provider。
 
 行为树验收：编译后运行 `python Script/bt_retest_acceptance.py --ue-root <UE-directory> --output <new-output-directory>`。独立 GameModeBase 服务器显式生成测试 Pawn/AIController 和继承 Blackboard，验证失败/恢复、末次快照、清理、基线、停止树及销毁目标。配套 UE Automation 前缀为 `NexusLink.AI.Blackboard`，不改项目默认 GameMode。
 
@@ -22,21 +22,21 @@ UE5.8 的 NexusLinkTestSuite 若已链接 ToolsetRegistry，也须在测试会�
 
 `test_00_smoke.py::test_proxy_discovery_status` 检查真实 HTTP `/status` 的既有发现协议字段（含 `server`、`wsPort`、`authRequired`），避免 Capability 命名迁移破坏 Desktop / Rider / VSCode 的实例扫描。
 
-## 动画、Niagara 与 Toolset 回归
+## 动画、Niagara 与独立能力回归
 
 UE Automation 的 `NexusLink.AssetEdit` 覆盖接口实现图、Unicode 结构 Hash、控件变量引用删除，以及部分成功后结构回读失败禁止保存；`NexusLink.Toolsets.Compatibility` 用真实宿主通道/类型与既有 PCG 实例验证关键帧、Niagara 向量、图参数传播和 UE 5.6 UIComponent 排序；`NexusLink.Import.MultiTakeConflicts` 自建双 take FBX，验证 Fail/Unique 不覆盖及 Replace 全产物读回；`NexusLink.Registry.AllDefinitionsValid` 验证真实注册定义符合启动期命名与资产路由约束。均可用 Editor-Cmd 的 `-ExecCmds="Automation RunTests <prefix>" -TestExit="Automation Test Queue Empty" -unattended -nullrhi` 执行，版本相关场景按宿主裁剪。
 
 `test_22_feature_gap_followups.py` 覆盖动作 Schema、结构计划/回读与过期哈希拒绝、PNG/WAV/FBX 首次导入冲突、骨骼姿态、所属任务历史和源控只读预检。PCG 生成/点读取、双人 ListenServer PIE、骨骼网格/动画 FBX 导出夹具需 GUI/RHI，标记 requires_gui；使用 `py Script/run_e2e.py --gui -k gap_`。任务列举/取消的跨 Owner 隔离同时由 `NexusLink.EditorOperations.OwnerAndContract` 验证。离线预算回归位于插件 `tools/trace_compare/test_runner.py`。
 
-`test_19_toolset_reuse.py` 检查既有查询/编辑入口保持同步返回，在 5.8 启用官方插件时报告原生后端，并通过 `NexusLink.Toolsets.LegacySync` 验证 Registry 过滤不会触发兼容重试。旧版继续运行同一查询契约，原生专用检查按版本跳过。
+`test_19_toolset_reuse.py` 检查既有查询/编辑入口保持同步返回并严格报告 `Backend=Independent`；`NexusLink.Independent.SettingsAndPlugins` 验证设置和插件查询契约。测试不以官方 Toolset 的启用状态作为执行条件。
 
-`test_20_editor_compatibility.py` 对原生与兼容后端运行相同的蓝图 GraphPlan/函数参数、UMG 结构、静态网格 LOD/凸包、场景文件夹、Sequencer 分段/关键帧、Niagara User Variables/Renderer 及 PCG 参数回环。测试使用独立资产，并验证错误连接、环与非法参数被拒绝；PCG 用例最低 UE 5.4。GraphPlan 失败应移除本次节点，原生 Registry 拒绝不得执行兼容重试。
+`test_20_editor_compatibility.py` 验证独立实现的蓝图 GraphPlan/函数参数、UMG 结构、静态网格 LOD/凸包、场景文件夹、Sequencer 分段/关键帧、Niagara User Variables/Renderer 及 PCG 参数回环。GraphText 用例导出真实 getter/setter 的 `UnrealGraphText`，预导入后追加到目标图并读回节点和连线；旧 Lisp 文本及非法节点文本被拒绝，目标图保持不变。GraphPlan 失败应移除本次节点；PCG 用例最低 UE 5.4。
 
 `test_23_editor_feedback_gaps.py` 覆盖 42 项变量类别批量写入、ToolTip、Replication/RepNotify 和 CallInEditor 回读及无效通知函数拒绝；`test_10_editor.py::test_manage_asset_lua_binding` 验证编译后的 Lua 模块名及重复绑定更新。`NexusLink.EditorRelated.ComponentBaseline` 同时检查 Actor CDO 组件指针为空时，关卡 SCS 默认值仍取继承覆盖模板，且恢复可撤销。
 
-`test_19_remaining_toolsets.py` 覆盖 Sequencer 分段及 float/bool 关键帧、Control Rig 四帧烘焙与控件键读回、Niagara 系统/渲染器/用户变量及嵌套动态输入写入、Game Features 生命周期和自定义 Toolset 注册/注销。Registry 过滤与禁用还通过 `NexusLink.Toolsets.DiscoveryFilters` Automation 验证。
+`test_19_remaining_toolsets.py` 覆盖 Sequencer 分段及 float/bool 关键帧、Control Rig 四帧烘焙与控件键读回、Niagara 系统/渲染器/用户变量及嵌套动态输入写入、Game Features 生命周期，以及 NexusLink 自有分组→工具→Schema 的发现闭环。验证未知分组/能力和外部 Registry 标识被拒绝，并通过 `NexusLink.Independent.DiscoveryContract` 核对自有发现契约。
 
-动画、Niagara 深层接口与自定义 Toolset 发现需 UE 5.8，并在宿主启用相应官方插件；Game Features 需 UE 5.7+ 的 `GameFeatures`。用例可在 headless 执行，Control Rig 场景另需示例 Mannequin 网格与 Body Rig 内容。
+自有发现适用于所有支持的编辑器版本；动画和 Niagara 深层动作按真实引擎 API 下限裁剪，不依赖官方 Toolset。Game Features 需 UE 5.7+ 的 `GameFeatures`；Control Rig 场景另需示例 Mannequin 网格与 Body Rig 内容。能够 headless 运行的用例保持 headless。
 
 生命周期用例仅使用环境变量 `NEXUS_GAME_FEATURE_FIXTURE` 明确指定的专用空 Feature 插件：须已被编辑器发现、允许内容且位于引擎认可的 Game Features 目录。缺少该配置时跳过；配置后验证缺少 GameFeatureData 的失败、创建测试 DataAsset、激活到 `Active`、停用到 `Loaded`。只在隔离测试宿主配置此变量，不指向业务 Feature 插件。
 
@@ -243,9 +243,9 @@ C++ `NexusLink.EditorOperations` 覆盖操作归属、最终压缩输出 Schema�
 
 自动启动等待就绪时按本次编辑器 PID 的实例注册文件绑定端口；多个编辑器同时启动不会因先监听的端口而连接到另一个工程。
 
-## UE 5.8 领域与图片回归
+## 独立领域与图片回归
 
-`test_16_project_discovery.py` 覆盖设置注册树、明确属性读取、插件依赖与挂载归属。`test_17_native_toolsets.py` 在启用对应官方 Toolset 的 UE 5.8 宿主验证 AgentSkill 列表/详情、带类型的语义查询、PCG 创建实例→执行→节点采样和 Niagara 诊断；语义索引/提供器未就绪时保留明确跳过原因。
+`test_16_project_discovery.py` 覆盖设置注册树、明确属性读取、插件依赖与挂载归属。`test_17_native_toolsets.py` 保留历史文件名，实际验证独立能力：临时项目 `Skills/<unique>/SKILL.md` 的列表/详情、精确路径限制与 finally 清理，带类型的真语义检索，PCG 创建实例→执行→节点采样，以及 Niagara 诊断。共同 helper 严格检查 `Backend=Independent`，只按实际领域插件门控；语义索引/提供器未就绪时保留明确跳过原因。
 
 `test_40_widget.py` 的 5.8 用例验证移动/重排、包裹/单子项还原/模板替换、循环拒绝及继承命名槽的编译、填充、占用拒绝和移除。`NexusLink.EditorOperations.SlateInput` 通过临时窗口验证替换、可见等待、表单预检、复选框/组合框、同名误点防护、拖拽和失效 Ref，使用 GUI 执行。
 
