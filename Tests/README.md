@@ -256,3 +256,5 @@ C++ `NexusLink.EditorOperations` 覆盖操作归属、最终压缩输出 Schema�
 `test_21_editor_followups.py` 覆盖 UMG 重命名/变量/委托与 UIComponent、材质及函数图整理、类型化设置、内容插件生命周期、Sequence 文件夹/条件/FBX 和原生 AnimMixer。持久化工程设置与插件用例仅在显式设置 `NEXUS_PERSISTENT_EDIT_FIXTURE=1` 的隔离可写宿主运行；Outliner/自定义绑定转换用例需 `--gui` 与 UE5.8。
 
 `test_25_feedback_nov09.py` 覆盖变量默认值继承、ClassReference 预览/验证、旧式动画与 ABP Retarget，以及导航体积几何与异步构建/保存；地图写入使用测试地图，原地图存在未保存更改时跳过切换。L1 的 `NexusLink.EditorRelated.Feedback*` 和 `NexusLink.Utils.PinType.ParsePrimitives` 覆盖对应引擎行为。
+
+`NexusLink.FeedbackNov10` 验证实际流送 ULevel 的 Actor 所属范围与预览/写入/删除、组件世界变换刷新、混合校验批提前拒绝、导航体积原生几何及调整、空默认 BrushBuilder 非致命读取、发现状态即时更新，以及只读/Windows 外部文件锁保存失败时原文件不变。`NexusLink.EditorOperations.SlateInput` 使用 SSearchBox 覆盖替换输入。

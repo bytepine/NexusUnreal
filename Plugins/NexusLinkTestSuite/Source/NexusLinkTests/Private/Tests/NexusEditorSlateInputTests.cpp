@@ -7,6 +7,7 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Widgets/SWindow.h"
 #include "Widgets/Input/SEditableTextBox.h"
+#include "Widgets/Input/SSearchBox.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SComboBox.h"
 #include "Widgets/Input/SButton.h"
@@ -64,7 +65,7 @@ public:
 			};
 			Window = SNew(SWindow).Title(FText::FromString(TEXT("Nexus Slate Input Probe ") + Owner)).ClientSize(FVector2D(420, 260))
 				[SNew(SVerticalBox)
-				+ SVerticalBox::Slot().AutoHeight()[SAssignNew(Input, SEditableTextBox).Text(FText::FromString(Seed)).OnTextCommitted_Lambda([Counter = Commits](const FText&, ETextCommit::Type) { ++Counter.Get(); })]
+				+ SVerticalBox::Slot().AutoHeight()[SAssignNew(Input, SSearchBox).InitialText(FText::FromString(Seed)).OnTextCommitted_Lambda([Counter = Commits](const FText&, ETextCommit::Type) { ++Counter.Get(); })]
 				+ SVerticalBox::Slot().AutoHeight()[SAssignNew(Check, SCheckBox)[SNew(STextBlock).Text(FText::FromString(Seed + TEXT("-check")))]]
 				+ SVerticalBox::Slot().AutoHeight()[SNew(SComboBox<TSharedPtr<FString>>).OptionsSource(&Choices.Get()).InitiallySelectedItem((*Choices)[0])
 					.OnGenerateWidget_Lambda([](TSharedPtr<FString> Item) { return SNew(STextBlock).Text(FText::FromString(*Item)); })
@@ -95,7 +96,7 @@ public:
 					for (const auto& Node : *Nodes)
 					{
 						auto Object = Node->AsObject(); const FString Text = Object->GetStringField(TEXT("Text")), Type = Object->GetStringField(TEXT("Type"));
-						if (Text == Seed) Object->TryGetStringField(TEXT("Ref"), Ref);
+						if (Text == Seed && Type == TEXT("SSearchBox")) Object->TryGetStringField(TEXT("Ref"), Ref);
 						if (Type == TEXT("SCheckBox")) Object->TryGetStringField(TEXT("Ref"), CheckRef);
 						if (Type.StartsWith(TEXT("SComboBox"))) Object->TryGetStringField(TEXT("Ref"), ComboRef);
 						if (Text == Seed + TEXT("-source")) Object->TryGetStringField(TEXT("Ref"), SourceRef);
@@ -134,7 +135,17 @@ public:
 		auto Args = MakeShared<FJsonObject>();
 		if (Phase == 1) { Args->SetStringField(TEXT("Action"), TEXT("Windows")); Pending = Call(TEXT("GetEditorSlate"), Args); Phase = 11; }
         else if (Phase == 11) { Args->SetStringField(TEXT("Action"), TEXT("Snapshot")); Args->SetStringField(TEXT("Ref"), WindowRef); Args->SetNumberField(TEXT("MaxDepth"), 10); Pending = Call(TEXT("GetEditorSlate"), Args); Phase = 2; }
-		else if (Phase == 2) { Args->SetStringField(TEXT("Ref"), Ref); Args->SetStringField(TEXT("Action"), TEXT("Type")); Args->SetStringField(TEXT("Text"), TEXT("中文")); Pending = Call(TEXT("InteractEditorSlate"), Args); Phase = 3; }
+		else if (Phase == 2) {
+			auto Filter = MakeShared<FJsonObject>(); Filter->SetStringField(TEXT("Action"), TEXT("Snapshot")); Filter->SetStringField(TEXT("Ref"), WindowRef);
+			Filter->SetStringField(TEXT("TextFilter"), Seed); Filter->SetStringField(TEXT("TypeFilter"), TEXT("SSearchBox"));
+			auto Filtered = Call(TEXT("GetEditorSlate"), Filter);
+			if (!Filtered.IsValid() || !Filtered->Result.IsValid()) { Test->AddError(TEXT("Filtered search-box snapshot unavailable")); return true; }
+			const auto& Nodes = Filtered->Result->GetArrayField(TEXT("Nodes"));
+			if (!Test->TestEqual(TEXT("Filtered snapshot finds the search box"), Nodes.Num(), 1)) return true;
+			Test->TestEqual(TEXT("Search box is the discovered input target"), Nodes[0]->AsObject()->GetStringField(TEXT("Ref")), Ref);
+			Test->TestEqual(TEXT("Search box role is editable"), Nodes[0]->AsObject()->GetStringField(TEXT("Role")), FString(TEXT("TextBox")));
+			Args->SetStringField(TEXT("Ref"), Ref); Args->SetStringField(TEXT("Action"), TEXT("Type")); Args->SetStringField(TEXT("Text"), TEXT("中文")); Pending = Call(TEXT("InteractEditorSlate"), Args); Phase = 3;
+		}
 		else if (Phase == 3) { Test->TestTrue(TEXT("Chinese text delivered"), Input->GetText().ToString().Contains(TEXT("中文"))); Args->SetStringField(TEXT("Ref"), Ref); Args->SetStringField(TEXT("Action"), TEXT("Click")); Pending = Call(TEXT("InteractEditorSlate"), Args); Phase = 4; }
 		else if (Phase == 4) { CommitsBeforeEnter = Commits.Get(); Args->SetStringField(TEXT("Ref"), Ref); Args->SetStringField(TEXT("Action"), TEXT("PressKey")); Args->SetStringField(TEXT("Key"), TEXT("Enter")); Pending = Call(TEXT("InteractEditorSlate"), Args); Phase = 5; }
 		else if (Phase == 5) { Test->TestTrue(TEXT("Enter committed text"), Commits.Get() > CommitsBeforeEnter); Args->SetStringField(TEXT("Ref"), Ref); Args->SetStringField(TEXT("Action"), TEXT("Hover")); Pending = Call(TEXT("InteractEditorSlate"), Args); Phase = 50; }
