@@ -36,7 +36,7 @@
 #include "Animation/AnimSequence.h"
 #include "AnimGraphNode_SequencePlayer.h"
 #include "ReferenceSkeleton.h"
-#if NX_UE_HAS_ANIM_SEQUENCE_DATA_MODEL
+#if NX_UE_HAS_ANIM_DATA_CONTROLLER
 #include "Animation/AnimData/IAnimationDataController.h"
 #endif
 #include "Misc/ScopeExit.h"
@@ -163,10 +163,16 @@ bool FNexusFeedbackRetargetTest::RunTest(const FString& Parameters)
 	}
 	TStrongObjectPtr<UAnimSequence> Sequence(NewObject<UAnimSequence>(Package, TEXT("Sequence"), RF_Public | RF_Standalone));
 	Sequence->SetSkeleton(Source.Get());
-#if NX_UE_HAS_ANIM_SEQUENCE_DATA_MODEL
-	auto& Controller = Sequence->GetController(); Controller.InitializeModel();
+#if NX_UE_HAS_ANIM_DATA_CONTROLLER
+	auto& Controller = Sequence->GetController();
+#if NX_UE_HAS_ANIM_CONTROLLER_MODEL_INIT
+	Controller.InitializeModel();
 	Controller.SetFrameRate(FFrameRate(30, 1)); Controller.SetNumberOfFrames(FFrameNumber(1));
 	Controller.AddBoneCurve(TEXT("root"));
+#else
+	Controller.SetFrameRate(FFrameRate(30, 1)); Controller.SetPlayLength(1.f / 30.f);
+	Controller.AddBoneTrack(TEXT("root"));
+#endif
 	Controller.SetBoneTrackKeys(TEXT("root"), {FVector3f::ZeroVector, FVector3f::ZeroVector}, {FQuat4f::Identity, FQuat4f::Identity}, {FVector3f::OneVector, FVector3f::OneVector});
 #else
 	FRawAnimSequenceTrack Track; Track.PosKeys.Add(FVector::ZeroVector); Track.RotKeys.Add(FQuat::Identity); Track.ScaleKeys.Add(FVector::OneVector);

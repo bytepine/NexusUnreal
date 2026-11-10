@@ -28,8 +28,11 @@ def assert_image(raw, mime):
 def test_mcp_image_protocol_bounds(mcp, require_tools):
     require_tools("ControlEditorAutomation", "GetEditorOperation")
     operation_result(mcp, mcp.call("ControlEditorAutomation", Action="Discover"))
-    result = operation_result(mcp, mcp.call("ControlEditorAutomation", Action="Run", TestNames=["NexusLink.Protocol.ImageContent"]))
-    assert result["Tests"][0]["Outcome"] == "Passed", result
+    result = operation_result(mcp, mcp.call("ControlEditorAutomation", Action="Run", TestNames=[
+        "NexusLink.Protocol.ImageContent", "NexusLink.Protocol.CaptureRetention",
+    ]))
+    assert len(result["Tests"]) == 2, result
+    assert all(test["Outcome"] == "Passed" for test in result["Tests"]), result
 
 
 @pytest.mark.requires_gui
@@ -58,7 +61,7 @@ def test_slate_capture_image_through_operation_wait(mcp, require_tools):
 @pytest.mark.requires_gui
 def test_capture_images_survive_batch(mcp, require_tools):
     require_tools("CaptureViewport")
-    raw = mcp.try_call("CallCapability", calls=[
+    raw = mcp.try_call("CallCapability", Calls=[
         {"Capability": "CaptureViewport", "Arguments": {"Target": "Editor", "MaxSize": 128}},
         {"Capability": "CaptureViewport", "Arguments": {"Target": "Editor", "MaxSize": 128}},
     ])

@@ -59,7 +59,6 @@ public class NexusLinkTests : ModuleRules
 					"MovieScene",
 					"MovieSceneTracks",
 					"AnimGraph",
-					"AnimGraph",
 				}
 			);
 		}

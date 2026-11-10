@@ -8,6 +8,10 @@
 #include "Misc/Guid.h"
 #include "HAL/FileManager.h"
 #include "Dom/JsonValue.h"
+#if WITH_EDITOR
+#include "Utils/NexusCaptureUtils.h"
+#include "Misc/ScopeExit.h"
+#endif
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusMcpImageContentTest, "NexusLink.Protocol.ImageContent", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FNexusMcpImageContentTest::RunTest(const FString&)
@@ -43,3 +47,38 @@ bool FNexusMcpImageContentTest::RunTest(const FString&)
 	IFileManager::Get().Delete(*BigPath);
 	return true;
 }
+
+#if WITH_EDITOR
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusCaptureRetentionTest, "NexusLink.Protocol.CaptureRetention", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusCaptureRetentionTest::RunTest(const FString&)
+{
+	IFileManager& Manager = IFileManager::Get();
+	const FString Directory = FPaths::ProjectSavedDir() / (TEXT("NexusCaptureRetention_") + FGuid::NewGuid().ToString(EGuidFormats::Digits));
+	if (!TestTrue(TEXT("Create isolated capture directory"), Manager.MakeDirectory(*Directory, true))) return false;
+	TArray<FString> Paths;
+	ON_SCOPE_EXIT { for (const FString& Path : Paths) Manager.Delete(*Path); Manager.DeleteDirectory(*Directory); };
+	for (int32 CaptureIndex = 0; CaptureIndex < 20; ++CaptureIndex)
+	{
+		const FString Path = Directory / FString::Printf(TEXT("NexusCapture_slate_%02d.png"), CaptureIndex);
+		Paths.Add(Path);
+		TestTrue(TEXT("Write old Slate capture"), FFileHelper::SaveStringToFile(TEXT("capture"), *Path));
+		Manager.SetTimeStamp(*Path, FDateTime(2020, 1, 1) + FTimespan::FromSeconds(CaptureIndex));
+	}
+	for (const TCHAR* Name : {TEXT("NexusCapture_Editor_new.png"), TEXT("NexusCapture_Editor_new.jpg")})
+	{
+		const FString Path = Directory / Name;
+		Paths.Add(Path);
+		TestTrue(TEXT("Write recent Editor capture"), FFileHelper::SaveStringToFile(TEXT("capture"), *Path));
+		Manager.SetTimeStamp(*Path, FDateTime(2022, 1, 1));
+	}
+	const FString OtherFile = Directory / TEXT("User.png"); Paths.Add(OtherFile);
+	TestTrue(TEXT("Write unrelated file"), FFileHelper::SaveStringToFile(TEXT("user"), *OtherFile));
+	FNexusCaptureUtils::CleanupOldCaptures(Directory);
+	TestTrue(TEXT("New PNG survives mixed capture types"), Manager.FileExists(*Paths[20]));
+	TestTrue(TEXT("New JPEG survives mixed capture types"), Manager.FileExists(*Paths[21]));
+	TestFalse(TEXT("Oldest capture removed"), Manager.FileExists(*Paths[0]));
+	TestFalse(TEXT("Second oldest capture removed"), Manager.FileExists(*Paths[1]));
+	TestTrue(TEXT("Unrelated file retained"), Manager.FileExists(*OtherFile));
+	return true;
+}
+#endif
