@@ -249,6 +249,16 @@ bool FNexusFrameRequestDispatchTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("首帧只执行队列快照"), ExecutionCount, 1);
 	Server->ProcessPendingRequests();
 	TestEqual(TEXT("下一帧处理等待期间收到的请求"), ExecutionCount, 2);
+	int32 ModalExecutionCount = 0;
+	FNexusMcpServer::QueueRequest(WeakServer, [&]()
+	{
+		TGuardValue<bool> SlowGuard(GIsSlowTask, true);
+		Server->ProcessPendingRequests();
+		TestEqual(TEXT("模态泵能够访问同帧已接受但尚未执行的请求"), ModalExecutionCount, 1);
+	});
+	FNexusMcpServer::QueueRequest(WeakServer, [&]() { ++ModalExecutionCount; });
+	Server->ProcessPendingRequests();
+	TestEqual(TEXT("模态重入不重复消费请求"), ModalExecutionCount, 1);
 	bool bRejectedStoppedRequest = false;
 	FNexusMcpServer::QueueRequest(WeakServer, [&]() { bRejectedStoppedRequest = !Server->IsRunning(); });
 	FTaskGraphInterface::Get().ProcessThreadUntilIdle(ENamedThreads::GameThread);

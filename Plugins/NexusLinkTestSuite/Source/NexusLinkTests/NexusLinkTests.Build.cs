@@ -65,10 +65,10 @@ public class NexusLinkTests : ModuleRules
 			PrivateDefinitions.Add("WITH_NEXUS_TEST_DATA_REGISTRY=0");
 			// Game 目标不链接 NexusLinkEditor，WITH_STATETREE 等 Editor 域可选插件宏没有
 			// 定义来源；测试文件里直接 #if WITH_STATETREE 检测（非 #ifdef），未定义时 MSVC 报
-			// C4668。这里兜底置 0。WITH_GAS/WITH_NIAGARA 由 NexusLink 定义。
+			// C4668。这里兜底置 0。WITH_GAS/WITH_NIAGARA/WITH_ENHANCED_INPUT 由 NexusLink 定义。
 			foreach (var C in NexusLinkOptionalPlugins.BuildFullTable())
 			{
-				if (C.Define != "WITH_GAS" && C.Define != "WITH_NIAGARA")
+				if (C.Define != "WITH_GAS" && C.Define != "WITH_NIAGARA" && C.Define != "WITH_ENHANCED_INPUT")
 				{
 					PublicDefinitions.Add(C.Define + "=0");
 				}

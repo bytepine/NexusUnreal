@@ -126,14 +126,23 @@ class MCPClient:
                 "capabilities": {},
             },
         }
-        resp = self._http.post(self.url, json=payload)
-        resp.raise_for_status()
+        deadline = time.monotonic() + 10
+        while True:
+            resp = self._http.post(self.url, json=payload)
+            resp.raise_for_status()
+            body = resp.json()
+            error = body.get("error") or {}
+            data = error.get("data") or {}
+            if (error.get("code") != -32002 or data.get("ErrorKind") != "EditorBusy"
+                    or data.get("bExecuted") is not False or time.monotonic() >= deadline):
+                break
+            time.sleep(.5)
+        result = self._unpack_rpc(body)
         session_id = resp.headers.get(_SESSION_HEADER)
         if not session_id:
             raise MCPError("initialize response missing Mcp-Session-Id header")
         self._session_id = session_id
 
-        result = self._unpack_rpc(resp.json())
         # Send 'initialized' notification (no id, no response expected)
         note = {"jsonrpc": "2.0", "method": "notifications/initialized"}
         self._http.post(self.url, json=note, headers=self._session_headers())
@@ -197,7 +206,18 @@ class MCPClient:
 
     def _tool_call_raw(self, tool: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute tools/call and unpack structuredContent. Raises MCPError on isError."""
-        result = self._rpc("tools/call", {"name": tool, "arguments": arguments})
+        deadline = time.monotonic() + 10
+        while True:
+            try:
+                result = self._rpc("tools/call", {"name": tool, "arguments": arguments})
+                break
+            except MCPError as error:
+                data = (error.raw or {}).get("error", {}).get("data", {})
+                # 仅重试服务端明确拒绝且未执行的请求；超时、断连和其他错误仍原样抛出。
+                if (error.code != -32002 or data.get("ErrorKind") != "EditorBusy"
+                        or data.get("bExecuted") is not False or time.monotonic() >= deadline):
+                    raise
+                time.sleep(.1)
         if result.get("isError"):
             content = result.get("content") or []
             text = content[0].get("text", "") if content else ""
