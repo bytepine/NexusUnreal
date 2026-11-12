@@ -10,6 +10,7 @@
 #include "Widgets/Input/SSearchBox.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SComboBox.h"
+#include "SSearchableComboBox.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/SBoxPanel.h"
@@ -21,6 +22,7 @@
 class FNexusSlateInputProbe final : public IAutomationLatentCommand
 {
 	FAutomationTestBase* Test;
+	bool bSearchable;
 	TSharedPtr<SWindow> Window;
 	TSharedPtr<SEditableTextBox> Input;
 	TSharedPtr<SCheckBox> Check;
@@ -46,7 +48,7 @@ class FNexusSlateInputProbe final : public IAutomationLatentCommand
 		return FNexusEditorOperations::Find(Id);
 	}
 public:
-	explicit FNexusSlateInputProbe(FAutomationTestBase* InTest) : Test(InTest) {}
+	explicit FNexusSlateInputProbe(FAutomationTestBase* InTest, bool bInSearchable = false) : Test(InTest), bSearchable(bInSearchable) {}
 	~FNexusSlateInputProbe() { if (Window.IsValid() && FSlateApplication::IsInitialized()) Window->RequestDestroyWindow(); }
 	bool Update() override
 	{
@@ -55,6 +57,11 @@ public:
 		if (Phase == 0)
 		{
 			Choices->Add(MakeShared<FString>(Seed + TEXT("-one"))); Choices->Add(MakeShared<FString>(Seed + TEXT("-two")));
+			auto Generate=[](TSharedPtr<FString> Item) { return SNew(STextBlock).Text(FText::FromString(*Item)); };
+			auto Select=[Selected=Choice,Keep=Choices](TSharedPtr<FString> Item,ESelectInfo::Type) { if (Item.IsValid() && Keep->Contains(Item)) Selected.Get()=*Item; };
+			TSharedRef<SWidget> Combo=bSearchable
+				? StaticCastSharedRef<SWidget>(SNew(SSearchableComboBox).OptionsSource(&Choices.Get()).InitiallySelectedItem((*Choices)[0]).OnGenerateWidget_Lambda(Generate).OnSelectionChanged_Lambda(Select)[SNew(STextBlock).Text(FText::FromString(Seed+TEXT("-combo")))])
+				: StaticCastSharedRef<SWidget>(SNew(SComboBox<TSharedPtr<FString>>).OptionsSource(&Choices.Get()).InitiallySelectedItem((*Choices)[0]).OnGenerateWidget_Lambda(Generate).OnSelectionChanged_Lambda(Select)[SNew(STextBlock).Text(FText::FromString(Seed+TEXT("-combo")))]);
 			auto DragBox = [&](const FString& Label)
 			{
 				return SNew(SBorder).Padding(8)
@@ -67,10 +74,7 @@ public:
 				[SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()[SAssignNew(Input, SSearchBox).InitialText(FText::FromString(Seed)).OnTextCommitted_Lambda([Counter = Commits](const FText&, ETextCommit::Type) { ++Counter.Get(); })]
 				+ SVerticalBox::Slot().AutoHeight()[SAssignNew(Check, SCheckBox)[SNew(STextBlock).Text(FText::FromString(Seed + TEXT("-check")))]]
-				+ SVerticalBox::Slot().AutoHeight()[SNew(SComboBox<TSharedPtr<FString>>).OptionsSource(&Choices.Get()).InitiallySelectedItem((*Choices)[0])
-					.OnGenerateWidget_Lambda([](TSharedPtr<FString> Item) { return SNew(STextBlock).Text(FText::FromString(*Item)); })
-					.OnSelectionChanged_Lambda([Selected = Choice, Keep = Choices](TSharedPtr<FString> Item, ESelectInfo::Type) { if (Item.IsValid() && Keep->Contains(Item)) Selected.Get() = *Item; })
-					[SNew(STextBlock).Text(FText::FromString(Seed + TEXT("-combo")))]]
+				+ SVerticalBox::Slot().AutoHeight()[Combo]
 				+ SVerticalBox::Slot().AutoHeight()[DragBox(Seed + TEXT("-source"))]
 				+ SVerticalBox::Slot().AutoHeight()[DragBox(Seed + TEXT("-destination"))]
 				+ SVerticalBox::Slot().AutoHeight()[SNew(SButton).OnClicked_Lambda([Count = UnrelatedClicks]() { ++Count.Get(); return FReply::Handled(); })[SNew(STextBlock).Text(FText::FromString(Seed + TEXT("-not-option")))]]
@@ -98,7 +102,7 @@ public:
 						auto Object = Node->AsObject(); const FString Text = Object->GetStringField(TEXT("Text")), Type = Object->GetStringField(TEXT("Type"));
 						if (Text == Seed && Type == TEXT("SSearchBox")) Object->TryGetStringField(TEXT("Ref"), Ref);
 						if (Type == TEXT("SCheckBox")) Object->TryGetStringField(TEXT("Ref"), CheckRef);
-						if (Type.StartsWith(TEXT("SComboBox"))) Object->TryGetStringField(TEXT("Ref"), ComboRef);
+						if (Type.StartsWith(TEXT("SComboBox")) || Type==TEXT("SSearchableComboBox")) Object->TryGetStringField(TEXT("Ref"), ComboRef);
 						if (Text == Seed + TEXT("-source")) Object->TryGetStringField(TEXT("Ref"), SourceRef);
 						if (Text == Seed + TEXT("-destination")) Object->TryGetStringField(TEXT("Ref"), DestinationRef);
 					}
@@ -195,5 +199,11 @@ bool FNexusEditorSlateInputTest::RunTest(const FString& Parameters)
 	if (!FSlateApplication::IsInitialized() || !FApp::CanEverRender()) { AddInfo(TEXT("GUI-only probe; run with an editor viewport")); return true; }
 	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FNexusSlateInputProbe>(this));
 	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusEditorSearchableComboTest, "NexusLink.EditorOperations.SearchableCombo", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusEditorSearchableComboTest::RunTest(const FString& Parameters)
+{
+	if (!FSlateApplication::IsInitialized() || !FApp::CanEverRender()) { AddInfo(TEXT("GUI-only probe")); return true; }
+	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FNexusSlateInputProbe>(this,true)); return true;
 }
 #endif

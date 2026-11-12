@@ -432,7 +432,9 @@ bool FNexusReviewDirtyLevelTest::RunTest(const FString& Parameters)
 	TSharedPtr<FJsonObject> Args = MakeShared<FJsonObject>();
 	Args->SetStringField(TEXT("AssetPath"), TEXT("/Engine/Maps/Entry"));
 	Package->SetDirtyFlag(true);
-	TestTrue(TEXT("Dirty non-current level blocks map switch"), ReviewCall(TEXT("ControlEditorLevel"), Args).HasErrors());
+	const auto Rejected=ReviewCall(TEXT("ControlEditorLevel"), Args);
+	TestTrue(TEXT("Dirty non-current level is a state conflict"), Rejected.bIsStateConflict && !Rejected.bIsArgInvalid);
+	TestTrue(TEXT("Dirty packages identify the blocking world"),Rejected.TopFields.IsValid() && Rejected.TopFields->GetArrayField(TEXT("DirtyWorldPackages")).ContainsByPredicate([&](const TSharedPtr<FJsonValue>& Value) { return Value->AsString()==Package->GetName(); }));
 	TestTrue(TEXT("Rejected switch preserves world"), GEditor->GetEditorWorldContext().World() == CurrentWorld);
 	TestTrue(TEXT("Rejected switch preserves dirty flag"), Package->IsDirty());
 #if NX_UE_AT_LEAST(5, 0)

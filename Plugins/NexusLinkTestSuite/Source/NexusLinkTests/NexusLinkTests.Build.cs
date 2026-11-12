@@ -33,6 +33,7 @@ public class NexusLinkTests : ModuleRules
 
 		if (Target.bBuildEditor)
 		{
+			PrivateDependencyModuleNames.Add(NexusLinkOptionalPlugins.MeetsMinEngineVersion(Target,5,0) ? "ToolWidgets" : "EditorWidgets");
             string RegistryProjectRoot = NexusLinkOptionalPlugins.FindProjectRoot(ModuleDirectory);
             var RegistrySearchDirs = NexusLinkOptionalPlugins.CollectPluginSearchDirs(RegistryProjectRoot, this);
             var RegistryConfig = NexusLinkOptionalPlugins.Opt(new[] { "DataRegistry.uplugin" }, "WITH_NEXUS_TEST_DATA_REGISTRY", "NEXUS_TEST_DATA_REGISTRY", 5, 0, rt: new[] { "DataRegistry" }, uproj: "DataRegistry");
