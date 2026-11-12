@@ -63,6 +63,19 @@ struct FNexusReliabilityTestRow : public FTableRowBase
 	~FNexusReliabilityTestRow() { ++DestructionCount; }
 };
 
+/** 数组写入使用真实反射数值和嵌套结构，验证失败不能污染 CDO。 */
+UCLASS()
+class ANexusArrayEditTestActor : public AActor
+{
+	GENERATED_BODY()
+public:
+	UPROPERTY(EditAnywhere, Category="NexusTest") TArray<int32> Integers;
+	UPROPERTY(EditAnywhere, Category="NexusTest") TArray<uint8> Bytes;
+	UPROPERTY(EditAnywhere, Category="NexusTest") TArray<int64> WideIntegers;
+	UPROPERTY(EditAnywhere, Category="NexusTest") TArray<float> Floats;
+	UPROPERTY(EditAnywhere, Category="NexusTest") TArray<FNexusReliabilityTestRow> Rows;
+};
+
 /** CDO 引用为空、实例才创建的所属对象，覆盖属性 Schema 的实例发现。 */
 UCLASS(EditInlineNew)
 class UNexusOwnedSettingsTestObject : public UObject

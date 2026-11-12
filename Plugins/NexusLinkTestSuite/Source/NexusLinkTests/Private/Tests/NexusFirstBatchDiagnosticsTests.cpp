@@ -109,6 +109,32 @@ bool FNexusProfilerCsvQueryTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("区间均值"), Stat->GetNumberField(TEXT("Mean")), 25.0);
 	TestEqual(TEXT("区间总和"), Stat->GetNumberField(TEXT("Total")), 50.0);
 	TestEqual(TEXT("区间样本数"), static_cast<int32>(Stat->GetNumberField(TEXT("SampleCount"))), 2);
+	// 真实捕获将 EVENTS 放在第一列；流式捕获用尾部完整表头补足早期未出现的统计项。
+	for (bool bHeaderAtEnd : {false, true})
+	{
+		const FString Csv = FString(bHeaderAtEnd ? TEXT("EVENTS,FrameTime\n,10\n") : TEXT("EVENTS,FrameTime,GameThread\n,10,1\n"))
+			+ TEXT("\"Begin,phase \"\"A\"\";Tick\",20,2\n\"\",30,3\n")
+			+ (bHeaderAtEnd ? TEXT("EVENTS,FrameTime,GameThread\n[HasHeaderRowAtEnd],1\n") : TEXT(""));
+		FFileHelper::SaveStringToFile(Csv, *Path);
+		Read = FirstBatchCall(TEXT("GetProfilerCsv"), Args);
+		if (!TestFalse(TEXT("含空 EVENTS 的捕获可读"), Read.HasErrors()) || !Read.Entries.Num()) return false;
+		const auto FrameStats = Read.Entries[0]->AsObject()->GetArrayField(TEXT("Stats"));
+		if (!TestEqual(TEXT("统计列不偏移"), FrameStats.Num(), 1)) return false;
+		TestEqual(TEXT("FrameTime 区间均值不受空事件影响"), FrameStats[0]->AsObject()->GetNumberField(TEXT("Mean")), 25.0);
+		Args->SetStringField(TEXT("StatFilter"), TEXT("GameThread"));
+		auto GameThread = FirstBatchCall(TEXT("GetProfilerCsv"), Args);
+		if (!TestFalse(TEXT("末尾统计列可读"), GameThread.HasErrors()) || !GameThread.Entries.Num()) return false;
+		TestEqual(TEXT("GameThread 未被事件列吞掉"), GameThread.Entries[0]->AsObject()->GetArrayField(TEXT("Stats"))[0]->AsObject()->GetNumberField(TEXT("Total")), 5.0);
+		Args->SetStringField(TEXT("Action"), TEXT("Events")); Args->SetNumberField(TEXT("FrameStart"), 0);
+		auto EventsRead = FirstBatchCall(TEXT("GetProfilerCsv"), Args);
+		if (!TestFalse(TEXT("事件可读"), EventsRead.HasErrors()) || !EventsRead.Entries.Num()) return false;
+		const auto Events = EventsRead.Entries[0]->AsObject()->GetArrayField(TEXT("Events"));
+		if (!TestEqual(TEXT("空事件不生成记录"), Events.Num(), 2)) return false;
+		TestEqual(TEXT("引号及逗号保留"), Events[0]->AsObject()->GetStringField(TEXT("Name")), FString(TEXT("Begin,phase \"A\"")));
+		TestEqual(TEXT("事件帧号不偏移"), static_cast<int32>(Events[0]->AsObject()->GetNumberField(TEXT("Frame"))), 1);
+		TestEqual(TEXT("分号分隔事件"), Events[1]->AsObject()->GetStringField(TEXT("Name")), FString(TEXT("Tick")));
+		Args->SetStringField(TEXT("Action"), TEXT("Stats")); Args->SetStringField(TEXT("StatFilter"), TEXT("FrameTime")); Args->SetNumberField(TEXT("FrameStart"), 1);
+	}
 	Args->SetNumberField(TEXT("FrameEnd"), 99);
 	TestTrue(TEXT("越界区间拒绝"), FirstBatchCall(TEXT("GetProfilerCsv"), Args).HasErrors());
 	Args->SetNumberField(TEXT("FrameEnd"), 3);
