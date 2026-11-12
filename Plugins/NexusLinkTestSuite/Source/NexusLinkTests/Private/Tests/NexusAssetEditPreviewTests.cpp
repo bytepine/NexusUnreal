@@ -75,7 +75,7 @@ bool FNexusAssetScalarPreviewTest::RunTest(const FString& Parameters)
 	const TCHAR* ValidSamples[][2] = {
 		{TEXT("Count"), TEXT("0")}, {TEXT("bEnabled"), TEXT("false")}, {TEXT("Weight"), TEXT("0")},
 		{TEXT("Count"), TEXT("00012")}, {TEXT("bEnabled"), TEXT("true")}, {TEXT("Weight"), TEXT("2.5")},
-		{TEXT("Label"), TEXT("hello")}, {TEXT("Key"), TEXT("MyName")}, {TEXT("Text"), TEXT("hello")}, {TEXT("Choice"), TEXT("Second")}};
+		{TEXT("Label"), TEXT("hello")}, {TEXT("Key"), TEXT("MyName")}, {TEXT("Text"), TEXT("hello")}, {TEXT("Choice"), TEXT("Second")}, {TEXT("Values"), TEXT("(1,2)")}};
 	for (const auto& Sample : ValidSamples)
 	{
 		TSharedPtr<FJsonObject> Args = AssetEditArgs(Table.Get(), TEXT("ManageAssetDataTable"), TEXT("Set"), Sample[0], Sample[1]);
@@ -85,12 +85,13 @@ bool FNexusAssetScalarPreviewTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Preview keeps package clean"), Package->IsDirty());
 	TestEqual(TEXT("Preview never records Undo"), GEditor->Trans->GetQueueLength(), UndoCount);
 	TestEqual(TEXT("Preview never modifies row"), Table->FindRow<FNexusReliabilityTestRow>(TEXT("Row"), TEXT("Test"))->Count, 7);
+	TestEqual(TEXT("Array preview never modifies row"), Table->FindRow<FNexusReliabilityTestRow>(TEXT("Row"), TEXT("Test"))->Values.Num(), 0);
 	const TCHAR* InvalidSamples[][2] = {
 		{TEXT("Count"), TEXT("2147483648")}, {TEXT("Count"), TEXT("7oops")}, {TEXT("Weight"), TEXT("nan")},
-		{TEXT("bEnabled"), TEXT("not-bool")}, {TEXT("Values"), TEXT("(1,2)")}};
+		{TEXT("bEnabled"), TEXT("not-bool")}, {TEXT("Values"), TEXT("not-an-array")}};
 	for (const auto& Sample : InvalidSamples)
 	{
-		TestTrue(TEXT("Invalid values/types rejected"), AssetEditCall(TEXT("GetAssetEditPreview"),
+		TestTrue(FString::Printf(TEXT("Invalid %s=%s rejected"), Sample[0], Sample[1]), AssetEditCall(TEXT("GetAssetEditPreview"),
 			AssetEditArgs(Table.Get(), TEXT("ManageAssetDataTable"), TEXT("Set"), Sample[0], Sample[1])).HasErrors());
 	}
 	TestFalse(TEXT("Rejected previews keep package clean"), Package->IsDirty());

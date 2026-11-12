@@ -1,5 +1,7 @@
 # NexusUnreal — pytest E2E 测试
 
+迁移反馈回归：Automation `NexusLink.FeedbackMigration` 在隔离 Editor-Cmd 验证 UTF-8 分片收包/累计上限、临时 SuperFunction 保存拦截、BodyInstance 零值完整恢复、自定义事件命名/冲突、嵌套默认值/缺失路径、类型化数组设置/清空及结构体验证、继承 getter 同型重映射的 dry-run/连线保留、CDO 空引用时的实例所属对象 Schema，以及过宽搜索的收窄建议。隔离宿主使用空 Content 与匹配引擎的模块配置，不加载业务资产。
+
 关联能力回归：Automation `NexusLink.EditorRelated` 覆盖完整容器类型回读和 UDS 元数据生命周期、继承组件写入/恢复及拥有子对象 Undo、恢复拒绝外部资产路径、科学计数法预览/验证与非法输入无写入、局部重命名、成员类型变更、DataAsset/Level 前值与回读、父组件基准及恢复、专用蓝图重设父类、导出只验证/冲突、编译失败保留磁盘字节、真实 Recast 多 Agent/投影和 AI 请求状态。`Tests/test_24_editor_related_capabilities.py` 覆盖 MCP 读写链，资产编辑器列表/脏资产关闭拒绝、行为树编辑后重新打开及 PIE AI 查询/停止标记 requires_gui。
 
 编辑器缺口：Automation `NexusLink.EditorGaps` 验证重设父类及 Undo/继承循环/数据丢失前置条件，真实 NavigationSystem 分派的完整/部分路径、普通 Actor 无移动，以及资产编辑器实际打开、聚焦和只验证；导航使用确定性 ANavigationData 夹具，无需构建 Recast 网格。MCP 用例在 `test_23_editor_feedback_gaps.py`，实际打开编辑器用例标记 `requires_gui`，其余可 headless 执行。
