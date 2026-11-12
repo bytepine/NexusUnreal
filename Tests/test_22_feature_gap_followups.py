@@ -120,7 +120,6 @@ def test_gap_first_import_and_conflicts(mcp, require_tools, test_ns, tmp_path, k
     assert replacement["Path"] == first["Path"], replacement
 
 
-@pytest.mark.skipif_ue_below("5.2")
 def test_gap_bone_pose_sampling(mcp, require_tools):
     require_tools("GetAssetAnimSequence")
     path = first_asset_path(mcp, "AnimSequence", path_filter="/Game/Characters/")

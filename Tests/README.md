@@ -259,4 +259,6 @@ C++ `NexusLink.EditorOperations` 覆盖操作归属、最终压缩输出 Schema�
 
 `NexusLink.FeedbackNov10` 验证实际流送 ULevel 的 Actor 所属范围与预览/写入/删除、组件世界变换刷新、混合校验批提前拒绝、导航体积原生几何及调整、空默认 BrushBuilder 非致命读取、发现状态即时更新，以及只读/Windows 外部文件锁保存失败时原文件不变。`NexusLink.EditorOperations.SlateInput` 使用 SSearchBox 覆盖替换输入。
 
+`NexusLink.FeedbackNov12` 验证 UE4/UE5 骨骼采样、BlendSpace1D 原生插值、嵌套状态图读写、隐藏关卡导航数据块与原生地图保存、无有效地图对象时的非致命拒绝，以及原生组件的标量校验与数组恢复混合批。`test_26_feedback_nov12.py` 验证 1D 保存/卸载/重载与跨目标 7 个蓝图的变量写入；使用 headless 独立测试宿主。
+
 `NexusLink.FirstBatch` 覆盖慢任务协议拒绝和恢复、静态 UMG 来源/绑定证据、CSV 区间聚合及坏列拒绝。`test_24_first_batch_diagnostics.py` 验证实时耗时、CSV 快照、UMG 诊断、慢任务期间真实 HTTP 响应、玩家按键/单帧/Action 注入、所属会话隔离、PIE 清理、多人世界选择与 CommonUI 实际激活事件；游戏和模态场景需要 `--gui`，CommonUI/进度泵需要 UE5.9。测试客户端仅在收到 EditorBusy 且 bExecuted=false 时有限重试，超时和断连不重试写入。
