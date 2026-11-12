@@ -239,7 +239,7 @@ UE4 的 Store 用例在独立临时目录启动自动分配端口的 Store，不
 
 `test_15_editor_operations.py` 覆盖错误操作 ID、Slate 只读与截图（GUI）、本地 Automation 发现及完整名称运行。所有状态经 `GetEditorOperation` 查询，不从代理缓存读取。
 
-C++ `NexusLink.EditorOperations` 覆盖操作归属、最终压缩输出 Schema、批次预检和 GUI 中文输入、点击、按键、禁用/隐藏/失效 Ref。GUI 探针需要会话明确启用危险能力。隔离工程加 `-NexusEditorOperationFailureProbe` 后，`NexusLink.EditorOperations.Probe.Outcome` 会故意失败，用于检查适配层逐项失败结果；普通测试不启用该参数。`Probe.Latent` 用于进度、有限等待和停止边界验证。
+C++ `NexusLink.EditorOperations` 覆盖操作归属、最终压缩输出 Schema、批次预检和 GUI 中文输入、点击、按键、禁用/隐藏/失效 Ref。GUI 探针沿用专用写能力的启用状态；`NexusLink.DangerousCap.Tags` 验证仅任意代码执行入口带危险标签。隔离工程加 `-NexusEditorOperationFailureProbe` 后，`NexusLink.EditorOperations.Probe.Outcome` 会故意失败，用于检查适配层逐项失败结果；普通测试不启用该参数。`Probe.Latent` 用于进度、有限等待和停止边界验证。
 
 自动启动等待就绪时按本次编辑器 PID 的实例注册文件绑定端口；多个编辑器同时启动不会因先监听的端口而连接到另一个工程。
 

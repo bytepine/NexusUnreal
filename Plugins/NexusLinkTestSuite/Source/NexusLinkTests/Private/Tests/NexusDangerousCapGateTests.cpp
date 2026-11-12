@@ -17,8 +17,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FNexusDangerousCapTagTest::RunTest(const FString& Parameters)
 {
 	const TCHAR* Names[] = {
-		TEXT("exec_command"),
-		TEXT("exec_python"),
+		TEXT("ExecCommand"),
+		TEXT("ExecPython"),
+		TEXT("EvalRuntimeLua"),
+		TEXT("DofileRuntimeLua"),
 	};
 	int32 Found = 0;
 	for (const TCHAR* Name : Names)
@@ -39,9 +41,19 @@ bool FNexusDangerousCapTagTest::RunTest(const FString& Parameters)
 		TestTrue(FString::Printf(TEXT("%s schema has reason"), Name),
 			Rec->Def.InputSchema.IsValid()
 			&& Rec->Def.InputSchema->TryGetObjectField(TEXT("properties"), Props)
-			&& Props && (*Props)->HasField(TEXT("reason")));
+			&& Props && (*Props)->HasField(TEXT("Reason")));
 	}
-	TestTrue(TEXT("at least exec_command is registered"), Found >= 1);
+	TestTrue(TEXT("at least ExecCommand is registered"), Found >= 1);
+	for (const FCapRecord& Record : FNexusCapabilityRegistry::Get().GetAllRecords())
+	{
+		bool bExecutesArbitraryCode = false;
+		for (const TCHAR* Name : Names)
+		{
+			bExecutesArbitraryCode |= Record.Def.Name == Name;
+		}
+		TestEqual(FString::Printf(TEXT("%s is dangerous only for arbitrary code execution"), *Record.Def.Name),
+			Record.Def.HasTag(FNexusMcpTags::Dangerous), bExecutesArbitraryCode);
+	}
 	TestFalse(TEXT("search_asset is not dangerous"),
 		FNexusDangerousCapGate::IsDangerous(TEXT("search_asset")));
 	return true;
