@@ -243,7 +243,7 @@ UE4 的 Store 用例在独立临时目录启动自动分配端口的 Store，不
 
 `test_15_editor_operations.py` 覆盖错误操作 ID、Slate 只读与截图（GUI）、本地 Automation 发现及完整名称运行。所有状态经 `GetEditorOperation` 查询，不从代理缓存读取。
 
-C++ `NexusLink.EditorOperations` 覆盖操作归属、最终压缩输出 Schema、批次预检和 GUI 中文输入、点击、按键、禁用/隐藏/失效 Ref。`NexusLink.EditorOperations.SlatePointer` 检查右键/中键、双击、滚轮、修饰键、归一化位置及同控件拖动的实际事件，并验证父 Ref/本地尺寸输出和非法参数在输入前被拒绝；MCP 回归在 `test_27_editor_pointer.py`，通过 `py Script/run_e2e.py --gui -k editor_pointer` 执行，需要 GUI，不把模态窗口列为支持场景。GUI 探针沿用专用写能力的启用状态；`NexusLink.DangerousCap.Tags` 验证仅任意代码执行入口带危险标签。隔离工程加 `-NexusEditorOperationFailureProbe` 后，`NexusLink.EditorOperations.Probe.Outcome` 会故意失败，用于检查适配层逐项失败结果；普通测试不启用该参数。`Probe.Latent` 用于进度、有限等待和停止边界验证。
+C++ `NexusLink.EditorOperations` 覆盖操作归属、最终压缩输出 Schema、批次预检和 GUI 中文输入、点击、按键、禁用/隐藏/失效 Ref。`NexusLink.EditorOperations.SlatePointer` 检查右键/中键、双击、滚轮、修饰键、归一化位置及同控件拖动的实际事件，覆盖左/右/中键捕获后的持键移动、释放捕获与引擎 `DetectDrag`；并验证父 Ref/本地尺寸输出和非法参数在输入前被拒绝；MCP 回归在 `test_27_editor_pointer.py`，通过 `py Script/run_e2e.py --gui -k editor_pointer` 执行，需要 GUI，不把模态窗口列为支持场景。GUI 探针沿用专用写能力的启用状态；`NexusLink.DangerousCap.Tags` 验证仅任意代码执行入口带危险标签。隔离工程加 `-NexusEditorOperationFailureProbe` 后，`NexusLink.EditorOperations.Probe.Outcome` 会故意失败，用于检查适配层逐项失败结果；普通测试不启用该参数。`Probe.Latent` 用于进度、有限等待和停止边界验证。
 
 自动启动等待就绪时按本次编辑器 PID 的实例注册文件绑定端口；多个编辑器同时启动不会因先监听的端口而连接到另一个工程。
 

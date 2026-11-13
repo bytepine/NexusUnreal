@@ -209,12 +209,13 @@ bool FNexusEditorSearchableComboTest::RunTest(const FString& Parameters)
 
 struct FNexusSlatePointerState final
 {
-	int32 DownCount = 0, UpCount = 0, DoubleClickCount = 0, WheelCount = 0, HeldMoveCount = 0;
+	int32 DownCount = 0, UpCount = 0, DoubleClickCount = 0, WheelCount = 0, HeldMoveCount = 0, CapturedMoveCount = 0, DragDetectedCount = 0;
 	FKey LastButton;
 	FVector2D DownPosition, UpPosition, DoubleClickPosition, WheelPosition;
 	float WheelDelta = 0;
 	bool bCtrl = false, bShift = false, bAlt = false, bCmd = false;
 	bool bHideOnMove = false;
+	bool bCaptureOnDown = false, bDetectDrag = false;
 	void ReadModifiers(const FPointerEvent& Event)
 	{
 		bCtrl = Event.IsControlDown(); bShift = Event.IsShiftDown(); bAlt = Event.IsAltDown(); bCmd = Event.IsCommandDown();
@@ -238,11 +239,14 @@ public:
 	FReply OnMouseButtonDown(const FGeometry& Geometry, const FPointerEvent& Event) override
 	{
 		++State->DownCount; State->LastButton = Event.GetEffectingButton(); State->DownPosition = RelativePosition(Geometry, Event); State->ReadModifiers(Event);
+		if (State->bDetectDrag) return FReply::Handled().DetectDrag(SharedThis(this), Event.GetEffectingButton());
+		if (State->bCaptureOnDown) return FReply::Handled().CaptureMouse(SharedThis(this));
 		return FReply::Handled();
 	}
 	FReply OnMouseButtonUp(const FGeometry& Geometry, const FPointerEvent& Event) override
 	{
 		++State->UpCount; State->LastButton = Event.GetEffectingButton(); State->UpPosition = RelativePosition(Geometry, Event); State->ReadModifiers(Event);
+		if (State->bCaptureOnDown) return FReply::Handled().ReleaseMouseCapture();
 		return FReply::Handled();
 	}
 	FReply OnMouseButtonDoubleClick(const FGeometry& Geometry, const FPointerEvent& Event) override
@@ -252,8 +256,18 @@ public:
 	}
 	FReply OnMouseMove(const FGeometry&, const FPointerEvent& Event) override
 	{
-		if (Event.IsMouseButtonDown(EKeys::MiddleMouseButton)) ++State->HeldMoveCount;
+		if (Event.IsMouseButtonDown(EKeys::LeftMouseButton) || Event.IsMouseButtonDown(EKeys::RightMouseButton) || Event.IsMouseButtonDown(EKeys::MiddleMouseButton))
+		{
+			++State->HeldMoveCount;
+			if (HasMouseCapture()) ++State->CapturedMoveCount;
+			State->ReadModifiers(Event);
+		}
 		if (State->bHideOnMove) SetVisibility(EVisibility::Collapsed);
+		return FReply::Handled();
+	}
+	FReply OnDragDetected(const FGeometry&, const FPointerEvent& Event) override
+	{
+		++State->DragDetectedCount; State->ReadModifiers(Event);
 		return FReply::Handled();
 	}
 	FReply OnMouseWheel(const FGeometry& Geometry, const FPointerEvent& Event) override
@@ -267,6 +281,7 @@ class FNexusSlatePointerProbe final : public IAutomationLatentCommand
 {
 	FAutomationTestBase* Test;
 	TSharedPtr<SWindow> Window;
+	TSharedPtr<SNexusSlatePointerTarget> PointerTarget;
 	TSharedRef<FNexusSlatePointerState> Pointer = MakeShared<FNexusSlatePointerState>();
 	FString Owner = FGuid::NewGuid().ToString(), Ref, WindowRef;
 	int32 Phase = 0;
@@ -315,7 +330,7 @@ public:
 		if (Phase == 0)
 		{
 			Window = SNew(SWindow).Title(FText::FromString(TEXT("Nexus Pointer Probe ") + Owner)).ClientSize(FVector2D(420, 280))
-				[SNew(SNexusSlatePointerTarget, Pointer).Padding(0)[SNew(STextBlock).Text(FText::FromString(Owner))]];
+				[SAssignNew(PointerTarget, SNexusSlatePointerTarget, Pointer).Padding(0)[SNew(STextBlock).Text(FText::FromString(Owner))]];
 			FSlateApplication::Get().AddWindow(Window.ToSharedRef()); ReadyAt = FPlatformTime::Seconds() + 0.5; ++Phase; return false;
 		}
 		if (FPlatformTime::Seconds() < ReadyAt) return false;
@@ -382,13 +397,30 @@ public:
 		}
 		else if (Phase == 5)
 		{
-			auto Arguments = Input(TEXT("Drag")); Arguments->SetStringField(TEXT("EndRef"), Ref); Arguments->SetStringField(TEXT("Button"), TEXT("Middle"));
+			// 捕获鼠标的控件和引擎拖动检测都必须收到持键移动，不能只测普通冒泡事件。
+			Pointer->bCaptureOnDown = true;
+			for (const TCHAR* ButtonName : {TEXT("Left"), TEXT("Right"), TEXT("Middle")})
+			{
+				const int32 CapturedMovesBefore = Pointer->CapturedMoveCount, ReleasesBefore = Pointer->UpCount;
+				const FKey ButtonKey = FString(ButtonName) == TEXT("Left") ? EKeys::LeftMouseButton : FString(ButtonName) == TEXT("Right") ? EKeys::RightMouseButton : EKeys::MiddleMouseButton;
+				auto Arguments = Input(TEXT("Drag")); Arguments->SetStringField(TEXT("EndRef"), Ref); Arguments->SetStringField(TEXT("Button"), ButtonName);
+				Arguments->SetObjectField(TEXT("Position"), Position(.15, .25)); Arguments->SetObjectField(TEXT("EndPosition"), Position(.85, .75));
+				Arguments->SetArrayField(TEXT("Modifiers"), {MakeShared<FJsonValueString>(TEXT("Ctrl"))});
+				if (!Call(TEXT("InteractEditorSlate"), Arguments).IsValid()) return true;
+				Test->TestTrue(FString::Printf(TEXT("%s drag delivers held moves after mouse capture"), ButtonName), Pointer->CapturedMoveCount > CapturedMovesBefore);
+				Test->TestTrue(TEXT("Captured drag preserves button and modifiers"), Pointer->LastButton == ButtonKey && Pointer->bCtrl && !Pointer->bShift && !Pointer->bAlt && !Pointer->bCmd);
+				CheckPosition(TEXT("Captured drag starts at requested position"), Pointer->DownPosition, .15, .25);
+				CheckPosition(TEXT("Captured drag ends at requested position"), Pointer->UpPosition, .85, .75);
+				Test->TestEqual(TEXT("Captured drag emits mouse up"), Pointer->UpCount, ReleasesBefore + 1);
+				Test->TestFalse(TEXT("Drag releases mouse capture"), PointerTarget->HasMouseCapture());
+			}
+			Pointer->bCaptureOnDown = false; Pointer->bDetectDrag = true;
+			auto Arguments = Input(TEXT("Drag")); Arguments->SetStringField(TEXT("EndRef"), Ref);
 			Arguments->SetObjectField(TEXT("Position"), Position(.15, .25)); Arguments->SetObjectField(TEXT("EndPosition"), Position(.85, .75));
-			Arguments->SetArrayField(TEXT("Modifiers"), {MakeShared<FJsonValueString>(TEXT("Ctrl"))});
 			if (!Call(TEXT("InteractEditorSlate"), Arguments).IsValid()) return true;
-			Test->TestTrue(TEXT("Same-ref drag holds the middle button and modifiers"), Pointer->LastButton == EKeys::MiddleMouseButton && Pointer->HeldMoveCount > 0 && Pointer->bCtrl);
-			CheckPosition(TEXT("Same-ref drag starts at requested position"), Pointer->DownPosition, .15, .25);
-			CheckPosition(TEXT("Same-ref drag ends at requested position"), Pointer->UpPosition, .85, .75);
+			Test->TestEqual(TEXT("Drag triggers the engine drag detector"), Pointer->DragDetectedCount, 1);
+			Test->TestFalse(TEXT("Detected drag leaves no mouse capture"), PointerTarget->HasMouseCapture());
+			Pointer->bDetectDrag = false;
 		}
 		else
 		{
