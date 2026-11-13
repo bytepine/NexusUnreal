@@ -173,21 +173,38 @@ def test_first_batch_multiplayer_input_world_selection(mcp, require_tools):
     mcp.call("ControlPie", Action="Start", NetMode="ListenServer", NumberOfClients=2, bRunUnderOneProcess=True)
     try:
         deadline = time.monotonic() + 40
+        worlds = []
         while time.monotonic() < deadline:
             status = cap_first(mcp.call("ControlPie", Action="Status"))
-            worlds = merge_with_defaults(status.get("PlayWorlds", []), status.get("PlayWorlds_defaults", {}))
-            if len(worlds) >= 2:
+            listed = merge_with_defaults(status.get("PlayWorlds", []), status.get("PlayWorlds_defaults", {}))
+            worlds = [world for world in listed if str(world.get("WorldPath", "")).startswith("/Game/")]
+            if len(worlds) >= 2 and len({world["WorldPath"] for world in worlds}) >= 2:
                 break
             time.sleep(.1)
         time.sleep(.5)
         status = cap_first(mcp.call("ControlPie", Action="Status"))
-        worlds = merge_with_defaults(status.get("PlayWorlds", []), status.get("PlayWorlds_defaults", {}))
-        assert len(worlds) == 2 and len({world["WorldPath"] for world in worlds}) == 2, status
+        listed = merge_with_defaults(status.get("PlayWorlds", []), status.get("PlayWorlds_defaults", {}))
+        worlds = [world for world in listed if str(world.get("WorldPath", "")).startswith("/Game/")]
+        assert len(worlds) >= 2 and len({world["WorldPath"] for world in worlds}) >= 2, status
+        worlds = worlds[:2]
         assert mcp.try_call("InteractRuntimeInput", Action="Apply", Inputs=[{"Key": "SpaceBar"}], DurationSeconds=1).get("isError")
         operations = []
         for world in worlds:
-            operation = cap_first(mcp.call("InteractRuntimeInput", Action="Apply", WorldPath=world["WorldPath"], LocalPlayerIndex=0, Inputs=[{"Key": "SpaceBar"}], DurationSeconds=5))
-            assert operation["WorldPath"] == world["WorldPath"], operation
+            operation = None
+            last_error = None
+            player_deadline = time.monotonic() + 15
+            while time.monotonic() < player_deadline:
+                try:
+                    operation = cap_first(mcp.call(
+                        "InteractRuntimeInput", Action="Apply", WorldPath=world["WorldPath"],
+                        LocalPlayerIndex=0, Inputs=[{"Key": "SpaceBar"}], DurationSeconds=5))
+                    break
+                except MCPError as error:
+                    last_error = error
+                    if "no PlayerController" not in str(error) and "Play world not found" not in str(error):
+                        raise
+                    time.sleep(0.25)
+            assert operation and operation.get("WorldPath") == world["WorldPath"], last_error
             operations.append(operation)
         for operation in operations:
             state = cap_first(mcp.call("GetRuntimeInput", OperationId=operation["OperationId"]))

@@ -8,7 +8,11 @@ public class NexusTarget : TargetRules
 	public NexusTarget(TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Game;
-#if UE_5_8_OR_LATER
+#if UE_5_9_OR_LATER
+		// V8 起 Game 与 UnrealGame 共用构建环境，IncludeTestsFolder 必须为 false。
+		DefaultBuildSettings = BuildSettingsVersion.V8;
+		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_9;
+#elif UE_5_8_OR_LATER
 		DefaultBuildSettings = BuildSettingsVersion.V7;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_8;
 #elif UE_5_7_OR_LATER

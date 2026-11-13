@@ -8,7 +8,10 @@ public class NexusEditorTarget : TargetRules
 	public NexusEditorTarget(TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Editor;
-#if UE_5_8_OR_LATER
+#if UE_5_9_OR_LATER
+		DefaultBuildSettings = BuildSettingsVersion.V8;
+		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_9;
+#elif UE_5_8_OR_LATER
 		DefaultBuildSettings = BuildSettingsVersion.V7;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_8;
 #elif UE_5_7_OR_LATER

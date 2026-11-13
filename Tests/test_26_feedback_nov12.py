@@ -55,3 +55,33 @@ def test_feedback_blueprint_cross_target_batch(mcp, require_tools, test_ns):
         mcp.call("ManageAssetBlueprint", AssetPath=path, bCompile=True, bVerify=verify, Operations=[{
             "Action": "SetComponentProperty", "ComponentName": "CharacterMesh0", "PropertyPath": "bHiddenInGame", "Value": "true",
         }])
+
+
+def test_feedback_blueprint_array_and_inherited_remap(mcp, require_tools, test_ns):
+    require_tools("CreateAssetBlueprint", "ManageAssetBlueprint", "CompileBlueprint")
+    parent, child = f"{test_ns}/BP_ArrayParent", f"{test_ns}/BP_ArrayChild"
+    mcp.call("CreateAssetBlueprint", AssetPath=parent, ParentClass="Actor")
+    mcp.call("ManageAssetBlueprint", AssetPath=parent, bCompile=True, Operations=[
+        {"Action": "AddVariable", "VariableName": "Scores", "VariableType": "Array<int>", "bIsPublic": True},
+        {"Action": "AddVariable", "VariableName": "Bonuses", "VariableType": "Array<int>", "bIsPublic": True},
+    ])
+    written = cap_first(mcp.call("ManageAssetBlueprint", AssetPath=parent, bCompile=True, Operations=[{
+        "Action": "SetArray", "PropertyPath": "Scores", "Values": [1, 2, 3],
+    }]))
+    assert not written.get("Error"), written
+    cleared = cap_first(mcp.call("ManageAssetBlueprint", AssetPath=parent, bCompile=True, Operations=[{
+        "Action": "ClearArray", "PropertyPath": "Scores",
+    }]))
+    assert not cleared.get("Error"), cleared
+    mcp.call("CreateAssetBlueprint", AssetPath=child, ParentClass=parent)
+    mcp.call("CompileBlueprint", AssetPath=child)
+    remap = cap_first(mcp.call("ManageAssetBlueprint", AssetPath=child, Operations=[{
+        "Action": "RemapMemberReferences", "OldMemberName": "Scores", "NewMemberName": "Bonuses", "bValidateOnly": True,
+    }]))
+    assert remap.get("bValidateOnly") is True and remap.get("ReferenceCount") == 0, remap
+
+
+def test_commonui_action_bindings_section(mcp, require_tools):
+    require_tools("GetCommonUIInfo")
+    bindings = cap_first(mcp.call("GetCommonUIInfo", Sections=["ActionBindings"]))
+    assert "ActionBindings" in bindings, bindings

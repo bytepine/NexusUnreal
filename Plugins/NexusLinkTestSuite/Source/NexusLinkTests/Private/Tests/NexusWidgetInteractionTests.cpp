@@ -20,6 +20,7 @@
 #include "Misc/ScopeExit.h"
 #include "WidgetBlueprint.h"
 #include "Widgets/SOverlay.h"
+#include "Slate/SObjectWidget.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusWidgetInteractionTest, "NexusLink.Runtime.Widget.ExactInteraction",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -38,14 +39,30 @@ bool FNexusWidgetInteractionTest::RunTest(const FString& Parameters)
 	UGameViewportClient* Viewport = NewObject<UGameViewportClient>(GEngine);
 	Context.GameViewport = Viewport;
 	TSharedRef<SOverlay> Overlay = SNew(SOverlay);
-    // The fixture intentionally mounts an isolated overlay without a real viewport.
-    PRAGMA_DISABLE_DEPRECATION_WARNINGS
-    Viewport->SetViewportOverlayWidget(nullptr, Overlay);
-    PRAGMA_ENABLE_DEPRECATION_WARNINGS
+	// 故意挂一个独立 overlay，不使用真实视口。
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+	Viewport->SetViewportOverlayWidget(nullptr, Overlay);
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	TArray<UUserWidget*> Instances;
 	ON_SCOPE_EXIT
 	{
-		for (UUserWidget* Instance : Instances) Instance->RemoveFromParent();
+		for (UUserWidget* Instance : Instances)
+		{
+			if (!Instance) continue;
+			Instance->RemoveFromParent();
+			// SObjectWidget 只要还活着就会把 UUserWidget 记进 GC 根，拖住整个世界。
+			if (TSharedPtr<SWidget> Cached = Instance->GetCachedWidget())
+			{
+				if (Cached->GetType() == TEXT("SObjectWidget"))
+				{
+					static_cast<SObjectWidget*>(Cached.Get())->ResetWidget();
+				}
+			}
+			Instance->ReleaseSlateResources(true);
+		}
+		Viewport->RemoveAllViewportWidgets();
+		Overlay->ClearChildren();
+		Context.GameViewport = nullptr;
 		GEngine->DestroyWorldContext(World);
 		World->DestroyWorld(false);
 	};

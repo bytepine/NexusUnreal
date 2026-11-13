@@ -81,7 +81,7 @@
 
 ### Fixed
 
-- 新增 `NexusLink.FeedbackNov12` 与 `test_26_feedback_nov12.py`，覆盖低版本骨骼采样、BlendSpace1D 插值及持久化、嵌套状态图、隐藏关卡导航数据块和地图保存、混合标量校验/数组恢复，以及原生组件与跨目标蓝图批次写入。
+- 新增 `NexusLink.FeedbackNov12` 与 `test_26_feedback_nov12.py`，覆盖低版本骨骼采样、BlendSpace1D 插值及持久化、嵌套状态图、隐藏关卡导航数据块和地图保存、混合标量校验/数组恢复、原生组件与跨目标蓝图批次写入，以及 `SetArray`/`ClearArray`、继承成员只验证重映射、导航体积调整、`ActorPropertySchema`/`Navigation` 与 CommonUI `ActionBindings`。
 - Retarget 原生回归按引擎版本构造动画数据，兼容 UE 4 原始轨道与 UE 5 动画数据控制器接口；图片批次回归使用规范的 `Calls` 参数验证内联图片透传，覆盖混合截图类型时按时间保留最新文件和保留无关文件。
 
 - 同步 PascalCase 业务字段及 Lua 能力名的 L1 / Python 回归与行为树验收脚本；新增真实输入 Schema、创建返回字段、路径回显、Lua 类型元数据及反馈分类汇总回归。
@@ -94,9 +94,10 @@
 - fix(test): GUI e2e 启动加 `-LiveCoding=false`，避免 `SaveAsset` 被 Live Coding 降级为 deferred
 - fix(test): `ManageAssetLuaBinding` 未知 action 由 schema enum 拦下，断言改为 `MCPError`
 - fix(unlua): UnLuaTestSuite 在 UE 5.4+ 用 `SetBegunPlay` 替代直接写 `bBegunPlay`（5.8 起为 private，5.4–5.7 直接写会 C4996）
-- fix(unreal): 跨版本 Target/模块——`V2`（UE4 / 5.0–5.2）/`V4`（5.3）/`V5`（5.4–5.6）/`V6`+`Unreal5_7`（5.7）/`V7`+`Unreal5_8`（5.8）；玩法变体 `NexusGameplay` ExtraModuleNames 5.6+（5.3+ 仍会因 uproject Modules 编进该模块）；AI 控制器 UPROPERTY 用基类 `UStateTreeComponent*`，5.5+ 才创建 `UStateTreeAIComponent`（5.4 无 MODULE_API 导出）；编辑器 `GetDescription` 仅 5.5+；`MakeWeakExecutionContext` 仅 5.6+；`SetBodySimulatePhysics` 仅 5.4+；冲动量去掉 `Units=cm/s`；`InputAction.h` 不再写 `EnhancedInput/Public/` 前缀；4.26 用 `NexusInputStubs`；uproject 将 StateTree/MVVM/PCG 等标为 Optional；`UEnvQueryContext_Danger` 改 `NEXUSGAMEPLAY_API`；`LogNexus` 导出 `NEXUS_API`；StateTree 实例数据宏走 `NexusGameplayVersionCompat.h`（`NG_UE_HAS_*`）
+- fix(unreal): 跨版本 Target/模块——`V2`（UE4 / 5.0–5.2）/`V4`（5.3）/`V5`（5.4–5.6）/`V6`+`Unreal5_7`（5.7）/`V7`+`Unreal5_8`（5.8）/`V8`+`Unreal5_9`（5.9，Game 的 IncludeTestsFolder 与 UnrealGame 一致）；玩法变体 `NexusGameplay` ExtraModuleNames 5.6+（5.3+ 仍会因 uproject Modules 编进该模块）；AI 控制器 UPROPERTY 用基类 `UStateTreeComponent*`，5.5+ 才创建 `UStateTreeAIComponent`（5.4 无 MODULE_API 导出）；编辑器 `GetDescription` 仅 5.5+；`MakeWeakExecutionContext` 仅 5.6+；`SetBodySimulatePhysics` 仅 5.4+；冲动量去掉 `Units=cm/s`；`InputAction.h` 不再写 `EnhancedInput/Public/` 前缀；4.26 用 `NexusInputStubs`；uproject 将 StateTree/MVVM/PCG 等标为 Optional；`UEnvQueryContext_Danger` 改 `NEXUSGAMEPLAY_API`；`LogNexus` 导出 `NEXUS_API`；StateTree 实例数据宏走 `NexusGameplayVersionCompat.h`（`NG_UE_HAS_*`）
 - fix(test): 全量 e2e 对齐——`skipif_ue_below` 移入 `pytest_runtest_setup`；用例统一 `cap_first` / `operations[]`；EQS 缺 cap 时 skip；`audit_capability_naming` 补 `unload`、期望数 176；GUI/PIE 对齐 `SpawnRuntimeActor` 单条、`ControlPie` results[]、`SetRuntimeWidgetProperty` 的 `updates[]`；补覆盖用例参数对齐真实 Schema（`RootMotion`/`anchorMin*`/`attribute`/`StartFrame`/`HalfHeight`/`updates[].ActorName`），schema 校验失败 skip 而非 fail
 - fix(test): `test_bp_graph_connect_exec` 缺 BeginPlay 时经 `ManageAssetBlueprint` 补 `K2Node_Event`；`test_anim_montage_create` 创建后 `AddSegment`（Mannequin Idle）并 save；`ExecCommand` 改用 `stat fps`（避免 `help stat` 弹 `ConsoleHelp.html`）
 - fix(test): `ue_launcher` 自动拉起时跳过启动前已在听的 MCP 端口，避免本机已有 Editor 占着 `:45000` 时把 headless 新实例误接到旧进程
 - fix(test): 用例与真实 Schema 对齐（此前这些 cap 因可选插件未启用而从未真跑过）——MetaSound 用 `ClassId`/`NodeId`/`FromNodeId`；MVVM `AddBinding` 不吃参数、`RemoveBinding` 只认 `BindingIndex`；InputAction `RemoveTrigger`/`RemoveModifier` 按 `ClassName` 而非 `index`、`SetFlags` 用 `bConsumesInput`；`not_a_real_action` 负例统一接受 schema 层 `MCPError`（IKRig / MVVM / PCG / ControlRig）
 - fix(test): `test_101` 的 `f"/Game/{test_ns}"` 把已带前缀的 ns 再拼一次，拼出 `/Game//Game/...`；`test_108` 的 StringTable 与 `test_97_statetree_manage` 撞同一个 `{test_ns}/ST_Created`，先跑的占位导致 StateTree 整组 not found，改名 `StrTable_Created`；IMC 单条结果响应被压平后 `results` 为空，改走 `or [cap_first(...)]`
+- fix(test): 控件交互自动化在销毁临时世界前摘掉视口层上的 Slate 控件，避免 `SObjectWidget` 拖住世界导致编辑器退出。

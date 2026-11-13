@@ -126,6 +126,29 @@ def test_feedback_navigation_bounds_and_build(mcp, require_tools, feedback_level
     assert point["bProjected"], point
 
 
+def test_feedback_level_schema_navigation_resize(mcp, require_tools, feedback_level):
+    require_tools("ManageAssetLevel", "GetAssetLevel")
+    created = cap_first(mcp.call("ManageAssetLevel", AssetPath=feedback_level, Operations=[{
+        "Action": "CreateNavMeshBoundsVolume",
+        "BoundsMin": {"X": -100, "Y": -100, "Z": 0},
+        "BoundsMax": {"X": 100, "Y": 100, "Z": 200},
+        "ActorName": "NavBoundsCoverage",
+    }]))
+    assert created.get("ActorName"), created
+    resized = cap_first(mcp.call("ManageAssetLevel", AssetPath=feedback_level, Operations=[{
+        "Action": "ResizeNavMeshBoundsVolume",
+        "ActorName": created["ActorName"],
+        "BoundsMin": {"X": -50, "Y": -50, "Z": 0},
+        "BoundsMax": {"X": 50, "Y": 50, "Z": 100},
+    }]))
+    assert resized.get("ActorName") == created["ActorName"], resized
+    schema = cap_first(mcp.call(
+        "GetAssetLevel", AssetPath=feedback_level, Sections=["ActorPropertySchema"], ActorName=created["ActorName"]))
+    assert schema.get("PropertySchemas"), schema
+    navigation = cap_first(mcp.call("GetAssetLevel", AssetPath=feedback_level, Sections=["Navigation"]))
+    assert "NavDataChunkCount" in navigation, navigation
+
+
 @pytest.mark.parametrize("query,expected", [("Retarget", "ManageAssetAnimSequence"), ("actor collision", "GetRuntimeActorProperty"), ("Lua inspect", "GetRuntimeLuaObject")])
 def test_feedback_search_terms(mcp, require_tools, query, expected):
     require_tools(expected)
