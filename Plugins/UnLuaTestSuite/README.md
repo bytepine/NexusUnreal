@@ -1,5 +1,7 @@
 # UnLuaTestSuite
 
+中文 | [English](README.en.md)
+
 从 [Tencent/UnLua](https://github.com/Tencent/UnLua) v2.3.6 示例工程提取的回归测试插件，放在本示例工程侧，**不**进入 UnLua 插件仓。
 
 对应的 Lua 脚本在工程 `Content/Script/Tests/`（UnLua 默认从 `Content/Script/?.lua` 加载）。
