@@ -8,6 +8,7 @@ import pytest
 from _framework.assertions import merge_with_defaults
 from _framework.asset_helpers import resolve_skeleton
 from _framework.mcp_client import cap_first
+from test_15_editor_operations import operation_result
 
 
 def _items(payload, name):
@@ -207,3 +208,84 @@ def test_editor_graph_native_domain_views(mcp, require_tools, test_ns, kind):
     _control(mcp, path, graph_name, "ZoomToFit")
     after = _graph(mcp, path, graph_name)
     assert after["bDirty"] == baseline["bDirty"] and _layout(after) == _layout(baseline)
+
+
+@pytest.mark.requires_gui
+@pytest.mark.skipif_ue_below("5.8")
+def test_editor_graph_pcg_multi_document_views(mcp, require_tools):
+    require_tools("CreateAssetPCGGraph", "GetEditorGraph", "ControlEditorGraph", "SearchAsset",
+                  "ControlEditorAutomation", "GetEditorOperation", "ControlEditorAssetEditor")
+    discovery = dict(AssetType="PCGGraph", PathFilter="/Game/_McpTest/", NameFilter="PCG_DocumentFixture")
+    previous = {item["Path"] for item in _items(mcp.call("SearchAsset", **discovery), "Assets")}
+    operation_result(mcp, mcp.call("ControlEditorAutomation", Action="Discover"))
+    fixture = "NexusLink.EditorGraph.PCGMultiDocumentFixture"
+    result = operation_result(mcp, mcp.call("ControlEditorAutomation", Action="Run", TestNames=[fixture]))
+    assert len(result["Tests"]) == 1 and result["Tests"][0]["Outcome"] == "Passed", result
+    found = [item for item in _items(mcp.call("SearchAsset", **discovery), "Assets") if item["Path"] not in previous]
+    assert len(found) == 1, found
+    path = found[0]["Path"]
+    try:
+        inventory = cap_first(mcp.call("GetEditorGraph", AssetPath=path))
+        graphs = _items(inventory, "Graphs")
+        assert len(graphs) == 3, inventory
+        first = next(item["GraphName"] for item in graphs if item["GraphName"].startswith("GraphA."))
+        second = next(item["GraphName"] for item in graphs if item["GraphName"].startswith("GraphB."))
+        root = next(item["GraphName"] for item in graphs if item["GraphName"] not in {first, second})
+        baselines = {name: _graph(mcp, path, name) for name in (root, first, second)}
+        assert all(not snapshot["bDirty"] for snapshot in baselines.values()), baselines
+        probes = {}
+        for name, snapshot in baselines.items():
+            nodes = [node for node in _items(snapshot, "Nodes") if node["NodeClass"].endswith(".PCGEditorGraphNode")]
+            assert len(nodes) == 1, snapshot
+            probes[name] = nodes[0]["NodeId"]
+        assert len(set(probes.values())) == 3, probes
+        assert baselines[root]["bIsOpen"] and baselines[root]["bViewAvailable"], baselines[root]
+        for name in (first, second):
+            assert not baselines[name]["bIsOpen"] and not baselines[name]["bViewAvailable"], baselines[name]
+            assert "SelectedNodeIds" not in baselines[name], baselines[name]
+            assert not _graph(mcp, path, name)["bIsOpen"], name
+
+        def check_view(name, selected, x, y):
+            snapshot = _graph(mcp, path, name)
+            assert snapshot["bViewAvailable"] and set(snapshot["SelectedNodeIds"]) == set(selected), snapshot
+            assert abs(snapshot["ViewLocation"]["X"] - x) < 1 and abs(snapshot["ViewLocation"]["Y"] - y) < 1, snapshot
+            assert abs(snapshot["Zoom"] - 1) < .01, snapshot
+            return snapshot
+
+        root_id = probes[root]
+        _control(mcp, path, root, "SelectNodes", NodeIds=[root_id])
+        _control(mcp, path, root, "SetView", ViewLocation={"X": 31, "Y": 47}, Zoom=1)
+        check_view(root, [root_id], 31, 47)
+        for name, x, y in ((first, 101, -67), (second, 503, 211)):
+            opened = _control(mcp, path, name, "Open")
+            assert opened["bIsOpen"] and opened["bViewAvailable"], opened
+            node_id = probes[name]
+            _control(mcp, path, name, "SelectNodes", NodeIds=[node_id])
+            _control(mcp, path, name, "SetView", ViewLocation={"X": x, "Y": y}, Zoom=1)
+            check_view(name, [node_id], x, y)
+            check_view(root, [root_id], 31, 47)
+            if name == first:
+                assert not _graph(mcp, path, second)["bIsOpen"], second
+
+        first_id = probes[first]
+        second_id = probes[second]
+        check_view(first, [first_id], 101, -67)
+        rejected = mcp.try_call("ControlEditorGraph", AssetPath=path, GraphName=first,
+                               Action="SelectNodes", NodeIds=[first_id, second_id])
+        assert rejected.get("isError"), rejected
+        check_view(first, [first_id], 101, -67)
+        check_view(second, [second_id], 503, 211)
+        _control(mcp, path, first, "ClearSelection")
+        check_view(first, [], 101, -67)
+        check_view(second, [second_id], 503, 211)
+        _control(mcp, path, first, "SelectNodes", NodeIds=[first_id])
+        _control(mcp, path, first, "SetView", ViewLocation={"X": -199, "Y": 88}, Zoom=1)
+        check_view(first, [first_id], -199, 88)
+        check_view(second, [second_id], 503, 211)
+        check_view(root, [root_id], 31, 47)
+        for name in (root, first, second):
+            after = _graph(mcp, path, name)
+            assert _layout(after) == _layout(baselines[name]) and after["bDirty"] == baselines[name]["bDirty"], after
+    finally:
+        # 夹具仅驻内存且未落盘；关闭窗口后交会话清理，避免临时引用阻止删除而掩盖断言。
+        mcp.call("ControlEditorAssetEditor", AssetPath=path, Action="Close")

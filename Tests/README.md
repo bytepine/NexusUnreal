@@ -243,9 +243,9 @@ UE4 的 Store 用例在独立临时目录启动自动分配端口的 Store，不
 
 `test_15_editor_operations.py` 覆盖错误操作 ID、Slate 只读与截图（GUI）、本地 Automation 发现及完整名称运行。所有状态经 `GetEditorOperation` 查询，不从代理缓存读取。
 
-`test_28_editor_graph.py` 的 10 项用例覆盖专用 `GetEditorGraph` / `ControlEditorGraph`：headless 图发现、节点布局与分页/精确查询，以及 GUI 原生打开、视图定位、选择增删/清除、无效节点批次无部分选择和延迟定位/缩放。GUI 用例覆盖普通/控件/动画蓝图、材质/材质函数预览图、行为树和可用 PCG 图，验证导航不改变节点布局或源资产脏状态，不调用 Slate 输入接口。运行 `py Script/run_e2e.py --gui -k editor_graph`。
+`test_28_editor_graph.py` 的 11 项用例覆盖专用 `GetEditorGraph` / `ControlEditorGraph`：headless 图发现、节点布局与分页/精确查询，以及 GUI 原生打开、视图定位、选择增删/清除、无效节点批次无部分选择和延迟定位/缩放。GUI 用例覆盖普通/控件/动画蓝图、材质/材质函数预览图、行为树和可用 PCG 图，验证导航不改变节点布局或源资产脏状态，不调用 Slate 输入接口。UE 5.8+ 的 PCG 多文档用例先运行宿主 `NexusLink.EditorGraph.PCGMultiDocumentFixture`，以公开 PCG API 创建两个嵌入图并预建未打开的图数据，再由 MCP 发现资产和图路径，验证只读查询不开图、逐图打开，以及主图和两个子图的选择/视图隔离与布局不变。运行 `py Script/run_e2e.py --gui -k editor_graph`；只测 PCG 多文档时使用 `-k 'editor_graph_discovery or editor_graph_pcg_multi_document_views'`，保留发现用例以初始化引擎版本门控。
 
-`test_28_blueprint_graph_edit.py` 的 5 项 headless 用例验证结构体引脚拆分/重组、父子引脚与默认值读回、节点坐标/尺寸/注释，以及安全节点复制的内部连线、新 GUID 映射和偏移；覆盖单端复制不保留外部连线，拒绝连线引脚、标量引脚、不支持保留默认值的输入结构体、异图节点、边界节点、无效选集和越界/溢出偏移，失败后原图保持不变。运行 `py Script/run_e2e.py -k blueprint_graph_edit`。
+`test_28_blueprint_graph_edit.py` 的 9 项 headless 用例验证结构体引脚拆分/重组、父子引脚与默认值读回、节点坐标/尺寸/注释，以及安全节点复制的内部连线、新 GUID 映射和偏移；覆盖 Vector / Rotator / Vector2D / LinearColor 的大坐标、微小小数及修改子值后的合并/重拆精度，单端复制不保留外部连线，拒绝连线引脚、标量引脚、非法子默认值、不支持保留默认值的输入结构体、异图节点、边界节点、无效选集和越界/溢出偏移，失败后原图保持不变。运行 `py Script/run_e2e.py -k blueprint_graph_edit`。
 
 C++ `NexusLink.EditorOperations` 覆盖操作归属、最终压缩输出 Schema、批次预检和 GUI 中文输入、点击、按键、禁用/隐藏/失效 Ref。`NexusLink.EditorOperations.SlatePointer` 检查右键/中键、双击、滚轮、修饰键、归一化位置及同控件拖动的实际事件，覆盖左/右/中键捕获后的持键移动、释放捕获与引擎 `DetectDrag`；并验证父 Ref/本地尺寸输出和非法参数在输入前被拒绝；MCP 回归在 `test_27_editor_pointer.py`，通过 `py Script/run_e2e.py --gui -k editor_pointer` 执行，需要 GUI，不把模态窗口列为支持场景。GUI 探针沿用专用写能力的启用状态；`NexusLink.DangerousCap.Tags` 验证仅任意代码执行入口带危险标签。隔离工程加 `-NexusEditorOperationFailureProbe` 后，`NexusLink.EditorOperations.Probe.Outcome` 会故意失败，用于检查适配层逐项失败结果；普通测试不启用该参数。`Probe.Latent` 用于进度、有限等待和停止边界验证。
 

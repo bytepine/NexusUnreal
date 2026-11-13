@@ -1,6 +1,10 @@
 # Copyright byteyang. All Rights Reserved.
 """蓝图结构体引脚与选定节点复制：专用 MCP 操作，可在 headless 下运行。"""
 import uuid
+import re
+from decimal import Decimal
+
+import pytest
 
 from _framework.mcp_client import cap_first
 from _framework.assertions import merge_with_defaults
@@ -109,7 +113,7 @@ def test_blueprint_struct_pin_rejects_connected_scalar_and_foreign_nodes(mcp, re
         assert_rejected_without_changes(mcp, path, invalid)
 
     # SetNode 可直接写原始文本；SplitPin 必须在原生分量数 check 前拒绝非法默认值。
-    for invalid_default in ("1,2,3,4", "nan,2,3", "1e100,2,3", "oops,2,3"):
+    for invalid_default in ("1,2,3,4", "nan,2,3", "1e400,2,3", "oops,2,3"):
         edit(mcp, path, Action="SetNode", GraphName="EventGraph", NodeId=write_vector,
              PinName="GraphVector", PinDefaultValue=invalid_default)
         rejected = assert_rejected_without_changes(mcp, path, base)
@@ -150,6 +154,48 @@ def test_blueprint_struct_pin_preserves_unsupported_input_defaults(mcp, require_
     edit(mcp, path, Action="RecombinePin", GraphName="EventGraph", NodeId=getter, PinName="GraphTransform")
     restored = pin(graph_nodes(mcp, path)[getter], "GraphTransform")
     assert not restored["bHidden"] and not restored["SubPins"], restored
+
+
+@pytest.mark.parametrize("variable_type,default_value,source_values,edited_values", [
+    ("Vector", "16777217.125,0.000000000123456789,-2.345678901234567",
+     ("16777217.125", "0.000000000123456789", "-2.345678901234567"),
+     ("16777219.375", "0.000000000987654321", "-3.456789012345678")),
+    ("Rotator", "16777217.125,0.000000000123456789,-2.345678901234567",
+     ("16777217.125", "0.000000000123456789", "-2.345678901234567"),
+     ("16777219.375", "0.000000000987654321", "-3.456789012345678")),
+    ("Vector2D", "X=16777217.125 Y=0.000000000123456789",
+     ("16777217.125", "0.000000000123456789"), ("16777219.375", "0.000000000987654321")),
+    ("LinearColor", "(R=0.0000000123456789,G=0.234567891,B=0.345678912,A=0.456789123)",
+     ("0.0000000123456789", "0.234567891", "0.345678912", "0.456789123"),
+     ("0.0000000987654321", "0.345678912", "0.456789123", "0.567891234")),
+], ids=["vector", "rotator", "vector2d", "linear_color"])
+def test_blueprint_struct_pin_preserves_component_precision(mcp, require_tools, test_ns,
+                                                           variable_type, default_value, source_values, edited_values):
+    path = create_blueprint(mcp, require_tools, test_ns, f"StructPinPrecision_{variable_type}")
+    edit(mcp, path, Action="AddVariable", VariableName="PrecisionValue", VariableType=variable_type)
+    node_id = add_variable_node(mcp, path, "PrecisionValue", setter=True)
+    edit(mcp, path, Action="SetNode", GraphName="EventGraph", NodeId=node_id,
+         PinName="PrecisionValue", PinDefaultValue=default_value)
+    operation = dict(GraphName="EventGraph", NodeId=node_id, PinName="PrecisionValue")
+    split = edit(mcp, path, Action="SplitPin", **operation)["Node"]
+    parent = pin(split, "PrecisionValue")
+    child_names = parent["SubPins"]
+    expected_split = (source_values[2], source_values[0], source_values[1]) if variable_type == "Rotator" else source_values
+    assert parent["DefaultValue"] == default_value, parent
+    assert [Decimal(pin(split, child)["DefaultValue"]) for child in child_names] == [Decimal(value) for value in expected_split], split
+
+    # 合并必须采用当前子值，保留大坐标与细小小数，不能复用旧父值或先转成 float。
+    for child_name, value in zip(child_names, edited_values):
+        edit(mcp, path, Action="SetNode", GraphName="EventGraph", NodeId=node_id, PinName=child_name, PinDefaultValue=value)
+    edit(mcp, path, Action="SetNode", GraphName="EventGraph", NodeId=node_id, PinName=child_names[0], PinDefaultValue="nan")
+    assert_rejected_without_changes(mcp, path, dict(Action="RecombinePin", **operation))
+    edit(mcp, path, Action="SetNode", GraphName="EventGraph", NodeId=node_id, PinName=child_names[0], PinDefaultValue=edited_values[0])
+    recombined = edit(mcp, path, Action="RecombinePin", **operation)["Node"]
+    expected_parent = (edited_values[1], edited_values[2], edited_values[0]) if variable_type == "Rotator" else edited_values
+    actual_parent = re.findall(r"[-+]?(?:\d*\.\d+|\d+)(?:[eE][-+]?\d+)?", pin(recombined, "PrecisionValue")["DefaultValue"])
+    assert [Decimal(value) for value in actual_parent] == [Decimal(value) for value in expected_parent], recombined
+    split_again = edit(mcp, path, Action="SplitPin", **operation)["Node"]
+    assert [Decimal(pin(split_again, child)["DefaultValue"]) for child in pin(split_again, "PrecisionValue")["SubPins"]] == [Decimal(value) for value in edited_values], split_again
 
 
 def test_blueprint_duplicate_nodes_preserves_internal_links_offsets_and_comments(mcp, require_tools, test_ns):

@@ -18,6 +18,11 @@
 		{
 			"Name": "NexusLink",
 			"Enabled": true
+		},
+		{
+			"Name": "PCG",
+			"Enabled": true,
+			"Optional": true
 		}
 	],
 	"Modules": [
