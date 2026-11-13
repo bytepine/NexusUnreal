@@ -10,8 +10,11 @@ on:
       - 'Plugins/**'
       - 'Script/gas*.py'
       - 'Script/tests/test_gas*.py'
+      - 'Script/check_ue_ci_report.py'
+      - 'Script/tests/test_check_ue_ci_report.py'
       - 'Tests/GasRetest/**'
       - '.github/workflows/gas-regression.yml'
+      - '.github/workflows/ue-validation.yml'
   pull_request:
   workflow_dispatch:
 
@@ -35,6 +38,8 @@ jobs:
           python-version: '3.12'
       - name: Validate fixed cases, baselines and archive failure handling
         run: python -m unittest discover -s Script/tests -p 'test_gas*.py'
+      - name: Validate UE report gate without an engine
+        run: python -m unittest discover -s Script/tests -p 'test_check_ue_ci_report.py'
       - name: Validate replay and baseline comparison
         working-directory: Plugins/NexusLink/tools
         run: python -m unittest gas_retest.test_runner gas_retest.test_report gas_retest.test_compare

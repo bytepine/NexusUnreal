@@ -96,7 +96,19 @@ py Script/gas_regression.py --ue-root <UE_5.7-directory>
 
 基线更新须人工审查：先用插件工具的 `--save-baseline` 保存到一个新文件，检查断言、权威端事件和用例签名，再替换对应受版本控制的文件，与用例变更一起提交。汇总报告不能替代单个场景基线。无需 UE 的门禁/归档回归：`py -m unittest discover -s Script/tests -p 'test_gas*.py'`。
 
-[GAS Tools Checks 工作流](../.github/workflows/gas-regression.yml) 仅在 GitHub 提供的 Ubuntu 机器上执行无需 UE 的工具检查。UE 编译和联机复测由用户手动启动，不通过 GitHub 调度本机，也不安装后台 Runner。
+[GAS Tools Checks 工作流](../.github/workflows/gas-regression.yml) 在 GitHub 提供的 Ubuntu 机器上执行无需 UE 的工具检查及 UE 报告门禁测试。GAS 联机复测仍由用户手动启动；可选的 UE 编译与 MCP 验证工作流见下一节，仓库不会安装或注册 Runner。
+
+## UE 5.7 受控验证
+
+[UE 5.7 Validation](../.github/workflows/ue-validation.yml) 仅支持手动 `workflow_dispatch`，固定使用 Windows x64 / UE 5.7，不由 push、PR 或定时任务触发。必须从默认分支启动，并输入已合入默认分支、包含本工作流及检查脚本的完整 40 位提交 SHA；先在 GitHub 托管机器上检查 SHA 及祖先关系，通过后才调度引擎机器。递归子模块严格跟随该提交中的指针。
+
+启用前，管理员须自行配置专用 Runner 的 `self-hosted`、`Windows`、`X64`、`ue-5.7` 标签，以及 `ue-validation` Environment：限制为默认分支、设置 required reviewers，并将 Environment variable `UE_5_7_ROOT` 指向名为 `UE_5.7` 的实际安装目录（如 `D:/Epic Games/UE_5.7`）。Runner 需有 Python 3.12、MSVC/Windows SDK、可联网安装 `Tests/requirements.txt` 的条件及足够的编译磁盘空间。GUI 模式还需要有效的交互桌面和 RHI；Windows 后台服务会话不能代替交互桌面。工作流文件本身不会创建这些保护或证明 Runner 已就绪；未配置时任务可能等待 Runner/审批，不能算验证通过。此机器不应同时承担交互开发或其他 UE 构建，因为既有构建器会清理残留构建进程。
+
+流程先在干净副本编译 `NexusEditor` 与 `Nexus` Game，再显式调用 `Script/run_e2e.py --ue-root <UE_5.7> --uproject Nexus.uproject`；启动器为实际被测工程另做 UBT 构建，不复用隔离目录的二进制，也不自动连接本机已有编辑器。默认 `headless` 跳过原有 `l4_runtime` / `lua` / `requires_gui` 场景；选择 `gui` 才运行这些场景。两种模式都不等于全部引擎版本验收。
+
+报告门禁 `Script/check_ue_ci_report.py` 要求基础 `/status`、元工具、EditorInfo、错误操作 ID，以及 `test_15_editor_operations.py` 中五项原生 Automation 用例实际通过；这些原生用例本就支持 headless，经 MCP 调用并断言 C++ 结果。GUI 模式还要求两项 Slate GUI 用例通过。报告缺失、空报告、失败/错误、基线缺失或跳过均失败；其他受条件限制的跳过保留计数，不冒充通过。首次启用后须人工核对剩余 skip 原因及所需可选夹具。
+
+每次归档 `Saved/UEValidation/source.json`（工程/子模块提交、引擎版本、平台与模式）、JUnit、门禁统计、构建/E2E 控制台输出及 `Saved/Logs/` 中的 Editor/Game 构建摘要、UBT 和编辑器日志。日志与报告保留 14 天；隔离构建临时树由既有构建器清理。发布或全量验收仍需按本次改动补充跨版本、GUI、GAS 联机和专用夹具测试，不能仅凭该基线绿灯推断全部功能已通过。
 
 本目录为 **NexusUnreal 示例工程**内的 NexusLink L2 回归测试实现。
 

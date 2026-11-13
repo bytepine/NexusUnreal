@@ -62,6 +62,7 @@ Plugin version: `Plugins/NexusLink/VERSION` or [NexusLink Releases](https://gith
 | Package for any platform | `py Script/package.py` (defaults to the host platform + Development; `--platform Win64 Linux`; `--config Shipping`; arguments after `--` pass through to UAT) |
 | L2 MCP regression, daily/headless | `py Script/run_e2e.py` |
 | Full L2 MCP regression, GUI including PIE/Lua | `py Script/run_e2e.py --gui` or `--full` |
+| Controlled UE 5.7 CI | Manually dispatch [UE 5.7 Validation](.github/workflows/ue-validation.yml) with a full commit SHA already merged into the default branch; see [test guide](Tests/README.en.md#controlled-ue-57-validation) for Windows runner and environment setup |
 
 | Layer | Description |
 |-------|-------------|

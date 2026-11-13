@@ -1,0 +1,127 @@
+name: UE 5.7 Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: 'Full 40-character commit SHA already merged into the default branch'
+        required: true
+        type: string
+      mode:
+        description: 'Windows UE 5.7 test mode (GUI needs an interactive runner session)'
+        required: true
+        default: headless
+        type: choice
+        options: [headless, gui]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ue-validation-windows-5.7
+  cancel-in-progress: false
+
+jobs:
+  validate-source:
+    runs-on: ubuntu-latest
+    outputs:
+      commit: ${{ steps.source.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Reject untrusted refs before scheduling the UE runner
+        id: source
+        shell: bash
+        env:
+          VALIDATION_COMMIT: ${{ inputs.commit }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DISPATCH_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          test "$DISPATCH_REF" = "refs/heads/$DEFAULT_BRANCH"
+          [[ "$VALIDATION_COMMIT" =~ ^[0-9a-fA-F]{40}$ ]]
+          selected=$(git rev-parse --verify "${VALIDATION_COMMIT}^{commit}")
+          git merge-base --is-ancestor "$selected" "refs/remotes/origin/$DEFAULT_BRANCH"
+          echo "commit=$selected" >> "$GITHUB_OUTPUT"
+
+  ue-validation:
+    needs: validate-source
+    environment: ue-validation
+    runs-on: [self-hosted, Windows, X64, ue-5.7]
+    timeout-minutes: 180
+    env:
+      NEXUS_UE_ROOT: ${{ vars.UE_5_7_ROOT }}
+      NEXUS_UE_URL: ''
+      WITH_GAS: '1'
+      WITH_NIAGARA: '1'
+      VALIDATION_MODE: ${{ inputs.mode }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate-source.outputs.commit }}
+          submodules: recursive
+          persist-credentials: false
+          clean: true
+      - name: Validate runner and record exact source versions
+        run: |
+          if (Test-Path Saved/UEValidation) { Remove-Item Saved/UEValidation -Recurse -Force }
+          New-Item Saved/UEValidation -ItemType Directory -Force | Out-Null
+          @'
+          import json, os, pathlib, subprocess, sys
+          root = pathlib.Path(os.environ.get("NEXUS_UE_ROOT", ""))
+          if root.name != "UE_5.7":
+              sys.exit("Set environment variable UE_5_7_ROOT to the UE_5.7 installation directory")
+          version = json.loads((root / "Engine/Build/Build.version").read_text(encoding="utf-8-sig"))
+          if (version.get("MajorVersion"), version.get("MinorVersion")) != (5, 7):
+              sys.exit("UE_5_7_ROOT must contain Unreal Engine 5.7")
+          for path in ("Engine/Build/BatchFiles/Build.bat", "Engine/Binaries/Win64/UnrealEditor-Cmd.exe"):
+              if not (root / path).is_file():
+                  sys.exit(f"Required UE executable is missing: {path}")
+          if os.environ["VALIDATION_MODE"] == "gui" and not (root / "Engine/Binaries/Win64/UnrealEditor.exe").is_file():
+              sys.exit("GUI mode requires UnrealEditor.exe and an interactive desktop")
+          manifest = {"commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+                      "submodules": subprocess.check_output(["git", "submodule", "status", "--recursive"], text=True),
+                      "engine": version, "mode": os.environ["VALIDATION_MODE"], "platform": "Win64"}
+          pathlib.Path("Saved/UEValidation/source.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install test dependencies
+        run: |
+          python -m venv Saved/UEValidation/venv
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Saved/UEValidation/venv/Scripts/python.exe -m pip install -r Tests/requirements.txt
+          exit $LASTEXITCODE
+      - name: Compile UE 5.7 Editor and Game targets in clean build copies
+        run: |
+          Saved/UEValidation/venv/Scripts/python.exe Script/build_test.py --ue-root (Split-Path $env:NEXUS_UE_ROOT -Parent) --versions UE_5.7 2>&1 | Tee-Object Saved/UEValidation/build-console.log
+          exit $LASTEXITCODE
+      - name: Run MCP suite including native Automation baseline
+        run: |
+          $modeArgs = @()
+          if ($env:VALIDATION_MODE -eq 'gui') { $modeArgs += '--gui' }
+          Saved/UEValidation/venv/Scripts/python.exe Script/run_e2e.py --ue-root $env:NEXUS_UE_ROOT --uproject Nexus.uproject --junitxml Saved/UEValidation/e2e.xml @modeArgs 2>&1 | Tee-Object Saved/UEValidation/e2e-console.log
+          exit $LASTEXITCODE
+      - name: Require actual smoke and native test execution
+        if: ${{ always() && !cancelled() }}
+        run: |
+          python Script/check_ue_ci_report.py Saved/UEValidation/e2e.xml --mode $env:VALIDATION_MODE | Tee-Object Saved/UEValidation/report-check.json
+          exit $LASTEXITCODE
+      - name: Upload build logs and validation reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ue-5.7-${{ inputs.mode }}-${{ needs.validate-source.outputs.commit }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            Saved/Logs/**
+            Saved/UEValidation/source.json
+            Saved/UEValidation/e2e.xml
+            Saved/UEValidation/report-check.json
+            Saved/UEValidation/*-console.log

@@ -70,6 +70,7 @@ git submodule update --init --recursive
 | 打包（任意平台） | `py Script/package.py`（默认本机平台 + Development；`--platform Win64 Linux`；`--config Shipping`；`--` 后参数转给 UAT） |
 | L2 MCP 回归（日常，headless） | `py Script/run_e2e.py` |
 | L2 MCP 全量（GUI，含 PIE/Lua） | `py Script/run_e2e.py --gui` 或 `--full` |
+| UE 5.7 受控 CI | 手动触发 [UE 5.7 Validation](.github/workflows/ue-validation.yml)，指定已合入默认分支的完整提交 SHA；Windows Runner 和环境配置见 [测试指南](Tests/README.md#ue-57-受控验证) |
 
 | 层级 | 说明 |
 |------|------|
