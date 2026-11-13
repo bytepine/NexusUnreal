@@ -206,4 +206,220 @@ bool FNexusEditorSearchableComboTest::RunTest(const FString& Parameters)
 	if (!FSlateApplication::IsInitialized() || !FApp::CanEverRender()) { AddInfo(TEXT("GUI-only probe")); return true; }
 	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FNexusSlateInputProbe>(this,true)); return true;
 }
+
+struct FNexusSlatePointerState final
+{
+	int32 DownCount = 0, UpCount = 0, DoubleClickCount = 0, WheelCount = 0, HeldMoveCount = 0;
+	FKey LastButton;
+	FVector2D DownPosition, UpPosition, DoubleClickPosition, WheelPosition;
+	float WheelDelta = 0;
+	bool bCtrl = false, bShift = false, bAlt = false, bCmd = false;
+	bool bHideOnMove = false;
+	void ReadModifiers(const FPointerEvent& Event)
+	{
+		bCtrl = Event.IsControlDown(); bShift = Event.IsShiftDown(); bAlt = Event.IsAltDown(); bCmd = Event.IsCommandDown();
+	}
+	int32 DispatchCount() const { return DownCount + UpCount + DoubleClickCount + WheelCount; }
+};
+
+class SNexusSlatePointerTarget final : public SBorder
+{
+	TSharedPtr<FNexusSlatePointerState> State;
+	static FVector2D RelativePosition(const FGeometry& Geometry, const FPointerEvent& Event)
+	{
+		const FVector2D Local = Geometry.AbsoluteToLocal(Event.GetScreenSpacePosition()), Size = Geometry.GetLocalSize();
+		return FVector2D(Local.X / Size.X, Local.Y / Size.Y);
+	}
+public:
+	void Construct(const SBorder::FArguments& Arguments, TSharedRef<FNexusSlatePointerState> InState)
+	{
+		State = InState; SBorder::Construct(Arguments);
+	}
+	FReply OnMouseButtonDown(const FGeometry& Geometry, const FPointerEvent& Event) override
+	{
+		++State->DownCount; State->LastButton = Event.GetEffectingButton(); State->DownPosition = RelativePosition(Geometry, Event); State->ReadModifiers(Event);
+		return FReply::Handled();
+	}
+	FReply OnMouseButtonUp(const FGeometry& Geometry, const FPointerEvent& Event) override
+	{
+		++State->UpCount; State->LastButton = Event.GetEffectingButton(); State->UpPosition = RelativePosition(Geometry, Event); State->ReadModifiers(Event);
+		return FReply::Handled();
+	}
+	FReply OnMouseButtonDoubleClick(const FGeometry& Geometry, const FPointerEvent& Event) override
+	{
+		++State->DoubleClickCount; State->LastButton = Event.GetEffectingButton(); State->DoubleClickPosition = RelativePosition(Geometry, Event); State->ReadModifiers(Event);
+		return FReply::Handled();
+	}
+	FReply OnMouseMove(const FGeometry&, const FPointerEvent& Event) override
+	{
+		if (Event.IsMouseButtonDown(EKeys::MiddleMouseButton)) ++State->HeldMoveCount;
+		if (State->bHideOnMove) SetVisibility(EVisibility::Collapsed);
+		return FReply::Handled();
+	}
+	FReply OnMouseWheel(const FGeometry& Geometry, const FPointerEvent& Event) override
+	{
+		++State->WheelCount; State->WheelDelta = Event.GetWheelDelta(); State->WheelPosition = RelativePosition(Geometry, Event); State->ReadModifiers(Event);
+		return FReply::Handled();
+	}
+};
+
+class FNexusSlatePointerProbe final : public IAutomationLatentCommand
+{
+	FAutomationTestBase* Test;
+	TSharedPtr<SWindow> Window;
+	TSharedRef<FNexusSlatePointerState> Pointer = MakeShared<FNexusSlatePointerState>();
+	FString Owner = FGuid::NewGuid().ToString(), Ref, WindowRef;
+	int32 Phase = 0;
+	double ReadyAt = 0;
+	TSharedPtr<FNexusEditorOperation> Call(const TCHAR* Name, const TSharedPtr<FJsonObject>& Arguments)
+	{
+		const auto* Record = FNexusCapabilityRegistry::Get().FindRecordByName(Name);
+		if (!Record) { Test->AddError(FString::Printf(TEXT("Missing capability %s"), Name)); return nullptr; }
+		const auto Result = Record->Instance->Run(Arguments);
+		if (Result.Entries.Num() != 1 || Result.Entries[0]->Type != EJson::Object) { Test->AddError(Result.FatalError); return nullptr; }
+		FString OperationId; Result.Entries[0]->AsObject()->TryGetStringField(TEXT("OperationId"), OperationId);
+		const auto Operation = FNexusEditorOperations::Find(OperationId);
+		if (!Operation.IsValid() || Operation->State != TEXT("Completed"))
+		{
+			Test->AddError(Operation.IsValid() ? Operation->Message : TEXT("Pointer operation did not complete synchronously")); return nullptr;
+		}
+		return Operation;
+	}
+	static TSharedRef<FJsonObject> Position(double X, double Y)
+	{
+		auto Value = MakeShared<FJsonObject>(); Value->SetNumberField(TEXT("X"), X); Value->SetNumberField(TEXT("Y"), Y); return Value;
+	}
+	TSharedRef<FJsonObject> Input(const TCHAR* Action)
+	{
+		auto Arguments = MakeShared<FJsonObject>(); Arguments->SetStringField(TEXT("Action"), Action); Arguments->SetStringField(TEXT("Ref"), Ref); return Arguments;
+	}
+	void CheckPosition(const TCHAR* Label, const FVector2D& Actual, double X, double Y)
+	{
+		Test->TestTrue(Label, Actual.Equals(FVector2D(X, Y), 0.01));
+	}
+	void Reject(const TSharedPtr<FJsonObject>& Arguments)
+	{
+		const auto* Record = FNexusCapabilityRegistry::Get().FindRecordByName(TEXT("InteractEditorSlate"));
+		if (!Record) { Test->AddError(TEXT("Missing InteractEditorSlate")); return; }
+		const int32 Before = Pointer->DispatchCount();
+		const auto Result = Record->Instance->Run(Arguments);
+		Test->TestTrue(TEXT("Invalid pointer arguments are rejected"), Result.HasErrors());
+		Test->TestEqual(TEXT("Invalid input dispatches no pointer events"), Pointer->DispatchCount(), Before);
+	}
+public:
+	explicit FNexusSlatePointerProbe(FAutomationTestBase* InTest) : Test(InTest) {}
+	~FNexusSlatePointerProbe() { if (Window.IsValid() && FSlateApplication::IsInitialized()) Window->RequestDestroyWindow(); }
+	bool Update() override
+	{
+		TGuardValue<FString> Scope(FNexusEditorOperations::RequestOwner(), Owner);
+		if (Phase == 0)
+		{
+			Window = SNew(SWindow).Title(FText::FromString(TEXT("Nexus Pointer Probe ") + Owner)).ClientSize(FVector2D(420, 280))
+				[SNew(SNexusSlatePointerTarget, Pointer).Padding(0)[SNew(STextBlock).Text(FText::FromString(Owner))]];
+			FSlateApplication::Get().AddWindow(Window.ToSharedRef()); ReadyAt = FPlatformTime::Seconds() + 0.5; ++Phase; return false;
+		}
+		if (FPlatformTime::Seconds() < ReadyAt) return false;
+		if (Phase == 1)
+		{
+			auto Arguments = MakeShared<FJsonObject>(); Arguments->SetStringField(TEXT("Action"), TEXT("Windows"));
+			const auto Windows = Call(TEXT("GetEditorSlate"), Arguments); if (!Windows.IsValid()) return true;
+			for (const auto& Value : Windows->Result->GetArrayField(TEXT("Windows")))
+				if (Value->AsObject()->GetStringField(TEXT("Title")) == TEXT("Nexus Pointer Probe ") + Owner) WindowRef = Value->AsObject()->GetStringField(TEXT("Ref"));
+			if (!Test->TestFalse(TEXT("Pointer window is discoverable"), WindowRef.IsEmpty())) return true;
+			Arguments->SetStringField(TEXT("Action"), TEXT("Snapshot")); Arguments->SetStringField(TEXT("Ref"), WindowRef);
+			const auto Snapshot = Call(TEXT("GetEditorSlate"), Arguments); if (!Snapshot.IsValid()) return true;
+			FString ParentRef;
+			for (const auto& Value : Snapshot->Result->GetArrayField(TEXT("Nodes")))
+			{
+				const auto Node = Value->AsObject();
+				if (Node->GetStringField(TEXT("Type")) != TEXT("SNexusSlatePointerTarget")) continue;
+				Ref = Node->GetStringField(TEXT("Ref")); Node->TryGetStringField(TEXT("ParentRef"), ParentRef);
+				const TSharedPtr<FJsonObject>* Size = nullptr;
+				Test->TestTrue(TEXT("Snapshot reports laid-out local size"), Node->TryGetObjectField(TEXT("LocalSize"), Size) && (*Size)->GetNumberField(TEXT("X")) > 0 && (*Size)->GetNumberField(TEXT("Y")) > 0);
+				for (const TCHAR* Action : {TEXT("DoubleClick"), TEXT("Scroll"), TEXT("Drag"), TEXT("PressKey")})
+				{
+					bool bFound = false; for (const auto& Candidate : Node->GetArrayField(TEXT("Actions"))) bFound |= Candidate->AsString() == Action;
+					Test->TestTrue(FString::Printf(TEXT("Snapshot advertises %s"), Action), bFound);
+				}
+			}
+			if (!Test->TestFalse(TEXT("Pointer target is discoverable"), Ref.IsEmpty())) return true;
+			Test->TestFalse(TEXT("Snapshot reports the actual parent"), ParentRef.IsEmpty());
+			Arguments->SetStringField(TEXT("TypeFilter"), TEXT("SNexusSlatePointerTarget"));
+			const auto Filtered = Call(TEXT("GetEditorSlate"), Arguments); if (!Filtered.IsValid()) return true;
+			const auto& Nodes = Filtered->Result->GetArrayField(TEXT("Nodes"));
+			if (Test->TestEqual(TEXT("Filtered snapshot isolates the target"), Nodes.Num(), 1))
+				Test->TestEqual(TEXT("Filtering preserves the actual parent reference"), Nodes[0]->AsObject()->GetStringField(TEXT("ParentRef")), ParentRef);
+			if (!Call(TEXT("InteractEditorSlate"), Input(TEXT("Click"))).IsValid()) return true;
+			Test->TestTrue(TEXT("Legacy click uses the left button"), Pointer->LastButton == EKeys::LeftMouseButton);
+			CheckPosition(TEXT("Legacy click uses the target center"), Pointer->DownPosition, .5, .5);
+		}
+		else if (Phase == 2)
+		{
+			auto Arguments = Input(TEXT("Click")); Arguments->SetStringField(TEXT("Button"), TEXT("Right")); Arguments->SetObjectField(TEXT("Position"), Position(.2, .3));
+			Arguments->SetArrayField(TEXT("Modifiers"), {MakeShared<FJsonValueString>(TEXT("Ctrl")), MakeShared<FJsonValueString>(TEXT("Shift"))});
+			if (!Call(TEXT("InteractEditorSlate"), Arguments).IsValid()) return true;
+			Test->TestTrue(TEXT("Right click carries Ctrl and Shift"), Pointer->LastButton == EKeys::RightMouseButton && Pointer->bCtrl && Pointer->bShift && !Pointer->bAlt && !Pointer->bCmd);
+			CheckPosition(TEXT("Right click uses normalized local position"), Pointer->DownPosition, .2, .3);
+		}
+		else if (Phase == 3)
+		{
+			auto Arguments = Input(TEXT("DoubleClick")); Arguments->SetObjectField(TEXT("Position"), Position(.6, .65));
+			Arguments->SetArrayField(TEXT("Modifiers"), {MakeShared<FJsonValueString>(TEXT("Alt")), MakeShared<FJsonValueString>(TEXT("Cmd"))});
+			if (!Call(TEXT("InteractEditorSlate"), Arguments).IsValid()) return true;
+			Test->TestEqual(TEXT("Double click delivers a double-click event"), Pointer->DoubleClickCount, 1);
+			Test->TestTrue(TEXT("Double click defaults to left and preserves modifiers"), Pointer->LastButton == EKeys::LeftMouseButton && Pointer->bAlt && Pointer->bCmd && !Pointer->bCtrl && !Pointer->bShift);
+			CheckPosition(TEXT("Double click uses local position"), Pointer->DoubleClickPosition, .6, .65);
+		}
+		else if (Phase == 4)
+		{
+			auto Arguments = Input(TEXT("Scroll")); Arguments->SetNumberField(TEXT("WheelDelta"), -2); Arguments->SetObjectField(TEXT("Position"), Position(.7, .4));
+			Arguments->SetArrayField(TEXT("Modifiers"), {MakeShared<FJsonValueString>(TEXT("Shift"))});
+			if (!Call(TEXT("InteractEditorSlate"), Arguments).IsValid()) return true;
+			Test->TestEqual(TEXT("Scroll delivers one wheel event"), Pointer->WheelCount, 1);
+			Test->TestEqual(TEXT("Scroll preserves signed wheel delta"), Pointer->WheelDelta, -2.f);
+			Test->TestTrue(TEXT("Scroll preserves Shift"), Pointer->bShift && !Pointer->bCtrl && !Pointer->bAlt && !Pointer->bCmd);
+			CheckPosition(TEXT("Scroll uses local position"), Pointer->WheelPosition, .7, .4);
+		}
+		else if (Phase == 5)
+		{
+			auto Arguments = Input(TEXT("Drag")); Arguments->SetStringField(TEXT("EndRef"), Ref); Arguments->SetStringField(TEXT("Button"), TEXT("Middle"));
+			Arguments->SetObjectField(TEXT("Position"), Position(.15, .25)); Arguments->SetObjectField(TEXT("EndPosition"), Position(.85, .75));
+			Arguments->SetArrayField(TEXT("Modifiers"), {MakeShared<FJsonValueString>(TEXT("Ctrl"))});
+			if (!Call(TEXT("InteractEditorSlate"), Arguments).IsValid()) return true;
+			Test->TestTrue(TEXT("Same-ref drag holds the middle button and modifiers"), Pointer->LastButton == EKeys::MiddleMouseButton && Pointer->HeldMoveCount > 0 && Pointer->bCtrl);
+			CheckPosition(TEXT("Same-ref drag starts at requested position"), Pointer->DownPosition, .15, .25);
+			CheckPosition(TEXT("Same-ref drag ends at requested position"), Pointer->UpPosition, .85, .75);
+		}
+		else
+		{
+			// 所有无效参数都必须在派发鼠标事件前失败。
+			for (double X : {-.1, 1.1}) { auto Arguments = Input(TEXT("Click")); Arguments->SetObjectField(TEXT("Position"), Position(X, .5)); Reject(Arguments); }
+			auto Arguments = Input(TEXT("Click")); auto MissingY = MakeShared<FJsonObject>(); MissingY->SetNumberField(TEXT("X"), .5); Arguments->SetObjectField(TEXT("Position"), MissingY); Reject(Arguments);
+			Arguments = Input(TEXT("Drag")); Arguments->SetStringField(TEXT("EndRef"), Ref); Arguments->SetObjectField(TEXT("EndPosition"), Position(.5, 1.1)); Reject(Arguments);
+			Reject(Input(TEXT("Scroll")));
+			for (double Delta : {0., -21., 21.}) { Arguments = Input(TEXT("Scroll")); Arguments->SetNumberField(TEXT("WheelDelta"), Delta); Reject(Arguments); }
+			Arguments = Input(TEXT("Click")); Arguments->SetStringField(TEXT("Button"), TEXT("Other")); Reject(Arguments);
+			Arguments = Input(TEXT("Click")); Arguments->SetArrayField(TEXT("Modifiers"), {MakeShared<FJsonValueString>(TEXT("Meta"))}); Reject(Arguments);
+			Arguments = Input(TEXT("Click")); Arguments->SetStringField(TEXT("Ref"), TEXT("foreign")); Reject(Arguments);
+			// 初始悬停会同步改变控件树，不能继续向原坐标派发点击。
+			const auto* Record = FNexusCapabilityRegistry::Get().FindRecordByName(TEXT("InteractEditorSlate"));
+			if (!Record) { Test->AddError(TEXT("Missing InteractEditorSlate")); return true; }
+			const int32 DownBeforeHide = Pointer->DownCount;
+			Pointer->bHideOnMove = true;
+			const auto HiddenClick = Record->Instance->Run(Input(TEXT("Click")));
+			if (Test->TestEqual(TEXT("Hidden-during-hover click returns an operation"), HiddenClick.Entries.Num(), 1))
+				Test->TestEqual(TEXT("Hidden-during-hover click fails"), HiddenClick.Entries[0]->AsObject()->GetStringField(TEXT("State")), FString(TEXT("Failed")));
+			Test->TestEqual(TEXT("Hidden-during-hover target receives no mouse down"), Pointer->DownCount, DownBeforeHide);
+			return true;
+		}
+		++Phase; return false;
+	}
+};
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusEditorSlatePointerTest, "NexusLink.EditorOperations.SlatePointer", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusEditorSlatePointerTest::RunTest(const FString& Parameters)
+{
+	if (!FSlateApplication::IsInitialized() || !FApp::CanEverRender()) { AddInfo(TEXT("GUI-only pointer probe")); return true; }
+	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FNexusSlatePointerProbe>(this)); return true;
+}
 #endif
