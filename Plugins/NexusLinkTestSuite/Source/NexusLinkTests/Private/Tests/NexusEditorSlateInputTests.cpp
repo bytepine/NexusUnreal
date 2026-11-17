@@ -148,6 +148,13 @@ public:
 			if (!Test->TestEqual(TEXT("Filtered snapshot finds the search box"), Nodes.Num(), 1)) return true;
 			Test->TestEqual(TEXT("Search box is the discovered input target"), Nodes[0]->AsObject()->GetStringField(TEXT("Ref")), Ref);
 			Test->TestEqual(TEXT("Search box role is editable"), Nodes[0]->AsObject()->GetStringField(TEXT("Role")), FString(TEXT("TextBox")));
+			Input->SetText(FText::GetEmpty()); Input->SetIsReadOnly(true);
+			auto ReadOnlyArgs = MakeShared<FJsonObject>(); ReadOnlyArgs->SetStringField(TEXT("Ref"), Ref); ReadOnlyArgs->SetStringField(TEXT("Action"), TEXT("Type"));
+			ReadOnlyArgs->SetStringField(TEXT("Text"), TEXT("must-not-report-applied")); ReadOnlyArgs->SetBoolField(TEXT("bReplace"), true);
+			const auto ReadOnlyResult = Call(TEXT("InteractEditorSlate"), ReadOnlyArgs);
+			Test->TestTrue(TEXT("Type rejects text that the focused input did not accept"), ReadOnlyResult.IsValid() && ReadOnlyResult->State == TEXT("Failed"));
+			Test->TestTrue(TEXT("Read-only text remains empty"), Input->GetText().IsEmpty());
+			Input->SetIsReadOnly(false); Input->SetText(FText::FromString(Seed));
 			Args->SetStringField(TEXT("Ref"), Ref); Args->SetStringField(TEXT("Action"), TEXT("Type")); Args->SetStringField(TEXT("Text"), TEXT("中文")); Pending = Call(TEXT("InteractEditorSlate"), Args); Phase = 3;
 		}
 		else if (Phase == 3) { Test->TestTrue(TEXT("Chinese text delivered"), Input->GetText().ToString().Contains(TEXT("中文"))); Args->SetStringField(TEXT("Ref"), Ref); Args->SetStringField(TEXT("Action"), TEXT("Click")); Pending = Call(TEXT("InteractEditorSlate"), Args); Phase = 4; }

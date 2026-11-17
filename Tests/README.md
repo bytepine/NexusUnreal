@@ -2,6 +2,8 @@
 
 中文 | [English](README.en.md)
 
+反馈回归：`NexusLink.Blueprint.NodeTypePinsReadOnly` 验证普通/动画蓝图的实例及静态函数引脚查询、非法图上下文拒绝，以及源图、编译状态和脏标记不变；`NexusLink.EditorContext.SelectionActorsSublevel` 验证共享 Editor World 的流送 Actor 返回自身所属关卡；`NexusLink.AssetSave.TransientMapRejected` 验证瞬态 World/Level 在原生保存前被拒绝且不清标志或创建文件。均在隔离测试宿主运行；Slate GUI 回归 `NexusLink.EditorOperations.SlateInput` 另覆盖只读空搜索框拒写。
+
 导航/碰撞反馈回归在 `test_25_feedback_navigation_collision.py`：导航状态、八叉树/瓦片/BSP 有界只读查询，16 项逐帧导航投影、批次取消/超时/写入预检，网格导航/分段/三角形诊断和碰撞刷新。Automation `NexusLink.FeedbackNov12.LiveCollision` 验证已注册组件使用重建后的 BodySetup；`NexusLink.Review.DirtyLevelProtection` 检查具体脏包与 StateConflict；`NexusLink.EditorOperations.SearchableCombo` 在 GUI 验证 UE4 属性下拉框公开基类的选择流程。
 
 迁移反馈回归：Automation `NexusLink.FeedbackMigration` 在隔离 Editor-Cmd 验证 UTF-8 分片收包/累计上限、临时 SuperFunction 保存拦截、BodyInstance 零值完整恢复、自定义事件命名/冲突、嵌套默认值/缺失路径、类型化数组设置/清空及结构体验证、继承 getter 同型重映射的 dry-run/连线保留、CDO 空引用时的实例所属对象 Schema，以及过宽搜索的收窄建议。隔离宿主使用空 Content 与匹配引擎的模块配置，不加载业务资产。
