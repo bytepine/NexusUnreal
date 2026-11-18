@@ -678,7 +678,7 @@ def _build_one(engine: dict, target: str, line_idx: int, total: int,
                print_lock: Lock, is_tty: bool,
                vs_version: Optional[str] = None,
                phase_label: str = "Editor",
-               max_parallel_actions: Optional[int] = None) -> Dict:
+               max_parallel_actions: Optional[int] = None, *, require_all: bool = False) -> Dict:
     ver = engine["version"]
     eng_path = engine["path"]
 
@@ -706,6 +706,10 @@ def _build_one(engine: dict, target: str, line_idx: int, total: int,
         max_parallel_actions=max_parallel_actions,
     )
 
+    if exit_code == -1 and require_all:
+        # 显式矩阵中的每个 Target 都需要构建结果，缺 UBT 入口也算失败。
+        exit_code = 1
+
     error_lines = _extract_errors(output) if exit_code not in (-1, 0) else []
     warn_lines = _extract_warnings(output) if exit_code != -1 else []
 
@@ -730,7 +734,7 @@ def _build_one(engine: dict, target: str, line_idx: int, total: int,
 
 def _run_phase(engines: List[dict], target: str, max_workers: int,
                vs_version: Optional[str], label: str,
-               pch_retry: bool = False) -> Tuple[Dict[str, Dict], int, int, int]:
+               pch_retry: bool = False, *, require_all: bool = False) -> Tuple[Dict[str, Dict], int, int, int]:
     print_lock = Lock()
     is_tty = sys.stdout.isatty()
     total = len(engines)
@@ -754,6 +758,7 @@ def _run_phase(engines: List[dict], target: str, max_workers: int,
             pool.submit(
                 _build_one, e, target, ver_index[e["version"]], total,
                 print_lock, is_tty, vs_version, label, mpa,
+                require_all=require_all,
             ): e["version"]
             for e in engines
         }
@@ -770,7 +775,7 @@ def _run_phase(engines: List[dict], target: str, max_workers: int,
                 "(workers=1, MaxParallelActions=1)",
                 flush=True,
             )
-            retry, _, _, _ = _run_phase(oom, target, 1, vs_version, label, pch_retry=True)
+            retry, _, _, _ = _run_phase(oom, target, 1, vs_version, label, pch_retry=True, require_all=require_all)
             for e in oom:
                 rr = dict(retry[e["version"]])
                 if rr["exit_code"] == 0:
@@ -812,7 +817,7 @@ def _write_phase_log(path: Path, header: List[str], engines: List[dict],
 
 
 def run_build_test_game(engines: List[dict], max_workers: int = 1,
-                        vs_version: Optional[str] = None) -> int:
+                        vs_version: Optional[str] = None, *, require_all: bool = False) -> int:
     """Game-target only (WITH_EDITOR=0). See run_build_test(..., include_game=True)."""
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     _kill_leftover_build_processes()
@@ -831,7 +836,7 @@ def run_build_test_game(engines: List[dict], max_workers: int = 1,
         f"Versions : {', '.join(e['version'] for e in engines)}",
     ]
     results, pass_count, fail_count, total_warnings = _run_phase(
-        engines, GAME_TARGET, max_workers, vs_version, "Game"
+        engines, GAME_TARGET, max_workers, vs_version, "Game", require_all=require_all,
     )
     _write_phase_log(
         LOG_FILE_GAME, header, engines, results,
@@ -845,7 +850,7 @@ def run_build_test_game(engines: List[dict], max_workers: int = 1,
 def run_build_test(engines: List[dict], max_workers: int = 1,
                    vs_version: Optional[str] = None,
                    include_game: bool = True,
-                   game_max_workers: int = 1) -> int:
+                   game_max_workers: int = 1, *, require_all: bool = False) -> int:
     """
     Build all engine versions: Editor phase, then optional Game phase (WITH_EDITOR=0).
 
@@ -865,7 +870,7 @@ def run_build_test(engines: List[dict], max_workers: int = 1,
 
     print("=== Phase 1: NexusEditor Development (WITH_EDITOR=1) ===", flush=True)
     editor_results, ed_pass, ed_fail, ed_warn = _run_phase(
-        engines, EDITOR_TARGET, max_workers, vs_version, "Editor",
+        engines, EDITOR_TARGET, max_workers, vs_version, "Editor", require_all=require_all,
     )
 
     game_results: Dict[str, Dict] = {}
@@ -873,7 +878,7 @@ def run_build_test(engines: List[dict], max_workers: int = 1,
     if include_game:
         print("\n=== Phase 2: Nexus Development (WITH_EDITOR=0) ===", flush=True)
         game_results, gm_pass, gm_fail, gm_warn = _run_phase(
-            engines, GAME_TARGET, game_max_workers, vs_version, "Game"
+            engines, GAME_TARGET, game_max_workers, vs_version, "Game", require_all=require_all,
         )
 
     sep = "=" * 64
@@ -969,7 +974,7 @@ def main() -> int:
         default=None,
         metavar="VER",
         nargs="+",
-        help="Only test specified versions, e.g. --versions UE_5.2 UE_5.3",
+        help="Require every specified version and selected target to build, e.g. --versions UE_5.2 UE_5.3",
     )
     parser.add_argument(
         "--vs",
@@ -1014,6 +1019,21 @@ def main() -> int:
         print(f"[ERROR] {e}", file=sys.stderr)
         return 1
 
+    if args.versions:
+        bad = [v for v in args.versions if not v.startswith("UE_")]
+        if bad:
+            print(
+                f"[ERROR] --versions must use UE_ prefix (got {bad}), e.g. UE_5.7",
+                file=sys.stderr,
+            )
+            return 1
+        allowed = set(args.versions)
+        missing = allowed - {e["version"] for e in engines}
+        if missing:
+            print(f"[ERROR] Specified versions not found: {', '.join(sorted(missing))}", file=sys.stderr)
+            return 1
+        engines = [e for e in engines if e["version"] in allowed]
+
     if not engines:
         hint = (
             "Use --ue-root to specify engine root directory"
@@ -1042,20 +1062,6 @@ def main() -> int:
             )
     print()
 
-    if args.versions:
-        bad = [v for v in args.versions if not v.startswith("UE_")]
-        if bad:
-            print(
-                f"[ERROR] --versions must use UE_ prefix (got {bad}), e.g. UE_5.7",
-                file=sys.stderr,
-            )
-            return 1
-        allowed = set(args.versions)
-        engines = [e for e in engines if e["version"] in allowed]
-        if not engines:
-            print(f"[ERROR] Specified versions {args.versions} not found in discovered list", file=sys.stderr)
-            return 1
-
     if args.max_workers < 1:
         print("[ERROR] --max-workers must be >= 1", file=sys.stderr)
         return 1
@@ -1075,6 +1081,7 @@ def main() -> int:
             engines,
             max_workers=game_workers,
             vs_version=args.vs,
+            require_all=bool(args.versions),
         )
     else:
         fail_count = run_build_test(
@@ -1083,6 +1090,7 @@ def main() -> int:
             vs_version=args.vs,
             include_game=not args.editor_only,
             game_max_workers=game_workers,
+            require_all=bool(args.versions),
         )
     return 0 if fail_count == 0 else 1
 

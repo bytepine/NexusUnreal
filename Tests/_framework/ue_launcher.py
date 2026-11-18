@@ -25,10 +25,10 @@ from __future__ import annotations
 import json
 import logging
 import os
-import os
 import platform
 import re
 import shutil
+import socket
 import subprocess
 import tempfile
 import sys
@@ -36,6 +36,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Optional
+from urllib.parse import urlsplit
 
 import httpx
 import psutil
@@ -46,6 +47,84 @@ _STATUS_ENDPOINT = "/status"
 _STREAM_ENDPOINT = "/stream"
 _DEFAULT_PORT_RANGE = range(45000, 45010)
 _READY_TIMEOUT_SEC = 180.0
+
+
+def _process_project(process: psutil.Process, engine_version: str) -> Optional[Path]:
+    # UE 使用首个位置参数，5.2+ 的 -project= 优先。其他参数可能是导入或比较对象。
+    args = process.cmdline()[1:]
+    arg = args[0] if args else ""
+    options = [value.split("=", 1)[1] for value in args if value.casefold().startswith("-project=")]
+    if options:
+        version = re.match(r"^(\d+)\.(\d+)", engine_version)
+        if not version or len(options) != 1:
+            return None
+        if tuple(map(int, version.groups())) >= (5, 2):
+            arg = options[0]
+    # 相对路径可能基于 UE 启动时的工作目录，不能按当前目录补全。
+    path = Path(arg.strip('"'))
+    return path.resolve() if path.suffix.casefold() == ".uproject" and path.is_absolute() else None
+
+
+def _owns_listener(process: psutil.Process, port: int, ipv6: bool) -> bool:
+    # psutil 5.9 使用 connections，6.x 起更名为 net_connections。
+    connections = getattr(process, "net_connections", None) or process.connections
+    family = socket.AF_INET6 if ipv6 else socket.AF_INET
+    addresses = ("::1", "::") if ipv6 else ("127.0.0.1", "0.0.0.0")
+    return any(c.status == psutil.CONN_LISTEN and c.family == family and
+               c.laddr.port == port and c.laddr.ip in addresses for c in connections(kind="tcp"))
+
+
+def matching_editor_urls(project: Path, url: Optional[str] = None, *, launched_pid: Optional[int] = None) -> List[str]:
+    """按目标工程、监听进程、具体回环地址与 Editor 状态匹配；自启动时仅核验已知子进程。"""
+    project = project.resolve()
+    requested = urlsplit(url) if url else None
+    if requested and (requested.scheme != "http" or requested.hostname not in ("localhost", "127.0.0.1", "::1")
+                      or requested.path.rstrip("/") not in ("", "/stream") or requested.username is not None
+                      or requested.query or requested.fragment):
+        return []
+    ipv6 = bool(requested and requested.hostname == "::1")
+    host = "[::1]" if ipv6 else "127.0.0.1"
+    matches = []
+    registry = Path(tempfile.gettempdir()) / "NexusLink"
+    manifests = (registry / f"{launched_pid}.json",) if launched_pid is not None else registry.glob("*.json")
+    with httpx.Client(timeout=2, trust_env=False) as client:
+        for manifest in manifests:
+            if not manifest.stem.isdecimal():
+                continue
+            try:
+                data = json.loads(manifest.read_text(encoding="utf-8-sig"))
+                if not isinstance(data, dict) or data.get("pid") != int(manifest.stem):
+                    continue
+                port = data.get("mcpPort")
+                if type(port) is not int or not 0 < port < 65536 or (requested and port != (requested.port or 80)):
+                    continue
+                if str(data.get("projectName", "")).casefold() != project.stem.casefold():
+                    continue
+                base = f"http://{host}:{port}"
+                process = psutil.Process(data["pid"])
+                try:
+                    if not _owns_listener(process, port, ipv6):
+                        continue
+                    process_project = project if launched_pid is not None else _process_project(
+                        process, str(data.get("engineVersion", "")))
+                except psutil.AccessDenied:
+                    process_project = None
+                if process_project is not None and process_project != project:
+                    continue
+                response = client.get(base + _STATUS_ENDPOINT)
+                response.raise_for_status()
+                status = response.json()
+                if (not isinstance(status, dict) or status.get("server") != "Nexus-Unreal"
+                        or status.get("hostKind") != "Editor"
+                        or str(status.get("projectName", "")).casefold() != project.stem.casefold()
+                        or type(data.get("wsPort")) is not int or status.get("wsPort") != data["wsPort"]):
+                    continue
+            except (OSError, ValueError, psutil.Error, httpx.HTTPError):
+                continue
+            if process_project is None:
+                raise RuntimeError(f"Cannot verify the process and .uproject for {base} ({project.name})")
+            matches.append(base + _STREAM_ENDPOINT)
+    return matches
 
 
 def _is_windows() -> bool:
@@ -180,25 +259,18 @@ class UELauncher:
         self._stdout_log_fh = open(self._stdout_log_path, "w", encoding="utf-8",
                                    errors="replace", buffering=1)
 
-        # 启动前记下已被占用的 MCP 端口，避免本机已有 Editor（例如 LetsGo GUI）
-        # 占着 45000 时，把刚拉起的 headless 实例误判为就绪。
-        occupied = self._listening_mcp_ports()
-        if occupied:
-            log.info("MCP ports already in use (will wait for a new one): %s",
-                     sorted(occupied))
-
         log.info("launching UE: %s", " ".join(args))
         log.info("UE stdout -> %s", self._stdout_log_path)
-        self._proc = subprocess.Popen(
-            args,
-            stdout=self._stdout_log_fh,
-            stderr=subprocess.STDOUT,
-            cwd=str(self.uproject.parent),
-        )
         try:
-            self._wait_until_ready(skip_ports=occupied)
-        except RuntimeError:
-            self._flush_stdout_log()
+            self._proc = subprocess.Popen(
+                args,
+                stdout=self._stdout_log_fh,
+                stderr=subprocess.STDOUT,
+                cwd=str(self.uproject.parent),
+            )
+            self._wait_until_ready()
+        except BaseException:
+            self.stop()
             raise
 
     def _detect_ue_version_label(self) -> Optional[str]:
@@ -336,7 +408,8 @@ class UELauncher:
             except Exception:  # noqa: BLE001
                 pass
             self._stdout_log_fh = None
-        if self._proc is None:
+        if self._proc is None or self._proc.poll() is not None:
+            self._proc = None
             return
         try:
             parent = psutil.Process(self._proc.pid)
@@ -378,70 +451,37 @@ class UELauncher:
         tail = lines[-max_lines:] if len(lines) > max_lines else lines
         return "".join(tail).rstrip()
 
-    def _listening_mcp_ports(self) -> set:
-        """探测启动前已在听的 NexusLink HTTP 端口。"""
-        found: set = set()
-        with httpx.Client(timeout=1.0) as client:
-            for port in self.port_range:
-                try:
-                    r = client.get(f"http://127.0.0.1:{port}{_STATUS_ENDPOINT}")
-                    if r.status_code == 200 and "wsPort" in r.text:
-                        found.add(port)
-                except Exception:  # noqa: BLE001
-                    continue
-        return found
-
-    def _registered_mcp_port(self) -> Optional[int]:
-        """Bind readiness to the process we launched, including concurrent editor starts."""
+    @property
+    def pid(self) -> int:
         if self._proc is None:
-            return None
-        manifest = Path(tempfile.gettempdir()) / "NexusLink" / f"{self._proc.pid}.json"
-        try:
-            data = json.loads(manifest.read_text(encoding="utf-8-sig"))
-            if int(data.get("pid", 0)) != self._proc.pid:
-                return None
-            if str(data.get("projectName", "")).casefold() != self.uproject.stem.casefold():
-                return None
-            port = int(data.get("mcpPort", 0))
-            return port if port in self.port_range else None
-        except (OSError, ValueError, TypeError):
-            return None
+            raise RuntimeError("Editor process has not started")
+        return self._proc.pid
 
-    def _wait_until_ready(self, skip_ports: Optional[set] = None) -> None:
+    def _wait_until_ready(self) -> None:
         deadline = time.monotonic() + self.ready_timeout
-        last_err: Optional[BaseException] = None
-        with httpx.Client(timeout=2.0) as client:
-            while time.monotonic() < deadline:
-                if self._proc is not None and self._proc.poll() is not None:
-                    tail = self._tail_stdout_log()
-                    raise RuntimeError(
-                        f"UEEditor-Cmd exited early with code "
-                        f"{self._proc.returncode}. "
-                        f"Full log: {self._stdout_log_path}\n"
-                        f"--- tail ---\n{tail}\n--- end tail ---"
-                    )
-                registered_port = self._registered_mcp_port()
-                # Occupancy at launch is insufficient: two new editors can race to
-                # become ready. Only the PID manifest identifies our editor.
-                for port in (() if registered_port is None else (registered_port,)):
-                    try:
-                        r = client.get(f"http://127.0.0.1:{port}{_STATUS_ENDPOINT}")
-                        if r.status_code == 200 and "wsPort" in r.text:
-                            self._resolved_port = port
-                            log.info("UE ready on port %d (%s)", port, r.text.strip())
-                            return
-                    except Exception as e:  # noqa: BLE001
-                        last_err = e
-                time.sleep(1.0)
-        raise RuntimeError(
-            f"UE did not become ready within {self.ready_timeout}s; "
-            f"last probe error: {last_err}"
-        )
+        while time.monotonic() < deadline:
+            if self._proc.poll() is not None:
+                raise RuntimeError(
+                    f"UEEditor-Cmd exited early with code {self._proc.returncode}. "
+                    f"Full log: {self._stdout_log_path}\n--- tail ---\n{self._tail_stdout_log()}"
+                )
+            urls = matching_editor_urls(self.uproject, launched_pid=self.pid)
+            if len(urls) == 1:
+                port = urlsplit(urls[0]).port
+                if port in self.port_range:
+                    self._resolved_port = port
+                    log.info("UE ready on port %d (PID %d)", port, self.pid)
+                    return
+            time.sleep(1.0)
+        raise RuntimeError(f"UE PID {self.pid} did not become ready within {self.ready_timeout}s")
 
 
 def autodetect_uproject(default_subpath: str = "nexus-unreal/Nexus.uproject") -> Optional[Path]:
     """Best-effort detection of the host uproject under the repo."""
     here = Path(__file__).resolve()
+    local = here.parents[2] / "Nexus.uproject"
+    if default_subpath == "nexus-unreal/Nexus.uproject" and local.is_file():
+        return local
     for parent in [here.parent, *here.parents]:
         candidate = parent / default_subpath
         if candidate.exists():

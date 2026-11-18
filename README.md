@@ -77,6 +77,8 @@ git submodule update --init --recursive
 | L1 C++ | `Plugins/NexusLinkTestSuite/`（`NexusLink.`）；UnLua 在 `Plugins/NexusLinkExtTestSuite/`（`NexusLinkExt.`） |
 | L2 pytest | 本仓 `Tests/` — 策略见 [Tests/README.md](Tests/README.md) |
 
+显式传入 `--versions` 时，每个指定引擎的所选 Target 都必须通过。缺版本或缺 UBT 入口会列出对应版本并返回非零退出码。自动发现时，缺少 UBT 入口的安装记为 `SKIP`。
+
 ---
 
 ## 文档

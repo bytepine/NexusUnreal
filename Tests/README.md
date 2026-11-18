@@ -50,7 +50,7 @@ UE Automation 的 `NexusLink.AssetEdit` 覆盖接口实现图、Unicode 结构 H
 
 ## 完整工程启动验收
 
-`Script/run_e2e.py` 显式连接 `--ue-url` 或自动复用已有编辑器时，也会透传 `--uproject`；隔离宿主测试应传入实际工程路径，确保磁盘校验和运行前后清理作用于被测工程。清理包括 Tag 生命周期测试生成的 `Config/Tags/NexusMcpTest_<GUID>.ini`，并检查路径没有越出工程目录。
+`Script/run_e2e.py` 与直接运行 pytest 时，用 `--uproject` 指定被测工程，省略时使用示例工程。复用已有编辑器须匹配本机直接 MCP 端口、监听进程的绝对 `.uproject` 路径及编辑器状态。自动模式仅在匹配唯一时复用，找不到匹配时可自动启动，多实例匹配时用 `--ue-url` 选择已验证的端口。同名编辑器的工程身份无法确认时，命令会停止并报告该实例。连接已有实例须使用本机直连地址。会话确认工程身份后才清理，范围包括 Tag 生命周期测试生成的 `Config/Tags/NexusMcpTest_<GUID>.ini`，并检查路径没有越出工程目录。
 
 修改公共 C++ 结构或基类布局后，关闭编辑器并完整重编所有引用模块，包括 NexusLink、编辑器模块、扩展及测试插件；Live Coding 不能替代这一步。不要把旧 `Intermediate` 的目标文件与新源码重新链接。`Script/build_test.py` 默认在干净目录构建完整示例工程；自行保留隔离目录作增量测试时，也必须确保依赖重编。
 
@@ -98,7 +98,7 @@ py Script/gas_regression.py --ue-root <UE_5.7-directory>
 
 基线更新须人工审查：先用插件工具的 `--save-baseline` 保存到一个新文件，检查断言、权威端事件和用例签名，再替换对应受版本控制的文件，与用例变更一起提交。汇总报告不能替代单个场景基线。无需 UE 的门禁/归档回归：`py -m unittest discover -s Script/tests -p 'test_gas*.py'`。
 
-[GAS Tools Checks 工作流](../.github/workflows/gas-regression.yml) 在 GitHub 提供的 Ubuntu 机器上执行无需 UE 的工具检查及 UE 报告门禁测试。GAS 联机复测仍由用户手动启动；可选的 UE 编译与 MCP 验证工作流见下一节，仓库不会安装或注册 Runner。
+[GAS Tools Checks 工作流](../.github/workflows/gas-regression.yml) 在 GitHub 提供的 Ubuntu 机器上运行 `python -m pytest -q Script/tests`，覆盖宿主脚本回归及 UE 报告门禁，无需安装 UE。GAS 联机复测仍由用户手动启动，可选的 UE 编译与 MCP 验证工作流见下一节。仓库不会安装或注册 Runner。
 
 ## UE 5.7 受控验证
 
@@ -201,7 +201,7 @@ pytest Tests --ue-url http://127.0.0.1:45000/stream
 | `pytest Tests -m "not lua"` | 跳过 UnLua |
 | `pytest Tests --headless` | 显式命令行模式（跳过 `l4_runtime` / `lua` / `requires_gui`） |
 | `pytest Tests -k blueprint` | 关键字过滤 |
-| `pytest Tests --keep-artifacts` | 保留 `/Game/_McpTest/<ts>/` 与历史 `/Game/_NexusTest` |
+| `pytest Tests --keep-artifacts` | 跳过会话前后的清理，保留 `/Game/_McpTest/<ts>/`、历史 `/Game/_NexusTest` 及磁盘测试产物 |
 
 ## 用例文件映射
 

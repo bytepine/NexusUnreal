@@ -4,6 +4,7 @@
 import contextlib
 import importlib.util
 import io
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -55,6 +56,49 @@ class BuildSchedulingTests(unittest.TestCase):
         builder, (_, _, failed, _) = self.run_phase([(6, ["error C2039: missing member"])])
         self.assertEqual(builder.call_count, 1)
         self.assertEqual(failed, 1)
+
+    def test_explicit_matrix_reports_missing_versions_before_building(self):
+        output = io.StringIO()
+        with patch.object(build.sys, "argv", ["build_test.py", "--versions", "UE_4.27", "UE_5.7"]), \
+                patch.object(build, "discover_engines_auto", return_value=[{"version": "UE_5.7", "path": "unused"}]), \
+                patch.object(build, "run_build_test", return_value=0) as compile_project, \
+                patch.object(build, "_list_installed_msvc", return_value=[]), \
+                patch.object(build, "_detect_msvc_for", return_value=None), \
+                patch.object(build.atexit, "register"), patch.object(build.signal, "signal"), \
+                contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(output):
+            self.assertNotEqual(build.main(), 0)
+        self.assertIn("Specified versions not found: UE_4.27", output.getvalue())
+        compile_project.assert_not_called()
+
+    def test_missing_build_script_fails_explicit_editor_and_game_targets(self):
+        for phase, logfile in [("--editor-only", "Build.Log"), ("--game-only", "Build.Game.Log")]:
+            with self.subTest(phase=phase), tempfile.TemporaryDirectory() as folder:
+                logs = Path(folder)
+                engine = {"version": "UE_5.7", "path": str(logs / "UE_5.7")}
+                with patch.object(build.sys, "argv", ["build_test.py", phase, "--versions", "UE_5.7"]), \
+                        patch.object(build, "discover_engines_auto", return_value=[engine]), \
+                        patch.object(build, "_list_installed_msvc", return_value=[]), \
+                        patch.object(build, "_detect_msvc_for", return_value=None), \
+                        patch.object(build, "LOG_DIR", logs), \
+                        patch.object(build, "LOG_FILE", logs / "Build.Log"), \
+                        patch.object(build, "LOG_FILE_GAME", logs / "Build.Game.Log"), \
+                        patch.object(build, "_kill_leftover_build_processes"), \
+                        patch.object(build, "_reset_temp_workspace"), \
+                        patch.object(build, "_isolated_uproject", return_value=build.UPROJECT_PATH), \
+                        patch.object(build.atexit, "register"), patch.object(build.signal, "signal"), \
+                        contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    self.assertNotEqual(build.main(), 0)
+                report = (logs / logfile).read_text(encoding="utf-8")
+                self.assertIn("[UE_5.7]", report)
+                self.assertIn("UBT Build script not found", report)
+                self.assertIn("PASS=0  FAIL=1", report)
+
+    def test_discovery_mode_reports_missing_build_script_as_skip(self):
+        _, (results, passed, failed, warnings) = self.run_phase([(-1, ["UBT Build script not found"])])
+        lines = []
+        self.assertEqual(build._format_result_block(results["UE_4.27"], lines, ""), (0, 0, 0))
+        self.assertTrue(any("SKIP" in line for line in lines))
+        self.assertEqual((passed, failed, warnings), (0, 0, 0))
 
 
 if __name__ == "__main__":

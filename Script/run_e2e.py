@@ -31,11 +31,6 @@ NEXUS_UNREAL_DIR = SCRIPT_DIR.parent
 TESTS_DIR = NEXUS_UNREAL_DIR / "Tests"
 LOG_DIR = NEXUS_UNREAL_DIR / "Saved" / "Logs"
 
-# NexusLink auto-picks the first free port in this range when the Editor boots.
-_PROBE_PORT_RANGE = range(45000, 45010)
-_PROBE_TIMEOUT_SEC = 2.0
-
-
 def _ensure_deps() -> None:
     try:
         import pytest  # noqa: F401
@@ -47,32 +42,6 @@ def _ensure_deps() -> None:
         subprocess.check_call(
             [sys.executable, "-m", "pip", "install", "-r", str(req)]
         )
-
-
-def _probe_live_editor() -> Optional[str]:
-    """Return the first http://127.0.0.1:<port>/stream that responds to MCP
-    `initialize`, or None when no live NexusLink Editor is reachable."""
-    import httpx  # imported here so --help still works without deps
-    payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-            "protocolVersion": "2025-06-18",
-            "capabilities": {},
-            "clientInfo": {"name": "run_e2e.probe", "version": "0"},
-        },
-    }
-    for port in _PROBE_PORT_RANGE:
-        url = f"http://127.0.0.1:{port}/stream"
-        try:
-            with httpx.Client(timeout=_PROBE_TIMEOUT_SEC) as c:
-                r = c.post(url, json=payload)
-            if r.status_code == 200 and "serverInfo" in r.text:
-                return url
-        except Exception:  # noqa: BLE001
-            continue
-    return None
 
 
 _HOST_UPROJECT = NEXUS_UNREAL_DIR / "Nexus.uproject"
@@ -146,39 +115,41 @@ def _autodetect_ue_root(preferred_label: Optional[str]) -> Optional[Tuple[str, s
 def _resolve_connection(args: argparse.Namespace) -> Tuple[List[str], str]:
     """Resolve how the pytest run should reach UE. Returns (extra_pytest_args,
     human_readable_mode_label)."""
-    # 1. Explicit --ue-url wins.
+    # 延迟加载 pytest 宿主依赖，保证全新环境也能运行 --help。
+    sys.path.insert(0, str(TESTS_DIR))
+    from _framework.ue_launcher import matching_editor_urls
+
+    project = Path(args.uproject or _HOST_UPROJECT).resolve()
+    if not project.is_file() or project.suffix.casefold() != ".uproject":
+        raise ValueError(f"Expected an existing .uproject: {project}")
+    project_args = ["--uproject", str(project)]
     if args.ue_url:
-        out = ["--ue-url", args.ue_url]
-        if args.uproject:
-            out.extend(["--uproject", args.uproject])
-        return out, f"explicit --ue-url {args.ue_url}"
+        matches = matching_editor_urls(project, args.ue_url)
+        if len(matches) != 1:
+            raise ValueError(f"Cannot verify local Editor at {args.ue_url} for {project}")
+        return ["--ue-url", matches[0], *project_args], f"explicit --ue-url {matches[0]}"
 
     # 2. Explicit --ue-root wins (force launch a specific UE version).
     if args.ue_root:
-        out = ["--ue-root", args.ue_root]
-        if args.uproject:
-            out.extend(["--uproject", args.uproject])
-        return out, f"explicit --ue-root {args.ue_root}"
+        return ["--ue-root", args.ue_root, *project_args], f"explicit --ue-root {args.ue_root}"
 
     # 3. Auto mode: probe for an existing Editor first.
-    live = _probe_live_editor()
+    live = matching_editor_urls(project)
+    if len(live) > 1:
+        raise ValueError(f"Multiple Editors match {project}; select one with --ue-url: {', '.join(live)}")
     if live:
-        out = ["--ue-url", live]
-        if args.uproject:
-            out.extend(["--uproject", args.uproject])
-        return out, f"auto: reusing live Editor at {live}"
+        return ["--ue-url", live[0], *project_args], f"auto: reusing Editor for {project} at {live[0]}"
 
     # 4. Auto-launch fallback. Pass --no-launch to skip and surface a hint
     #    instead (useful for CI that wants a hard fail when the Editor is
     #    missing rather than a 5-10 minute UBT build + cold start).
     if args.no_launch:
-        return [], "no live Editor on 127.0.0.1:45000..45009 (--no-launch set)"
+        return [], f"No verified local Editor for {project} (--no-launch set)"
 
-    uproject_hint = Path(args.uproject) if args.uproject else _HOST_UPROJECT
-    preferred = _uproject_engine_association(uproject_hint) if uproject_hint.exists() else None
+    preferred = _uproject_engine_association(project)
     found = _autodetect_ue_root(preferred)
     if not found:
-        return [], "no live Editor and no installed UE detected"
+        return [], f"No verified local Editor for {project} and no installed UE detected"
     ver, path = found
     matched_note = (
         f" (matched uproject EngineAssociation={preferred})"
@@ -186,23 +157,7 @@ def _resolve_connection(args: argparse.Namespace) -> Tuple[List[str], str]:
         else f" (preferred {preferred}, using latest instead)"
         if preferred else ""
     )
-    out = ["--ue-root", path]
-    if args.uproject:
-        out.extend(["--uproject", args.uproject])
-    return out, f"auto: launching {ver} from {path}{matched_note}"
-
-
-def _purge_disk_artifacts(label: str, *, project_root: Optional[Path] = None, include_report: bool = True) -> None:
-    """删除上一轮 pytest/e2e 落在 Saved/Logs、Content/_McpTest、Content/_NexusTest 的临时文件。"""
-    sys.path.insert(0, str(TESTS_DIR))
-    from _framework.test_cleanup import purge_disk_test_artifacts
-
-    removed = purge_disk_test_artifacts(
-        project_root if project_root is not None else NEXUS_UNREAL_DIR,
-        include_report=include_report,
-    )
-    if removed:
-        print(f"[cleanup:{label}] {', '.join(removed)}", flush=True)
+    return ["--ue-root", path, *project_args], f"auto: launching {ver} from {path}{matched_note}"
 
 
 def main() -> int:
@@ -268,9 +223,6 @@ def main() -> int:
     audit_rc = subprocess.call([sys.executable, str(coverage_audit)])
     if audit_rc != 0:
         return audit_rc
-    project_root = Path(args.uproject).resolve().parent if args.uproject else NEXUS_UNREAL_DIR
-    _purge_disk_artifacts("pre", project_root=project_root)
-
     plugin_scripts = NEXUS_UNREAL_DIR / "Plugins/NexusLink/scripts"
     for name in ("audit_capability_naming.py", "audit_capability_params.py"):
         audit_script = plugin_scripts / name
@@ -281,20 +233,13 @@ def main() -> int:
         if audit_rc != 0:
             return audit_rc
 
-    conn_args, mode = _resolve_connection(args)
+    try:
+        conn_args, mode = _resolve_connection(args)
+    except (ValueError, RuntimeError) as exc:
+        print(f"[error] {exc}", file=sys.stderr)
+        return 2
     if not conn_args:
-        eng = _uproject_engine_association(_HOST_UPROJECT) if _HOST_UPROJECT.exists() else None
-        hint = f" (EngineAssociation={eng})" if eng else ""
-        print(
-            "[error] no live NexusLink Editor detected on "
-            "127.0.0.1:45000..45009\n"
-            "        and --no-launch was supplied (or no UE install found"
-            + hint + ").\n"
-            "        Either drop --no-launch to let the runner UBT-build "
-            "and headless-launch,\n"
-            "        or open Nexus.uproject manually and re-run.",
-            file=sys.stderr,
-        )
+        print(f"[error] {mode}", file=sys.stderr)
         return 2
     print(f"[mode] {mode}", flush=True)
 
@@ -328,9 +273,7 @@ def main() -> int:
     cmd.extend(forwarded)
 
     print(f"[run] {' '.join(cmd)}", flush=True)
-    rc = subprocess.call(cmd, cwd=str(NEXUS_UNREAL_DIR))
-    _purge_disk_artifacts("post", project_root=project_root, include_report=False)
-    return rc
+    return subprocess.call(cmd, cwd=str(NEXUS_UNREAL_DIR))
 
 
 if __name__ == "__main__":

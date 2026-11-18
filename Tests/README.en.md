@@ -50,7 +50,7 @@ Lifecycle cases use only the dedicated empty Feature plugin explicitly set throu
 
 ## Full-project startup acceptance
 
-`Script/run_e2e.py` also forwards `--uproject` when explicitly connecting through `--ue-url` or reusing an existing editor. Supply the actual project path for isolated-host tests so disk validation and before/after cleanup target the tested project. Cleanup includes `Config/Tags/NexusMcpTest_<GUID>.ini` from Tag lifecycle tests and verifies paths remain inside the project.
+For `Script/run_e2e.py` or direct pytest, use `--uproject` to select the project under test. The sample project is the default. Reusing an editor requires a direct local MCP port, a listening process whose absolute `.uproject` path matches, and editor status. Automatic mode reuses a unique match and can start an editor when no match is found. Use `--ue-url` to select a verified port when multiple editors match. If the project identity of an editor with the same project name cannot be verified, the command stops and reports that instance. Connecting to an existing instance requires a direct loopback address. Cleanup starts after the session verifies the project. It includes `Config/Tags/NexusMcpTest_<GUID>.ini` from Tag lifecycle tests and keeps paths within the project.
 
 After changing public C++ structs or base-class layouts, close the editor and fully rebuild every referencing module, including NexusLink, editor modules, extensions, and test plugins. Live Coding does not replace this step. Do not relink old `Intermediate` objects against new source. `Script/build_test.py` builds the complete sample in clean directories by default; when retaining isolated directories for incremental tests, ensure dependencies rebuild as well.
 
@@ -98,7 +98,7 @@ Exit codes: `0` means all fixed cases/baseline checks passed; `1` means assertio
 
 Baseline changes require manual review: use the plugin tool's `--save-baseline` to create a new file, inspect assertions, authoritative-side events, and the case signature, then replace the version-controlled file and commit it with the case change. Aggregate reports cannot replace per-scenario baselines. UE-free gate/archive regressions: `py -m unittest discover -s Script/tests -p 'test_gas*.py'`.
 
-The [GAS Tools Checks workflow](../.github/workflows/gas-regression.yml) runs UE-free tool checks and UE report-gate tests on GitHub-hosted Ubuntu. Users still start GAS network retests manually; the optional UE build/MCP workflow is described below. The repository does not install or register runners.
+The [GAS Tools Checks workflow](../.github/workflows/gas-regression.yml) runs `python -m pytest -q Script/tests` on GitHub-hosted Ubuntu. It covers host-script regressions and report validation without an Unreal Engine installation. Users still start GAS network retests manually. The optional UE build and MCP workflow is described below. The repository does not install or register runners.
 
 ## Controlled UE 5.7 validation
 
@@ -202,7 +202,7 @@ pytest Tests --ue-url http://127.0.0.1:45000/stream
 | `pytest Tests -m "not lua"` | Skip UnLua |
 | `pytest Tests --headless` | Explicit command-line mode, skipping `l4_runtime` / `lua` / `requires_gui` |
 | `pytest Tests -k blueprint` | Keyword filter |
-| `pytest Tests --keep-artifacts` | Retain `/Game/_McpTest/<ts>/` and legacy `/Game/_NexusTest` |
+| `pytest Tests --keep-artifacts` | Skip session cleanup before and after testing, retaining `/Game/_McpTest/<ts>/`, legacy `/Game/_NexusTest`, and disk artifacts |
 
 ## Test-file map
 

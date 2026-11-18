@@ -31,7 +31,7 @@ from _framework.capability_probe import _MissingCapabilities, require_capabiliti
 from _framework.mcp_client import MCPClient, MCPError, cap_first
 from _framework.runtime_helpers import pie_is_running
 from _framework.test_cleanup import purge_disk_test_artifacts, purge_mcp_test_assets
-from _framework.ue_launcher import UELauncher, autodetect_uproject
+from _framework.ue_launcher import UELauncher, autodetect_uproject, matching_editor_urls
 
 log = logging.getLogger(__name__)
 
@@ -135,15 +135,10 @@ def _test_artifact_hygiene(
 ) -> Generator[None, None, None]:
     """测试前后清理磁盘临时文件与 /Game/_McpTest、/Game/_NexusTest 下全部 UE 资产。"""
     keep = bool(pytestconfig.getoption("--keep-artifacts"))
-    uproject = pytestconfig.getoption("--uproject")
-    resolved = Path(uproject) if uproject else autodetect_uproject()
-    project_root = resolved.parent if resolved and resolved.exists() else Path.cwd()
-
-    removed = purge_disk_test_artifacts(project_root)
-    if removed:
-        log.info("pre-run disk cleanup: %s", ", ".join(removed))
-
     if not keep:
+        removed = purge_disk_test_artifacts(pytestconfig._nexus_verified_project.parent)
+        if removed:
+            log.info("pre-run disk cleanup: %s", ", ".join(removed))
         purge_mcp_test_assets(mcp)
 
     yield
@@ -154,49 +149,60 @@ def _test_artifact_hygiene(
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     """UE 进程退出后再删磁盘日志，避免 WinError 32 文件占用。"""
-    if session.config.getoption("--keep-artifacts"):
+    project = getattr(session.config, "_nexus_verified_project", None)
+    if project is None or session.config.getoption("--keep-artifacts"):
         return
-    uproject = session.config.getoption("--uproject")
-    resolved = Path(uproject) if uproject else autodetect_uproject()
-    project_root = resolved.parent if resolved and resolved.exists() else Path.cwd()
-    removed = purge_disk_test_artifacts(project_root, include_report=False)
+    removed = purge_disk_test_artifacts(project.parent, include_report=False)
     if removed:
         log.info("session-finish disk cleanup: %s", ", ".join(removed))
 
 
 @pytest.fixture(scope="session")
-def _ue_url(pytestconfig: pytest.Config) -> Generator[str, None, None]:
+def _target_uproject(pytestconfig: pytest.Config) -> Path:
+    uproject = pytestconfig.getoption("--uproject")
+    project = Path(uproject).resolve() if uproject else autodetect_uproject()
+    if not project or not project.is_file() or project.suffix.casefold() != ".uproject":
+        pytest.fail(f"Cannot verify target .uproject: {project}")
+    return project
+
+
+@pytest.fixture(scope="session")
+def _ue_url(pytestconfig: pytest.Config, _target_uproject: Path) -> Generator[str, None, None]:
     direct = pytestconfig.getoption("--ue-url")
     if direct:
-        log.info("using existing UE at %s", direct)
-        yield direct
+        matches = matching_editor_urls(_target_uproject, direct)
+        if len(matches) != 1:
+            pytest.fail(f"Cannot verify local Editor at {direct} for {_target_uproject}")
+        log.info("using existing UE at %s", matches[0])
+        yield matches[0]
         return
 
     ue_root = pytestconfig.getoption("--ue-root")
-    uproject = pytestconfig.getoption("--uproject")
     if not ue_root:
         pytest.skip(
             "no --ue-url and no --ue-root provided; "
             "start a UE Editor with NexusLink loaded and pass --ue-url."
         )
-    resolved_uproject = Path(uproject) if uproject else autodetect_uproject()
-    if not resolved_uproject or not resolved_uproject.exists():
-        pytest.skip("could not locate .uproject for auto-launch mode")
-
     headless = not bool(pytestconfig.getoption("--gui"))
     with UELauncher(
-        uproject=resolved_uproject,
+        uproject=_target_uproject,
         ue_root=Path(ue_root),
         headless=headless,
     ) as launcher:
+        pytestconfig._nexus_launched_pid = launcher.pid
         yield launcher.url
 
 
 @pytest.fixture(scope="session")
-def mcp(_ue_url: str) -> Generator[MCPClient, None, None]:
+def mcp(_ue_url: str, pytestconfig: pytest.Config, _target_uproject: Path) -> Generator[MCPClient, None, None]:
     client = MCPClient(_ue_url)
-    client.initialize()
     try:
+        client.initialize()
+        # 握手之后再次验证端口归属；自启动只接受本会话创建的 PID。
+        pid = getattr(pytestconfig, "_nexus_launched_pid", None)
+        if len(matching_editor_urls(_target_uproject, _ue_url, launched_pid=pid)) != 1:
+            pytest.fail(f"Editor identity changed during handshake at {_ue_url} for {_target_uproject}")
+        pytestconfig._nexus_verified_project = _target_uproject
         yield client
     finally:
         client.close()

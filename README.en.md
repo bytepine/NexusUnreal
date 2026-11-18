@@ -69,6 +69,8 @@ Plugin version: `Plugins/NexusLink/VERSION` or [NexusLink Releases](https://gith
 | L1 C++ | `Plugins/NexusLinkTestSuite/` (`NexusLink.`); UnLua tests: `Plugins/NexusLinkExtTestSuite/` (`NexusLinkExt.`) |
 | L2 pytest | This repository's `Tests/`; see [Tests/README.en.md](Tests/README.en.md) for policy |
 
+With `--versions`, every requested engine must pass for every selected target. The command lists any missing engines or UBT entry points and returns a nonzero exit code. Automatic discovery records installations without a UBT entry point as `SKIP`.
+
 ## Documentation
 
 All maintained documentation must provide complete Chinese and English versions, in separate Chinese and English files with reciprocal links at the top. Update both languages together, including README files, contribution and test guides, checklists, and changelogs; generated documents must be updated through their source or generator. Keep commands, paths, API names, and version numbers consistent between languages.

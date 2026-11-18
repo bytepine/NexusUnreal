@@ -87,12 +87,14 @@
 
 ### Fixed
 
+- 显式指定跨版本编译矩阵时，缺失的引擎版本或 UBT 入口会导致失败。Ubuntu CI 运行整套无需 UE 的宿主脚本回归。
+
 - 新增 `NexusLink.FeedbackNov12` 与 `test_26_feedback_nov12.py`，覆盖低版本骨骼采样、BlendSpace1D 插值及持久化、嵌套状态图、隐藏关卡导航数据块和地图保存、混合标量校验/数组恢复、原生组件与跨目标蓝图批次写入，以及 `SetArray`/`ClearArray`、继承成员只验证重映射、导航体积调整、`ActorPropertySchema`/`Navigation` 与 CommonUI `ActionBindings`。
 - Retarget 原生回归按引擎版本构造动画数据，兼容 UE 4 原始轨道与 UE 5 动画数据控制器接口；图片批次回归使用规范的 `Calls` 参数验证内联图片透传，覆盖混合截图类型时按时间保留最新文件和保留无关文件。
 
 - 同步 PascalCase 业务字段及 Lua 能力名的 L1 / Python 回归与行为树验收脚本；新增真实输入 Schema、创建返回字段、路径回显、Lua 类型元数据及反馈分类汇总回归。
 
-- 完整工程回归：资产预览磁盘校验及运行前后清理遵循 `--uproject`，显式连接或自动复用 Editor 时透传工程路径；PIE 按测试模块管理生命周期、Runtime 压缩用例显式请求 PIE、Slate 截图使用查询返回的 `Ref` 并校验不触发 ensure；MVVM 删除负例使用完整可编译绑定，避免空绑定编译弹窗阻塞后续 PIE；补充公共 C++ 布局变更后的完整重编与启动验收说明。
+- 完整工程回归：资产预览磁盘校验和清理使用已验证的 `--uproject`。复用本机编辑器时核对工程绝对路径和 MCP 端口归属，拒绝歧义的自动连接。PIE 按测试模块管理生命周期、Runtime 压缩用例显式请求 PIE、Slate 截图使用查询返回的 `Ref` 并校验不触发 ensure。MVVM 删除负例使用完整可编译绑定，避免空绑定编译弹窗阻塞后续 PIE。补充公共 C++ 布局变更后的完整重编与启动验收说明。
 
 - fix(test): E2E 预期业务失败同时校验 `isError` 与结构化详情；修正蓝图编译、原生字段、StateTree 类型及测试资产重名，网格、纹理与动画写入使用测试副本。
 - fix(test): E2E 覆盖审计扫描 NexusLink / NexusLinkExt 的 Runtime 与 Editor 模块，按 PascalCase 实际调用参数关联 action / section，支持列表变量、循环与参数化用例（含 `pytest.param`）；追加后的参数表保持行配对，容器别名与循环迭代值正确保留，不同用例的变更相互隔离；未知参数行仍扫描固定调用，不再将未调用的字面量或同文件其他能力误算为覆盖，空扫描直接失败；新增独立脚本回归测试

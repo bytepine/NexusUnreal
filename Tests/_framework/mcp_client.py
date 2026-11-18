@@ -110,6 +110,7 @@ class MCPClient:
             )
         self._http = httpx.Client(
             timeout=timeout,
+            trust_env=urlparse(url).hostname not in ("127.0.0.1", "localhost", "::1"),
             headers={"Authorization": f"Bearer {token}"},
         )
 
