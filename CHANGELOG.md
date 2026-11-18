@@ -61,7 +61,7 @@
 - test(e2e): `test_95` 补 Runtime 迁入后的 `GetOutputLog` 与 `CaptureViewport target=pie bValidateOnly`；`test_10` 补 `CaptureEditorPanel` 的 `target=list` 面板枚举、`ViewAngle` 缺 `ActorName` 的拒绝路径与 `target=viewport bValidateOnly`
 - test(plugin): L1 `NexusLink.Utils.Runtime.RequirePlayWorld`（未开 PIE 时拒绝 Editor World）与 `NexusLink.Host.RegistryScope.All`（全表宿主可见性）
 - test(plugin): `NexusLink.Trace` 覆盖 UE 4.26+ 文件不存在、四个 Sections、有限耗时与默认时间窗、默认值、时间窗口和重复读取；优先用独立录制进程生成的已关闭文件，避免旧引擎停录写线程错误；UE4 另验证 Store 无路径条目、TraceId 回读与缓存，以及快照边界和提前断流。
-- test(plugin): 增加 `NexusLink.Reliability` 回归，覆盖 MCP 标准字段、section 枚举、业务错误聚合、批量回滚与延迟保存、DataTable 字段及临时行析构、重复读取不阻断；L2 回滚用例检查错误信封与结构化失败详情。
+- test(plugin): 增加 `NexusLink.Reliability` 回归，覆盖 MCP 标准字段、双入口 Capability 调用准入、section 枚举、业务错误聚合、批量回滚与延迟保存、DataTable 字段及临时行析构、重复读取不阻断；L2 回滚用例检查错误信封与结构化失败详情。
 
 ### Changed
 
@@ -94,7 +94,7 @@
 
 - 同步 PascalCase 业务字段及 Lua 能力名的 L1 / Python 回归与行为树验收脚本；新增真实输入 Schema、创建返回字段、路径回显、Lua 类型元数据及反馈分类汇总回归。
 
-- 完整工程回归：资产预览磁盘校验和清理使用已验证的 `--uproject`。复用本机编辑器时核对工程绝对路径和 MCP 端口归属，拒绝歧义的自动连接。PIE 按测试模块管理生命周期、Runtime 压缩用例显式请求 PIE、Slate 截图使用查询返回的 `Ref` 并校验不触发 ensure。MVVM 删除负例使用完整可编译绑定，避免空绑定编译弹窗阻塞后续 PIE。补充公共 C++ 布局变更后的完整重编与启动验收说明。
+- 完整工程回归：资产预览磁盘校验和清理使用已验证的 `--uproject`。复用本机编辑器时核对工程绝对路径和 MCP 端口归属，拒绝歧义的自动连接。自动发现和实际启动共用本机编辑器选择规则。PIE 按测试模块管理生命周期、Runtime 压缩用例显式请求 PIE、Slate 截图使用查询返回的 `Ref` 并校验不触发 ensure。MVVM 删除负例使用完整可编译绑定，避免空绑定编译弹窗阻塞后续 PIE。补充公共 C++ 布局变更后的完整重编与启动验收说明。
 
 - fix(test): E2E 预期业务失败同时校验 `isError` 与结构化详情；修正蓝图编译、原生字段、StateTree 类型及测试资产重名，网格、纹理与动画写入使用测试副本。
 - fix(test): E2E 覆盖审计扫描 NexusLink / NexusLinkExt 的 Runtime 与 Editor 模块，按 PascalCase 实际调用参数关联 action / section，支持列表变量、循环与参数化用例（含 `pytest.param`）；追加后的参数表保持行配对，容器别名与循环迭代值正确保留，不同用例的变更相互隔离；未知参数行仍扫描固定调用，不再将未调用的字面量或同文件其他能力误算为覆盖，空扫描直接失败；新增独立脚本回归测试

@@ -52,6 +52,8 @@ UE Automation 的 `NexusLink.AssetEdit` 覆盖接口实现图、Unicode 结构 H
 
 `Script/run_e2e.py` 与直接运行 pytest 时，用 `--uproject` 指定被测工程，省略时使用示例工程。复用已有编辑器须匹配本机直接 MCP 端口、监听进程的绝对 `.uproject` 路径及编辑器状态。自动模式仅在匹配唯一时复用，找不到匹配时可自动启动，多实例匹配时用 `--ue-url` 选择已验证的端口。同名编辑器的工程身份无法确认时，命令会停止并报告该实例。连接已有实例须使用本机直连地址。会话确认工程身份后才清理，范围包括 Tag 生命周期测试生成的 `Config/Tags/NexusMcpTest_<GUID>.ini`，并检查路径没有越出工程目录。
 
+自动启动时，`run_e2e.py` 先尝试工程关联的 UE 版本，再从新到旧查找本机可用的安装。发现和启动采用同一套当前平台的可执行文件选择规则。默认优先 `-Cmd`，`--gui` 或 `--full` 优先 GUI 编辑器。
+
 修改公共 C++ 结构或基类布局后，关闭编辑器并完整重编所有引用模块，包括 NexusLink、编辑器模块、扩展及测试插件；Live Coding 不能替代这一步。不要把旧 `Intermediate` 的目标文件与新源码重新链接。`Script/build_test.py` 默认在干净目录构建完整示例工程；自行保留隔离目录作增量测试时，也必须确保依赖重编。
 
 如果编辑器在 MCP 就绪前报告 DLL `GetLastError=1114`，应定位加载阶段的首个异常；卸载后的类注册回调崩溃可能是连带结果。编译通过不代表启动通过：完整工程验收还须以对应引擎启动 GUI，再运行 `test_00_smoke.py`、`test_15_editor_operations.py` 和本次涉及的运行测试。跨版本验收使用独立的内容及配置副本，避免测试写入原工程。 `test_02_asset_edit_preview.py` 的磁盘校验遵循 `--uproject`，读取当前被测工程的资产文件。 PIE 夹具按测试模块启动与停止，避免 Automation 等编辑器操作结束 PIE 后，后续模块沿用已失效的会话。 Runtime 压缩用例显式请求 PIE；Slate 截图使用窗口查询返回的 `Ref`，不依赖此前 PIE 窗口的焦点。

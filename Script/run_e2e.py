@@ -48,18 +48,6 @@ _HOST_UPROJECT = NEXUS_UNREAL_DIR / "Nexus.uproject"
 _VER_LABEL_RE = re.compile(r"^UE_?(\d+)\.(\d+)$", re.IGNORECASE)
 
 
-def _has_editor_cmd(ue_root: Path) -> bool:
-    candidates = [
-        ue_root / "Engine" / "Binaries" / "Win64" / "UnrealEditor-Cmd.exe",
-        ue_root / "Engine" / "Binaries" / "Win64" / "UE4Editor-Cmd.exe",
-        ue_root / "Engine" / "Binaries" / "Mac" / "UnrealEditor-Cmd",
-        ue_root / "Engine" / "Binaries" / "Mac" / "UE4Editor-Cmd",
-        ue_root / "Engine" / "Binaries" / "Linux" / "UnrealEditor-Cmd",
-        ue_root / "Engine" / "Binaries" / "Linux" / "UE4Editor-Cmd",
-    ]
-    return any(p.exists() for p in candidates)
-
-
 def _uproject_engine_association(uproject: Path) -> Optional[str]:
     try:
         with open(uproject, "r", encoding="utf-8") as f:
@@ -75,13 +63,15 @@ def _uproject_engine_association(uproject: Path) -> Optional[str]:
     return f"UE_{m.group(1)}.{m.group(2)}" if m else None
 
 
-def _autodetect_ue_root(preferred_label: Optional[str]) -> Optional[Tuple[str, str]]:
+def _autodetect_ue_root(preferred_label: Optional[str], *, headless: bool) -> Optional[Tuple[str, str]]:
     """Return (version_label, install_path) for the best UE candidate.
 
     Selection order:
       1. UE matching `preferred_label` (e.g. the uproject EngineAssociation).
-      2. Newest installed UE with a usable Editor-Cmd binary.
+      2. Newest installed UE with an editor binary usable by the launcher.
     """
+    from _framework.ue_launcher import resolve_editor_exe
+
     try:
         sys.path.insert(0, str(SCRIPT_DIR))
         from engine_discovery import discover_engines_auto  # type: ignore
@@ -95,24 +85,18 @@ def _autodetect_ue_root(preferred_label: Optional[str]) -> Optional[Tuple[str, s
         print(f"[warn] engine auto-discovery raised: {e}",
               file=sys.stderr, flush=True)
         return None
-    if not engines:
-        return None
-
-    if preferred_label:
-        for entry in engines:
-            if entry["version"].lower() == preferred_label.lower() \
-                    and _has_editor_cmd(Path(entry["path"])):
-                return entry["version"], entry["path"]
-
-    # `discover_engines_auto` already sorts ascending by (major, minor);
-    # pick the highest version that has a usable Editor-Cmd binary.
-    for entry in reversed(engines):
-        if _has_editor_cmd(Path(entry["path"])):
-            return entry["version"], entry["path"]
+    preferred = [entry for entry in engines if entry["version"].casefold() == (preferred_label or "").casefold()]
+    candidates = preferred + [entry for entry in reversed(engines) if entry not in preferred]
+    for entry in candidates:
+        try:
+            resolve_editor_exe(Path(entry["path"]), headless=headless)
+        except FileNotFoundError:
+            continue
+        return entry["version"], entry["path"]
     return None
 
 
-def _resolve_connection(args: argparse.Namespace) -> Tuple[List[str], str]:
+def _resolve_connection(args: argparse.Namespace, *, headless: bool = True) -> Tuple[List[str], str]:
     """Resolve how the pytest run should reach UE. Returns (extra_pytest_args,
     human_readable_mode_label)."""
     # 延迟加载 pytest 宿主依赖，保证全新环境也能运行 --help。
@@ -147,7 +131,7 @@ def _resolve_connection(args: argparse.Namespace) -> Tuple[List[str], str]:
         return [], f"No verified local Editor for {project} (--no-launch set)"
 
     preferred = _uproject_engine_association(project)
-    found = _autodetect_ue_root(preferred)
+    found = _autodetect_ue_root(preferred, headless=headless)
     if not found:
         return [], f"No verified local Editor for {project} and no installed UE detected"
     ver, path = found
@@ -216,6 +200,7 @@ def main() -> int:
         help="Write a JUnit XML report; defaults to Saved/Logs/TestReport.xml.",
     )
     args, forwarded = parser.parse_known_args()
+    gui = args.gui or args.full
 
     _ensure_deps()
     coverage_audit = NEXUS_UNREAL_DIR / "Script/audit_e2e_coverage.py"
@@ -234,7 +219,7 @@ def main() -> int:
             return audit_rc
 
     try:
-        conn_args, mode = _resolve_connection(args)
+        conn_args, mode = _resolve_connection(args, headless=not gui)
     except (ValueError, RuntimeError) as exc:
         print(f"[error] {exc}", file=sys.stderr)
         return 2
@@ -265,7 +250,7 @@ def main() -> int:
     cmd.extend(conn_args)
     if args.keep_artifacts:
         cmd.append("--keep-artifacts")
-    if args.gui or args.full:
+    if gui:
         cmd.append("--gui")
     elif "--ue-root" in conn_args:
         cmd.append("--headless")

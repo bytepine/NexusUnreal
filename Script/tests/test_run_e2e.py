@@ -45,11 +45,31 @@ def test_ambiguous_and_unverified_connections(tmp_path, monkeypatch):
     monkeypatch.setattr(ue_launcher, "matching_editor_urls", lambda *args: [])
     assert not runner._resolve_connection(args)[0]
     args.no_launch = False
-    monkeypatch.setattr(runner, "_autodetect_ue_root", lambda preferred: ("UE_5.7", "engine"))
+    monkeypatch.setattr(runner, "_autodetect_ue_root", lambda preferred, *, headless: ("UE_5.7", "engine"))
     assert runner._resolve_connection(args)[0] == ["--ue-root", "engine", "--uproject", str(project)]
     args.ue_url = "http://127.0.0.1:45000/stream"
     with pytest.raises(ValueError, match="Cannot verify"):
         runner._resolve_connection(args)
+
+
+@pytest.mark.parametrize("headless", [True, False])
+@pytest.mark.parametrize("preferred", [None, "UE_5.7", "UE_5.8"])
+def test_autodetect_uses_the_local_editor_resolver(tmp_path, monkeypatch, headless, preferred):
+    local = tmp_path / "UE_5.7"
+    foreign = tmp_path / "UE_5.8"
+    for binary in (
+        local / "Engine/Binaries/Win64/UnrealEditor.exe",
+        foreign / "Engine/Binaries/Linux/UnrealEditor-Cmd",
+    ):
+        binary.parent.mkdir(parents=True)
+        binary.touch()
+    monkeypatch.setattr(ue_launcher, "_is_windows", lambda: True)
+    monkeypatch.setitem(sys.modules, "engine_discovery", SimpleNamespace(
+        discover_engines_auto=lambda: [
+            {"version": root.name, "path": str(root)} for root in (local, foreign)
+        ],
+    ))
+    assert runner._autodetect_ue_root(preferred, headless=headless) == ("UE_5.7", str(local))
 
 
 def test_attach_requires_project_path_and_live_port_owner(tmp_path, monkeypatch):

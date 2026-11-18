@@ -115,6 +115,66 @@ bool FNexusProtocolContractTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusCapabilityCallAccessTest,
+	"NexusLink.Reliability.CapabilityCallAccess",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FNexusCapabilityCallAccessTest::RunTest(const FString& Parameters)
+{
+	UNexusLinkSettings* Settings = GetMutableDefault<UNexusLinkSettings>();
+	TGuardValue<bool> FeedbackGuard(Settings->bEnableFeedback, false);
+	TGuardValue<TSet<FString>> EnabledGuard(Settings->SessionEnabledCapabilities, TSet<FString>());
+	TGuardValue<TSet<FString>> DisabledGuard(Settings->SessionDisabledCapabilities, TSet<FString>());
+	FNexusMcpDispatcher Dispatcher([](const FString&) {});
+	const FString CapName = TEXT("GetEditorInfo");
+	for (const ENexusToolsListMode Mode : { ENexusToolsListMode::SearchMode, ENexusToolsListMode::MultiTool })
+	{
+		TGuardValue<ENexusToolsListMode> ModeGuard(Settings->ToolsListMode, Mode);
+		const bool bSearch = Mode == ENexusToolsListMode::SearchMode;
+		const auto Call = [&](const FString& Name)
+		{
+			const FString Params = bSearch
+				? FString::Printf(TEXT(R"({"name":"CallCapability","arguments":{"Capability":"%s"}})"), *Name)
+				: FString::Printf(TEXT(R"({"name":"%s","arguments":{}})"), *Name);
+			TSharedPtr<FJsonObject> Response;
+			Dispatcher.DispatchDirect(FString::Printf(TEXT(R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":%s})"), *Params),
+				[&Response](const FString& Json) { Response = ParseReliabilityResponse(Json); });
+			return Response;
+		};
+		Settings->SetSessionCapabilityEnabled(CapName, true, false);
+		const auto Success = Call(CapName);
+		const TSharedPtr<FJsonObject>* Result = nullptr;
+		if (!TestTrue(TEXT("已启用能力返回工具结果"), Success.IsValid() && Success->TryGetObjectField(TEXT("result"), Result))) return false;
+		TestFalse(TEXT("已启用能力调用成功"), (*Result)->GetBoolField(TEXT("isError")));
+
+		Settings->SetSessionCapabilityEnabled(CapName, false, false);
+		const FString UnknownName = TEXT("NexusTestUnknownCapability");
+		for (const FString& Name : { CapName, UnknownName })
+		{
+			const auto Response = Call(Name);
+			if (!TestTrue(TEXT("调用失败时返回有效 JSON"), Response.IsValid())) return false;
+			if (bSearch)
+			{
+				if (!TestTrue(TEXT("SearchMode 错误放入工具结果"), Response->TryGetObjectField(TEXT("result"), Result))) return false;
+				TestTrue(TEXT("SearchMode 标记 isError"), (*Result)->GetBoolField(TEXT("isError")));
+				const TSharedPtr<FJsonObject>* Details = nullptr;
+				if (!TestTrue(TEXT("SearchMode 提供结构化错误"), (*Result)->TryGetObjectField(TEXT("structuredContent"), Details))) return false;
+				TestEqual(TEXT("SearchMode 区分禁用与未知"), (*Details)->GetStringField(TEXT("ErrorKind")),
+					FString(Name == CapName ? TEXT("disabled") : TEXT("unknown")));
+			}
+			else
+			{
+				const TSharedPtr<FJsonObject>* Error = nullptr;
+				if (!TestTrue(TEXT("MultiTool 返回 JSON-RPC 错误"), Response->TryGetObjectField(TEXT("error"), Error))) return false;
+				TestEqual(TEXT("MultiTool 使用 method not found"), (*Error)->GetIntegerField(TEXT("code")), -32601);
+				TestTrue(TEXT("MultiTool 消息区分禁用与未知"), (*Error)->GetStringField(TEXT("message")).Contains(
+					Name == CapName ? TEXT("disabled in settings") : TEXT("Tool not found")));
+			}
+		}
+	}
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusPascalCasePayloadTest,
 	"NexusLink.Reliability.PascalCasePayload",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
