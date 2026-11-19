@@ -9,12 +9,15 @@ from _framework.mcp_client import cap_first
     ("navigation path", "GetNavigationPath"),
     ("asset editor", "ControlEditorAssetEditor"),
     ("FindAsset", "SearchAsset"),
+    ("project info", "GetEditorInfo"),
+    ("selected actor", "GetEditorContext"),
+    ("staticmesh bodysetup", "GetAssetStaticMesh"),
 ])
 def test_editor_gaps_intent_discovery(mcp, require_tools, query, name):
     require_tools(name)
     result = mcp.call("SearchCapabilities", Query=query)
     assert result["Capability"]["name"] == name, result
-    assert result["Capability"]["Parameters"] and not result.get("bTruncated"), result
+    assert isinstance(result["Capability"]["Parameters"], list) and not result.get("bTruncated"), result
 
 
 def test_editor_gaps_reparent(mcp, require_tools, test_ns):

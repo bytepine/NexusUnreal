@@ -11,6 +11,21 @@ from _framework.assertions import merge_with_defaults
 from test_15_editor_operations import operation_result
 
 
+def test_feedback_discovery_parameter_constraints(mcp, require_tools):
+    require_tools("GetEditorScene", "InteractEditorSlate")
+    scene = mcp.call("SearchCapabilities", CapabilityName="GetEditorScene")["Capability"]
+    parameters = {param["name"]: param for param in scene["Parameters"]}
+    for bound in ("BoundsMin", "BoundsMax"):
+        description = parameters[bound]["description"]
+        assert "require both BoundsMin and BoundsMax" in description and "finite X, Y, Z" in description
+    assert "NavigationContributors uses the bounds only" in parameters["ActorPath"]["description"]
+
+    slate = mcp.call("SearchCapabilities", CapabilityName="InteractEditorSlate")["Capability"]
+    wheel = next(param for param in slate["Parameters"] if param["name"] == "WheelDelta")
+    assert (wheel["minimum"], wheel["maximum"]) == (-20, 20), wheel
+    assert "Required for Scroll" in wheel["description"] and "nonzero" in wheel["description"], wheel
+
+
 def test_feedback_navigation_scene_diagnostics(mcp, require_tools):
     require_tools("GetEditorScene", "GetEditorOperation")
     status = operation_result(mcp, mcp.call("GetEditorScene", Action="NavigationStatus", WaitSeconds=.1))["CompatibilityResult"]
