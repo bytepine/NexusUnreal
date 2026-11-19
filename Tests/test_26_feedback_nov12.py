@@ -81,7 +81,10 @@ def test_feedback_blueprint_array_and_inherited_remap(mcp, require_tools, test_n
     assert remap.get("bValidateOnly") is True and remap.get("ReferenceCount") == 0, remap
 
 
-def test_commonui_action_bindings_section(mcp, require_tools):
+@pytest.mark.requires_gui
+@pytest.mark.l4_runtime
+def test_commonui_action_bindings_section(mcp, require_tools, request):
     require_tools("GetCommonUIInfo")
+    request.getfixturevalue("pie")
     bindings = cap_first(mcp.call("GetCommonUIInfo", Sections=["ActionBindings"]))
     assert "ActionBindings" in bindings, bindings
