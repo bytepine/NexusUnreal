@@ -38,6 +38,8 @@ public class NexusLinkTests : ModuleRules
             var RegistrySearchDirs = NexusLinkOptionalPlugins.CollectPluginSearchDirs(RegistryProjectRoot, this);
             var RegistryConfig = NexusLinkOptionalPlugins.Opt(new[] { "DataRegistry.uplugin" }, "WITH_NEXUS_TEST_DATA_REGISTRY", "NEXUS_TEST_DATA_REGISTRY", 5, 0, rt: new[] { "DataRegistry" }, uproj: "DataRegistry");
             NexusLinkOptionalPlugins.Apply(this, Target, RegistryConfig, RegistrySearchDirs, RegistryProjectRoot, false);
+            var stateTree = System.Array.Find(NexusLinkOptionalPlugins.BuildFullTable(), config => config.Define == "WITH_STATETREE");
+            NexusLinkOptionalPlugins.Apply(this, Target, stateTree, RegistrySearchDirs, RegistryProjectRoot, true, false);
 			var PCGDocuments = NexusLinkOptionalPlugins.Opt(new[] { "PCG.uplugin" }, "WITH_NEXUS_TEST_PCG_DOCUMENTS", "WITH_PCG", 5, 8,
 				rt: new[] { "PCG" }, ed: new[] { "PCGEditor" }, uproj: "PCG");
 			if (NexusLinkOptionalPlugins.Apply(this, Target, PCGDocuments, RegistrySearchDirs, RegistryProjectRoot, true))

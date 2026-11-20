@@ -6,6 +6,7 @@ from decimal import Decimal
 
 import pytest
 
+from _framework.asset_helpers import resolve_skeleton
 from _framework.mcp_client import cap_first
 from _framework.assertions import merge_with_defaults
 
@@ -59,6 +60,83 @@ def assert_rejected_without_changes(mcp, path, operation, graph="EventGraph"):
     after = graph_nodes(mcp, path, graph)
     assert after == before, (operation, before, after)
     return rejected
+
+
+def assert_removal_rejected(mcp, path, graph, node_id, error, *, animation=False):
+    before = graph_nodes(mcp, path, graph)
+    assert not cap_first(mcp.call("GetEditorGraph", AssetPath=path))["bDirty"]
+    calls = [("GetAssetEditPreview", {"Capability": "ManageAssetBlueprint"}),
+             ("ManageAssetBlueprint", {"bVerifyStructure": True}), ("ManageAssetBlueprint", {})]
+    if animation:
+        calls.append(("ManageAssetAnimBlueprint", {}))
+    for tool, options in calls:
+        remove = {"Action": "RemoveNode", "GraphName": graph, "NodeId": node_id}
+        rejected = mcp.try_call(tool, AssetPath=path, Operations=[remove], **options)
+        assert rejected.get("isError") and error in str(rejected), rejected
+        assert graph_nodes(mcp, path, graph) == before
+        assert not cap_first(mcp.call("GetEditorGraph", AssetPath=path))["bDirty"]
+
+
+def test_blueprint_remove_node_protects_function_entry(mcp, require_tools, test_ns):
+    path = create_blueprint(mcp, require_tools, test_ns, "ProtectedEntry")
+    require_tools("GetAssetEditPreview", "GetEditorGraph", "SaveAsset")
+    graph = "RunSequence"
+    edit(mcp, path, Action="AddFunction", FunctionName=graph)
+    entry_id = next(node_id for node_id, node in graph_nodes(mcp, path, graph).items()
+                    if node["NodeClass"] == "K2Node_FunctionEntry")
+    sequence = edit(mcp, path, Action="AddNode", GraphName=graph, NodeClass="K2Node_ExecutionSequence")["NodeId"]
+    edit(mcp, path, Action="Connect", GraphName=graph, SourceNodeId=entry_id, SourcePinName="then",
+         TargetNodeId=sequence, TargetPinName="execute")
+    mcp.call("SaveAsset", AssetPath=path)
+    assert any(link["NodeId"] == sequence for link in pin(graph_nodes(mcp, path, graph)[entry_id], "then")["LinkedTo"])
+    assert_removal_rejected(mcp, path, graph, entry_id, "cannot be deleted")
+
+    overview = cap_first(mcp.call("GetAssetBlueprint", AssetPath=path, Sections=["GraphOverview"]))
+    graph_path = next(g["GraphPath"] for g in overview["Graphs"] if g["GraphName"] == graph)
+    remove = {"Action": "RemoveNode", "GraphName": graph_path, "NodeId": sequence}
+    preview = mcp.call("GetAssetEditPreview", Capability="ManageAssetBlueprint", AssetPath=path, Operations=[remove])
+    assert cap_first(preview)["bValid"] and preview["Removed"], preview
+    assert sequence in graph_nodes(mcp, path, graph)
+    written = cap_first(mcp.call("ManageAssetBlueprint", AssetPath=path, Operations=[remove], bVerifyStructure=True))
+    assert written["bStructureVerified"], written
+    after = graph_nodes(mcp, path, graph)
+    assert sequence not in after and not pin(after[entry_id], "then").get("LinkedTo")
+
+
+def test_remove_node_protects_math_expression_graph(mcp, require_tools, test_ns):
+    require_tools("CreateAssetAnimBlueprint", "GetAssetBlueprint", "ManageAssetBlueprint", "ManageAssetAnimBlueprint",
+                  "GetAssetEditPreview", "GetEditorGraph", "ExecPython", "SaveAsset")
+    path = f"{test_ns}/ABP_ReadOnlyExpression"
+    mcp.call("CreateAssetAnimBlueprint", AssetPath=path, SkeletonPath=resolve_skeleton(mcp))
+    edit(mcp, path, Action="AddNode", GraphName="EventGraph", NodeClass="K2Node_MathExpression")
+    overview = cap_first(mcp.call("GetAssetBlueprint", AssetPath=path, Sections=["GraphOverview"]))
+    graph = next(g["GraphPath"] for g in overview["Graphs"] if "K2Node_MathExpression" in g["GraphPath"])
+    mcp.call("ExecPython", Code=f"import unreal\nunreal.find_object(None, {graph!r}).get_outer().set_editor_property('expression', 'x + 1')")
+    mcp.call("SaveAsset", AssetPath=path)
+    arithmetic = next(node_id for node_id, node in graph_nodes(mcp, path, graph).items()
+                      if node["NodeClass"] == "K2Node_CallFunction")
+    assert_removal_rejected(mcp, path, graph, arithmetic, "read-only graph", animation=True)
+
+
+def test_anim_blueprint_remove_node_protects_root(mcp, require_tools, test_ns):
+    require_tools("CreateAssetAnimBlueprint", "ManageAssetAnimBlueprint", "GetAssetBlueprint")
+    path = f"{test_ns}/ABP_ProtectedRoot"
+    mcp.call("CreateAssetAnimBlueprint", AssetPath=path, SkeletonPath=resolve_skeleton(mcp))
+    root = next(node_id for node_id, node in graph_nodes(mcp, path, "AnimGraph").items()
+                if node["NodeClass"] == "AnimGraphNode_Root")
+    player = cap_first(mcp.call("ManageAssetAnimBlueprint", AssetPath=path, Operations=[
+        {"Action": "AddNode", "NodeClass": "SequencePlayer"}]))["NodeId"]
+    mcp.call("ManageAssetAnimBlueprint", AssetPath=path, Operations=[{
+        "Action": "Connect", "SourceNodeId": player, "SourcePinName": "Pose", "TargetNodeId": root, "TargetPinName": "Result",
+    }])
+    before = graph_nodes(mcp, path, "AnimGraph")
+    assert any(link["NodeId"] == player for link in pin(before[root], "Result")["LinkedTo"])
+    rejected = mcp.try_call("ManageAssetAnimBlueprint", AssetPath=path, Operations=[{"Action": "RemoveNode", "NodeId": root}])
+    assert rejected.get("isError") and "cannot be deleted" in str(rejected), rejected
+    assert graph_nodes(mcp, path, "AnimGraph") == before
+    mcp.call("ManageAssetAnimBlueprint", AssetPath=path, Operations=[{"Action": "RemoveNode", "NodeId": player}])
+    after = graph_nodes(mcp, path, "AnimGraph")
+    assert player not in after and not pin(after[root], "Result").get("LinkedTo")
 
 
 def test_blueprint_struct_pin_split_recombine_and_layout_readback(mcp, require_tools, test_ns):

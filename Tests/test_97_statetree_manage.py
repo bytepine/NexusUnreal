@@ -84,7 +84,7 @@ def test_manage_state_tree_rename_state(st_path, mcp):
     assert not entry.get("Error"), r
 
 
-def test_manage_state_tree_add_task_transition(st_path, mcp):
+def test_manage_state_tree_add_task(st_path, mcp):
     add_task = mcp.call_capability(
         "ManageAssetStateTree",
         AssetPath=st_path,
@@ -97,27 +97,54 @@ def test_manage_state_tree_add_task_transition(st_path, mcp):
     te = cap_first(add_task)
     assert isinstance(te, dict), add_task
 
-    mcp.call_capability(
-        "ManageAssetStateTree",
-        AssetPath=st_path,
-        Operations=[{"Action": "AddState", "StateName": "NxTransSrc"}],
-    )
-    mcp.call_capability(
-        "ManageAssetStateTree",
-        AssetPath=st_path,
-        Operations=[{"Action": "AddState", "StateName": "NxTransDst"}],
-    )
-    r = mcp.call_capability(
-        "ManageAssetStateTree",
-        AssetPath=st_path,
-        Operations=[{
-            "Action": "AddTransition",
-            "StateName": "NxTransSrc",
-            "TargetState": "NxTransDst",
-        }],
-    )
-    entry = cap_first(r)
-    assert not entry.get("Error"), r
+
+def test_manage_state_tree_transition_target(test_ns, mcp, require_tools):
+    require_tools("CreateAssetStateTree", "ManageAssetStateTree", "GetAssetStateTree")
+    path = f"{test_ns}/ST_TransitionTarget"
+    mcp.call("CreateAssetStateTree", AssetPath=path)
+    mcp.call("ManageAssetStateTree", AssetPath=path, Operations=[
+        {"Action": "AddState", "StateName": "Source"},
+        {"Action": "AddState", "StateName": "Target"},
+        {"Action": "AddTransition", "StateName": "Source", "TargetState": "Target"},
+    ])
+    tree = cap_first(mcp.call("GetAssetStateTree", AssetPath=path))
+    source = next(state for state in tree["SubTrees"] if state["Name"] == "Source")
+    assert [transition["Target"] for transition in source["Transitions"]] == ["Target"], source
+    mcp.call("ManageAssetStateTree", AssetPath=path, Operations=[
+        {"Action": "RenameState", "StateName": "Target", "NewName": "Renamed"},
+        {"Action": "AddState", "StateName": "Target"},
+    ])
+    states = cap_first(mcp.call("GetAssetStateTree", AssetPath=path))["SubTrees"]
+    source = next(state for state in states if state["Name"] == "Source")
+    assert [transition["Target"] for transition in source["Transitions"]] == ["Renamed"], source
+
+
+def test_manage_state_tree_transition_rejections(test_ns, mcp, require_tools):
+    require_tools("CreateAssetStateTree", "ManageAssetStateTree", "GetAssetStateTree")
+    path = f"{test_ns}/ST_TransitionRejections"
+    mcp.call("CreateAssetStateTree", AssetPath=path)
+    mcp.call("ManageAssetStateTree", AssetPath=path, Operations=[
+        {"Action": "AddState", "StateName": "Left"},
+        {"Action": "AddState", "StateName": "Right"},
+        {"Action": "AddState", "ParentState": "Left", "StateName": "Idle"},
+        {"Action": "AddState", "ParentState": "Right", "StateName": "Idle"},
+    ])
+    before = cap_first(mcp.call("GetAssetStateTree", AssetPath=path))["SubTrees"]
+    for source, target in (("IDLE", "Right"), ("Left", "idle")):
+        result = mcp.try_call("ManageAssetStateTree", AssetPath=path, Operations=[
+            {"Action": "AddTransition", "StateName": source, "TargetState": target}])
+        assert result["isError"] and "ambiguous" in str(result["structuredContent"]).lower(), result
+        assert cap_first(mcp.call("GetAssetStateTree", AssetPath=path))["SubTrees"] == before
+
+    operations = [
+        {"Action": "AddTransition", "StateName": "Left", "TargetState": "Right"},
+        {"Action": "RemoveTransition", "StateName": "Left", "Index": 99},
+    ]
+    result = mcp.try_call("CallCapability", Calls=[
+        {"Capability": "ManageAssetStateTree", "Arguments": {"AssetPath": path, "Operations": [op]}}
+        for op in operations])
+    assert result["isError"] and result["structuredContent"]["bRolledBack"], result
+    assert cap_first(mcp.call("GetAssetStateTree", AssetPath=path))["SubTrees"] == before
 
 
 def test_manage_state_tree_remove_state(st_path, mcp):

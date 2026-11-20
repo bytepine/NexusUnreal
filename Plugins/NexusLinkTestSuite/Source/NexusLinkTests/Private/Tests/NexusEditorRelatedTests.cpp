@@ -16,6 +16,7 @@
 #include "Engine/InheritableComponentHandler.h"
 #include "Engine/StaticMesh.h"
 #include "Components/SceneComponent.h"
+#include "Components/LODSyncComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -458,6 +459,9 @@ bool FNexusRelatedComponentsTest::RunTest(const FString& Parameters)
 	if (!TestFalse(TEXT("关卡 SCS 属性重置"), RelatedCall(TEXT("ManageAssetLevel"), RelatedArgs(World, ResetActor)).HasErrors())) return false;
 	TestEqual(TEXT("实例恢复为子蓝图模板"), static_cast<double>(Instance->GetRelativeLocation().X), 72.0);
 	GEditor->UndoTransaction();
+	// Undo 可以重建 Actor 的构造脚本组件，应检查当前实例。
+	Instance = Cast<USceneComponent>(Member->GetObjectPropertyValue_InContainer(Actor));
+	if (!TestNotNull(TEXT("撤销后 SCS 实例"), Instance)) return false;
 	TestEqual(TEXT("重置可撤销"), static_cast<double>(Instance->GetRelativeLocation().X), 99.0);
 	Operation->SetStringField(TEXT("Action"), TEXT("ResetComponentPropertyToDefault")); Operation->RemoveField(TEXT("ExpectedValue")); Args->SetBoolField(TEXT("bVerify"), false);
 	TestFalse(TEXT("Reset child to parent template"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
@@ -467,6 +471,102 @@ bool FNexusRelatedComponentsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Reset writes actual parent value"), FCString::Atod(*ResetProperty->GetStringField(TEXT("Value"))), 31.0);
 	TestFalse(TEXT("Reset removes the difference"), ResetProperty->GetBoolField(TEXT("bDiffersFromDefault")));
 	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusComponentMapPathTest, "NexusLink.EditorRelated.ComponentMapPath", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusComponentMapPathTest::RunTest(const FString& Parameters)
+{
+	TStrongObjectPtr<UBlueprint> Parent(RelatedBlueprint(AActor::StaticClass()));
+	ON_SCOPE_EXIT { Parent->GetOutermost()->SetDirtyFlag(false); };
+	auto Add = RelatedOperation(TEXT("AddComponent"));
+	Add->SetStringField(TEXT("ComponentName"), TEXT("Probe"));
+	Add->SetStringField(TEXT("ComponentClass"), TEXT("LODSyncComponent"));
+	auto AddArgs = RelatedArgs(Parent.Get(), Add);
+	AddArgs->SetBoolField(TEXT("bCompile"), true);
+	if (!TestFalse(TEXT("Parent component"), RelatedCall(TEXT("ManageAssetBlueprint"), AddArgs).HasErrors())) return false;
+	USCS_Node* Node = Parent->SimpleConstructionScript->FindSCSNode(TEXT("Probe"));
+	if (!TestNotNull(TEXT("Parent SCS node"), Node)) return false;
+	auto* Template = CastChecked<ULODSyncComponent>(Node->ComponentTemplate);
+	Template->CustomLODMapping.FindOrAdd(TEXT("a.b")).Mapping.Add(3);
+
+	TStrongObjectPtr<UBlueprint> Child(RelatedBlueprint(Parent->GeneratedClass));
+	ON_SCOPE_EXIT { Child->GetOutermost()->SetDirtyFlag(false); };
+	const FString Path = TEXT("CustomLODMapping[\"a.b\"].Mapping[0]");
+	auto Write = RelatedOperation(TEXT("SetComponentProperty"));
+	Write->SetStringField(TEXT("ComponentName"), TEXT("Probe"));
+	auto WriteArgs = RelatedArgs(Child.Get(), Write);
+	Child->GetOutermost()->SetDirtyFlag(false);
+	// 路径错误和值错误都不能留下继承覆盖，也不能把子蓝图标脏。
+	for (const FString& BadPath : {FString(TEXT("MissingField")), Path})
+	{
+		Write->SetStringField(TEXT("PropertyPath"), BadPath);
+		Write->SetStringField(TEXT("Value"), TEXT("not-a-number"));
+		if (!TestTrue(TEXT("Invalid component edit rejected"), RelatedCall(TEXT("ManageAssetBlueprint"), WriteArgs).HasErrors())) return false;
+		UInheritableComponentHandler* Handler = Child->GetInheritableComponentHandler(false);
+		TestTrue(TEXT("No override created"), !Handler || !Handler->GetOverridenComponentTemplate(FComponentKey(Node)));
+		TestFalse(TEXT("Child package clean"), Child->GetOutermost()->IsDirty());
+	}
+	Write->SetStringField(TEXT("PropertyPath"), Path);
+	Write->SetStringField(TEXT("Value"), TEXT("5"));
+	WriteArgs->SetBoolField(TEXT("bCompile"), true);
+	if (!TestFalse(TEXT("Write inherited map entry"), RelatedCall(TEXT("ManageAssetBlueprint"), WriteArgs).HasErrors())) return false;
+	TestEqual(TEXT("Parent template preserved"), Template->CustomLODMapping.FindChecked(TEXT("a.b")).Mapping[0], 3);
+
+	auto Query = MakeShared<FJsonObject>();
+	Query->SetStringField(TEXT("AssetPath"), Child->GetPathName());
+	Query->SetStringField(TEXT("ComponentName"), TEXT("Probe"));
+	Query->SetStringField(TEXT("Baseline"), TEXT("ParentTemplate"));
+	Query->SetArrayField(TEXT("Sections"), {MakeShared<FJsonValueString>(TEXT("Component"))});
+	Query->SetArrayField(TEXT("PropertyPaths"), {MakeShared<FJsonValueString>(Path)});
+	auto CheckValues = [this](const FCapabilityResult& Result, int32 Actual, int32 Baseline)
+	{
+		if (!TestFalse(TEXT("Map comparison available"), Result.HasErrors()) || Result.Entries.Num() != 1) return false;
+		const auto& Rows = Result.Entries[0]->AsObject()->GetArrayField(TEXT("Properties"));
+		if (!TestEqual(TEXT("One map entry"), Rows.Num(), 1)) return false;
+		const auto Row = Rows[0]->AsObject();
+		TestEqual(TEXT("Value"), Row->GetStringField(TEXT("Value")), FString::FromInt(Actual));
+		TestEqual(TEXT("Baseline"), Row->GetStringField(TEXT("DefaultValue")), FString::FromInt(Baseline));
+		return TestEqual(TEXT("Difference"), Row->GetBoolField(TEXT("bDiffersFromDefault")), Actual != Baseline);
+	};
+	if (!CheckValues(RelatedCall(TEXT("GetAssetBlueprint"), Query), 5, 3)) return false;
+
+	UPackage* WorldPackage = CreatePackage(*(TEXT("/Game/_McpTest/MapPaths_") + FGuid::NewGuid().ToString(EGuidFormats::Digits)));
+	UWorld* World = UWorld::CreateWorld(EWorldType::Editor, false, TEXT("MapPaths"), WorldPackage);
+	ON_SCOPE_EXIT { WorldPackage->SetDirtyFlag(false); World->DestroyWorld(false); };
+	AActor* Actor = World->SpawnActor<AActor>(Child->GeneratedClass);
+	if (!TestNotNull(TEXT("Placed child"), Actor)) return false;
+	const FString ActorPath = TEXT("Probe.") + Path;
+	const ULODSyncComponent* Instance = Actor->FindComponentByClass<ULODSyncComponent>();
+	if (!TestNotNull(TEXT("Placed LOD sync component"), Instance)) return false;
+	const FLODMappingData* Mapping = Instance->CustomLODMapping.Find(TEXT("a.b"));
+	if (!TestNotNull(TEXT("Placed LOD mapping"), Mapping)) return false;
+	TestTrue(TEXT("Registration builds a transient inverse mapping"), Mapping->InverseMapping.Num() > 0);
+	auto ActorEdit = RelatedOperation(TEXT("SetActorProperty"));
+	ActorEdit->SetStringField(TEXT("ActorName"), Actor->GetName());
+	ActorEdit->SetStringField(TEXT("PropertyPath"), ActorPath);
+	ActorEdit->SetStringField(TEXT("Value"), TEXT("7"));
+	auto ActorArgs = RelatedArgs(World, ActorEdit);
+	const FCapabilityResult ActorWrite = RelatedCall(TEXT("ManageAssetLevel"), ActorArgs);
+	if (ActorWrite.HasErrors()) for (const auto& Entry : ActorWrite.Entries) AddInfo(FNexusJsonUtils::SerializeCondensed(Entry->AsObject()));
+	if (!TestFalse(TEXT("Write actor map entry"), ActorWrite.HasErrors())) return false;
+	auto ActorQuery = MakeShared<FJsonObject>();
+	ActorQuery->SetStringField(TEXT("AssetPath"), World->GetPathName());
+	ActorQuery->SetStringField(TEXT("ActorName"), Actor->GetName());
+	ActorQuery->SetArrayField(TEXT("Sections"), {MakeShared<FJsonValueString>(TEXT("ActorPropertySchema"))});
+	ActorQuery->SetArrayField(TEXT("PropertyPaths"), {MakeShared<FJsonValueString>(TEXT("Probe.CustomLODMapping[\"a.b\"]"))});
+	const auto Schema = RelatedCall(TEXT("GetAssetLevel"), ActorQuery);
+	if (!TestFalse(TEXT("Schema of map struct"), Schema.HasErrors())) return false;
+	ActorQuery->SetArrayField(TEXT("Sections"), {MakeShared<FJsonValueString>(TEXT("ActorProperties"))});
+	ActorQuery->SetArrayField(TEXT("PropertyPaths"), {MakeShared<FJsonValueString>(ActorPath)});
+	if (!CheckValues(RelatedCall(TEXT("GetAssetLevel"), ActorQuery), 7, 5)) return false;
+	ActorEdit->SetStringField(TEXT("Action"), TEXT("ResetActorPropertyToDefault"));
+	if (!TestFalse(TEXT("Reset actor map entry"), RelatedCall(TEXT("ManageAssetLevel"), ActorArgs).HasErrors())) return false;
+	if (!CheckValues(RelatedCall(TEXT("GetAssetLevel"), ActorQuery), 5, 5)) return false;
+
+	Write->SetStringField(TEXT("Action"), TEXT("ResetComponentPropertyToDefault"));
+	WriteArgs->SetBoolField(TEXT("bCompile"), false);
+	if (!TestFalse(TEXT("Reset inherited map entry"), RelatedCall(TEXT("ManageAssetBlueprint"), WriteArgs).HasErrors())) return false;
+	return CheckValues(RelatedCall(TEXT("GetAssetBlueprint"), Query), 3, 3);
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusRelatedCompileTest, "NexusLink.EditorRelated.CompileFailureNeverSaves", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -687,11 +787,25 @@ bool FNexusRelatedInheritedUndoTest::RunTest(const FString& Parameters)
 	TStrongObjectPtr<UBlueprint> Child(RelatedBlueprint(Parent->GeneratedClass));
 	ON_SCOPE_EXIT { Child->GetOutermost()->SetDirtyFlag(false); };
 	USCS_Node* Node = Parent->SimpleConstructionScript->FindSCSNode(TEXT("Probe"));
-	USceneComponent* Override = Cast<USceneComponent>(Child->GetInheritableComponentHandler(true)->CreateOverridenComponentTemplate(FComponentKey(Node)));
-	if (!TestNotNull(TEXT("Inherited override fixture"), Override)) return false;
-	Override->SetRelativeLocation(FVector(10,0,0)); Override->ClearFlags(RF_Transactional);
+	if (!TestNotNull(TEXT("Parent component node"), Node)) return false;
+	const FComponentKey Key(Node);
+	UInheritableComponentHandler* Handler = Child->GetInheritableComponentHandler(true);
+	if (!TestNotNull(TEXT("Child override handler"), Handler) || !TestNull(TEXT("Probe initially inherits its template"), Handler->GetOverridenComponentTemplate(Key))) return false;
+	Handler->ClearFlags(RF_Transactional);
 	Operation = RelatedOperation(TEXT("SetComponentProperty")); Operation->SetStringField(TEXT("ComponentName"), TEXT("Probe")); Operation->SetStringField(TEXT("PropertyPath"), TEXT("RelativeLocation.X")); Operation->SetStringField(TEXT("Value"), TEXT("20"));
 	auto Args = RelatedArgs(Child.Get(), Operation);
+	if (!TestFalse(TEXT("First inherited write"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors())) return false;
+	USceneComponent* Override = Cast<USceneComponent>(Handler->GetOverridenComponentTemplate(Key));
+	if (!TestNotNull(TEXT("First write creates an override"), Override)) return false;
+	TestEqual(TEXT("First override value"), static_cast<double>(Override->GetRelativeLocation().X), 20.0);
+	GEditor->UndoTransaction();
+	if (!TestNull(TEXT("Undo removes the new override record"), Handler->GetOverridenComponentTemplate(Key))) return false;
+	TestTrue(TEXT("Child resolves the parent template after undo"), Node->GetActualComponentTemplate(CastChecked<UBlueprintGeneratedClass>(Child->GeneratedClass)) == Node->ComponentTemplate);
+	GEditor->RedoTransaction();
+	Override = Cast<USceneComponent>(Handler->GetOverridenComponentTemplate(Key));
+	if (!TestNotNull(TEXT("Redo restores the override record"), Override)) return false;
+	TestEqual(TEXT("Redo restores the first override value"), static_cast<double>(Override->GetRelativeLocation().X), 20.0);
+	Override->SetRelativeLocation(FVector(10,0,0)); Override->ClearFlags(RF_Transactional);
 	if (!TestFalse(TEXT("Default unverified inherited write"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors())) return false;
 	TestEqual(TEXT("Inherited value written"), static_cast<double>(Override->GetRelativeLocation().X), 20.0);
 	GEditor->UndoTransaction();
@@ -722,6 +836,22 @@ bool FNexusRelatedResetBoundaryTest::RunTest(const FString& Parameters)
 	FKismetEditorUtilities::CompileBlueprint(Parent.Get());
 	TStrongObjectPtr<UBlueprint> Child(RelatedBlueprint(Parent->GeneratedClass));
 	ON_SCOPE_EXIT { Child->GetOutermost()->SetDirtyFlag(false); };
+	auto Write = RelatedOperation(TEXT("SetComponentProperty"));
+	Write->SetStringField(TEXT("ComponentName"), TEXT("Probe"));
+	Write->SetStringField(TEXT("PropertyPath"), TEXT("StaticMesh.LightMapResolution"));
+	Write->SetStringField(TEXT("Value"), TEXT("256"));
+	const auto WriteArgs = RelatedArgs(Child.Get(), Write);
+	Child->GetOutermost()->SetDirtyFlag(false);
+	for (const bool bVerify : {false, true})
+	{
+		WriteArgs->SetBoolField(TEXT("bVerify"), bVerify);
+		TestTrue(TEXT("Writing through a shared asset is rejected"), RelatedCall(TEXT("ManageAssetBlueprint"), WriteArgs).HasErrors());
+		TestEqual(TEXT("Shared mesh value is unchanged"), Resolution->GetPropertyValue_InContainer(ParentMesh.Get()), 64);
+		const UInheritableComponentHandler* Handler = Child->GetInheritableComponentHandler(false);
+		TestTrue(TEXT("Rejected traversal creates no override"), !Handler || !Handler->GetOverridenComponentTemplate(FComponentKey(Node)));
+		TestFalse(TEXT("Rejected traversal keeps child package clean"), Child->GetOutermost()->IsDirty());
+	}
+	WriteArgs->SetBoolField(TEXT("bVerify"), false);
 	UStaticMeshComponent* Override = CastChecked<UStaticMeshComponent>(Child->GetInheritableComponentHandler(true)->CreateOverridenComponentTemplate(FComponentKey(Node)));
 	Override->SetStaticMesh(ChildMesh.Get());
 	Operation = RelatedOperation(TEXT("ResetComponentPropertyToDefault")); Operation->SetStringField(TEXT("ComponentName"), TEXT("Probe")); Operation->SetStringField(TEXT("PropertyPath"), TEXT("StaticMesh.LightMapResolution"));
@@ -738,6 +868,10 @@ bool FNexusRelatedResetBoundaryTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Owned subobject value restored"), Resolution->GetPropertyValue_InContainer(OwnedChildMesh), 64);
 	GEditor->UndoTransaction();
 	TestEqual(TEXT("Undo snapshots the actual owned object"), Resolution->GetPropertyValue_InContainer(OwnedChildMesh), 128);
+	if (!TestFalse(TEXT("Writing an owned component subobject succeeds"), RelatedCall(TEXT("ManageAssetBlueprint"), WriteArgs).HasErrors())) return false;
+	TestEqual(TEXT("Write reaches the owned mesh"), Resolution->GetPropertyValue_InContainer(OwnedChildMesh), 256);
+	GEditor->UndoTransaction();
+	TestEqual(TEXT("Undo restores the edited mesh"), Resolution->GetPropertyValue_InContainer(OwnedChildMesh), 128);
 	return true;
 }
 #endif

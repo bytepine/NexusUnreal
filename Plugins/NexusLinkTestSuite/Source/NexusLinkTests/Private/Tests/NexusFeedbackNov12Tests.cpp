@@ -5,6 +5,8 @@
 #include "NexusEditorServices.h"
 #include "Utils/NexusAssetUtils.h"
 #include "Utils/NexusAnimGraphUtils.h"
+#include "Utils/NexusBlueprintGraphUtils.h"
+#include "AnimStateConduitNode.h"
 #include "Utils/NexusVersionCompat.h"
 #include "Utils/NexusJsonUtils.h"
 #include "Animation/Skeleton.h"
@@ -127,6 +129,12 @@ bool FNexusFeedbackAnimation12Test::RunTest(const FString& Parameters)
 	if (!TestFalse(TEXT("Add player to nested graph by path"), FeedbackNov12Call(TEXT("ManageAssetAnimBlueprint"), Args).HasErrors())) return false;
 	Args = FeedbackNov12Args(Blueprint); Args->SetStringField(TEXT("GraphName"), StateGraphName); Args->SetArrayField(TEXT("Sections"), {MakeShared<FJsonValueString>(TEXT("graph"))});
 	TestFalse(TEXT("Read nested graph"), FeedbackNov12Call(TEXT("GetAssetAnimBlueprint"), Args).HasErrors());
+	UEdGraph* Machine = FNexusAnimGraphUtils::FindAnimGraph(Blueprint, TEXT("Locomotion"));
+	if (!TestNotNull(TEXT("State machine graph for conduit"), Machine)) return false;
+	FGraphNodeCreator<UAnimStateConduitNode> ConduitCreator(*Machine);
+	UAnimStateConduitNode* Conduit = ConduitCreator.CreateNode(false);
+	ConduitCreator.Finalize();
+	TestEqual(TEXT("Conduit keeps its own graph type"), FNexusBlueprintGraphUtils::GetBPGraphType(Conduit->GetBoundGraph()), FString(TEXT("Conduit")));
 	return true;
 }
 

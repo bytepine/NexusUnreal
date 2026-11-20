@@ -4,6 +4,7 @@ import pytest
 from _framework.mcp_client import cap_first
 from _framework.runtime_helpers import spawn_runtime_actors, destroy_runtime_actors
 from test_15_editor_operations import operation_result
+from test_28_blueprint_graph_edit import edit, graph_nodes
 
 
 def test_related_blueprint_renames_and_component_reset(mcp, require_tools, test_ns):
@@ -62,6 +63,82 @@ def test_related_level_actor_properties_and_reset(mcp, require_tools, test_ns):
     reset = cap_first(mcp.call("GetAssetLevel", AssetPath=path, Sections=["ActorProperties"], ActorName=name,
                                PropertyPaths=["InitialLifeSpan"]))["Properties"][0]
     assert reset["Value"] == reset["DefaultValue"] and not reset["bDiffersFromDefault"], reset
+
+
+def test_level_set_elements_keep_hash_and_value(mcp, require_tools, test_ns):
+    require_tools("CreateAssetBlueprint", "ManageAssetBlueprint", "CreateAssetLevel", "ManageAssetLevel", "GetAssetLevel")
+    component = f"{test_ns}/BP_SetElementComponent"
+    bp, level = f"{test_ns}/BP_SetElementActor", f"{test_ns}/L_SetElements"
+    mcp.call("CreateAssetBlueprint", AssetPath=component, ParentClass="ActorComponent")
+    mcp.call("ManageAssetBlueprint", AssetPath=component, bCompile=True, Operations=[
+        {"Action": "AddVariable", "VariableName": "Ids", "VariableType": "Set<int>"},
+    ])
+    mcp.call("CreateAssetBlueprint", AssetPath=bp, ParentClass="Actor")
+    mcp.call("ManageAssetBlueprint", AssetPath=bp, bCompile=True, Operations=[
+        {"Action": "AddComponent", "ComponentName": "Probe", "ComponentClass": "BP_SetElementComponent_C"},
+    ])
+    edit(mcp, bp, Action="SetComponentProperty", ComponentName="Probe", PropertyPath="Ids", Value="(1,2)")
+    mcp.call("CreateAssetLevel", AssetPath=level)
+    name = cap_first(mcp.call("ManageAssetLevel", AssetPath=level, Operations=[
+        {"Action": "SpawnActor", "AssetPath": bp},
+    ]))["ActorName"]
+
+    def read():
+        return cap_first(mcp.call("GetAssetLevel", AssetPath=level, ActorName=name, Sections=["ActorProperties"],
+                                  PropertyPaths=["Probe.Ids", "Probe.Ids[1]"]))["Properties"]
+
+    target = {"ActorName": name, "PropertyPath": "Probe.Ids"}
+    mcp.call("ManageAssetLevel", AssetPath=level, Operations=[dict(target, Action="SetActorProperty", Value="(1,2,4)")])
+    before = read()
+    assert before[0]["bDiffersFromDefault"] and before[1]["Value"] == before[1]["DefaultValue"] == "1", before
+    target["PropertyPath"] = "Probe.Ids[1]"
+    for change in ({"Action": "SetActorProperty", "Value": "3"}, {"Action": "SetActorProperty", "Value": "2"},
+                   {"Action": "ResetActorPropertyToDefault"}):
+        result = mcp.try_call("ManageAssetLevel", AssetPath=level, Operations=[dict(target, **change)])
+        assert result.get("isError") and "whole Set" in str(result), result
+        assert read() == before
+
+
+def test_level_construction_script_controls_light_intensity(mcp, require_tools, test_ns):
+    require_tools("CreateAssetBlueprint", "ManageAssetBlueprint", "GetAssetBlueprint", "CreateAssetLevel",
+                  "GetAssetEditPreview", "ManageAssetLevel", "GetAssetLevel")
+    bp, level = f"{test_ns}/BP_ConstructionLight", f"{test_ns}/L_ConstructionLight"
+    mcp.call("CreateAssetBlueprint", AssetPath=bp, ParentClass="Actor")
+    mcp.call("ManageAssetBlueprint", AssetPath=bp, bCompile=True, Operations=[
+        {"Action": "AddComponent", "ComponentName": "LightProbe", "ComponentClass": "PointLightComponent"},
+    ])
+    graph = "UserConstructionScript"
+    entry = next(n["NodeId"] for n in graph_nodes(mcp, bp, graph).values() if n["NodeClass"] == "K2Node_FunctionEntry")
+    source = edit(mcp, bp, Action="AddNode", GraphName=graph, NodeClass="K2Node_VariableGet", VariableName="LightProbe")["NodeId"]
+    setter = edit(mcp, bp, Action="AddNode", GraphName=graph, NodeClass="K2Node_CallFunction", FunctionClass="LightComponent",
+                  FunctionName="SetIntensity")["NodeId"]
+    mcp.call("ManageAssetBlueprint", AssetPath=bp, bCompile=True, Operations=[
+        {"Action": "SetNode", "GraphName": graph, "NodeId": setter, "PinName": "NewIntensity", "PinDefaultValue": "1000"},
+        {"Action": "Connect", "GraphName": graph, "SourceNodeId": source, "SourcePinName": "LightProbe",
+         "TargetNodeId": setter, "TargetPinName": "self"},
+        {"Action": "Connect", "GraphName": graph, "SourceNodeId": entry, "SourcePinName": "then",
+         "TargetNodeId": setter, "TargetPinName": "execute"},
+    ])
+    mcp.call("CreateAssetLevel", AssetPath=level)
+    name = cap_first(mcp.call("ManageAssetLevel", AssetPath=level, Operations=[{"Action": "SpawnActor", "AssetPath": bp}]))["ActorName"]
+    target = {"ActorName": name, "PropertyPath": "LightProbe.Intensity"}
+    write = dict(target, Action="SetActorProperty", Value="2000")
+
+    def read():
+        return cap_first(mcp.call("GetAssetLevel", AssetPath=level, ActorName=name, Sections=["ActorProperties"],
+                                  PropertyPaths=[target["PropertyPath"]]))["Properties"][0]
+
+    before = read()
+    assert float(before["Value"]) == 1000 and before["bDiffersFromDefault"], before
+    for tool, options, operation in (
+        ("GetAssetEditPreview", {"Capability": "ManageAssetLevel"}, write),
+        ("ManageAssetLevel", {}, write), ("ManageAssetLevel", {"bVerify": True}, write),
+        ("ManageAssetLevel", {}, dict(write, ExpectedValue="1000")),
+        ("ManageAssetLevel", {}, dict(target, Action="ResetActorPropertyToDefault")),
+    ):
+        result = mcp.try_call(tool, AssetPath=level, Operations=[operation], **options)
+        assert result.get("isError") and "construction script" in str(result), result
+        assert read() == before
 
 
 def test_related_variable_type_roundtrip(mcp, require_tools, test_ns):

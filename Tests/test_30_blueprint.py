@@ -18,6 +18,28 @@ def bp_path(test_ns, mcp):
     yield path
 
 
+def test_inherited_component_cannot_edit_shared_material(test_ns, mcp):
+    material = f"{test_ns}/M_ComponentShared"
+    parent = f"{test_ns}/BP_DecalParent"
+    child = f"{test_ns}/BP_DecalChild"
+    mcp.call("CreateAssetMaterial", AssetPath=material)
+    mcp.call("CreateAssetBlueprint", AssetPath=parent, ParentClass="Actor")
+    mcp.call("ManageAssetBlueprint", AssetPath=parent, bCompile=True, Operations=[
+        {"Action": "AddComponent", "ComponentName": "Probe", "ComponentClass": "DecalComponent"},
+        {"Action": "SetComponentProperty", "ComponentName": "Probe", "PropertyPath": "DecalMaterial",
+         "Value": f"{material}.M_ComponentShared"},
+    ])
+    mcp.call("CreateAssetBlueprint", AssetPath=child, ParentClass=f"{parent}.BP_DecalParent_C")
+    original = cap_first(mcp.call("GetAssetMaterial", AssetPath=material, Sections=["Overview"]))
+    assert original["MaterialDomain"] and not original.get("bTwoSided", False), original
+    rejected = mcp.try_call("ManageAssetBlueprint", AssetPath=child, Operations=[{
+        "Action": "SetComponentProperty", "ComponentName": "Probe",
+        "PropertyPath": "DecalMaterial.TwoSided", "Value": "True",
+    }])
+    assert rejected["isError"] and "external object or asset" in str(rejected), rejected
+    assert cap_first(mcp.call("GetAssetMaterial", AssetPath=material, Sections=["Overview"])) == original
+
+
 def test_bp_variable_batch_add(mcp, bp_path):
     """4.2：新增两个变量。MyActorLabel 避开与 AActor::ActorLabel 冲突。
     新版 manage_asset_blueprint 用 Operations=[{Action=add_variable,...}]。"""
@@ -449,6 +471,9 @@ def test_bp_add_macro_timeline_dispatcher(mcp, bp_path):
     entry = cap_first(r)
     assert isinstance(entry, dict), r
     assert not entry.get("Error"), r
+    result = cap_first(mcp.call("GetAssetBlueprint", AssetPath=bp_path, Sections=["graphOverview"], GraphType="Macro"))
+    macros = merge_with_defaults(result["Graphs"], result.get("Graphs_defaults", {}))
+    assert any(graph["GraphName"] == "NxMacro" and graph["GraphType"] == "Macro" for graph in macros), result
 
 
 def test_bp_compile_status(mcp, bp_path):

@@ -551,6 +551,9 @@ def test_anim_blueprint_nested_graph_paths(test_ns, mcp, template_skeleton):
     mcp.call("CreateAssetAnimBlueprint", AssetPath=path, SkeletonPath=template_skeleton)
     mcp.call("ManageAssetAnimBlueprint", AssetPath=path, Operations=[
         {"Action": "AddStateMachine", "StateMachineName": "Locomotion"},
+        {"Action": "AddState", "StateMachineName": "Locomotion", "StateName": "Idle"},
+        {"Action": "AddState", "StateMachineName": "Locomotion", "StateName": "Walk"},
+        {"Action": "AddTransition", "StateMachineName": "Locomotion", "StateName": "Idle", "TargetStateName": "Walk"},
         {"Action": "AddState", "StateMachineName": "Locomotion", "StateName": "AnimGraph"},
     ])
 
@@ -568,6 +571,12 @@ def test_anim_blueprint_nested_graph_paths(test_ns, mcp, template_skeleton):
     assert_tool_error(mcp.try_call("GetAssetAnimBlueprint", AssetPath=path, Sections=["graph"], GraphName="AnimGraph"))
     blueprint_graph = cap_first(mcp.call("GetAssetBlueprint", AssetPath=path, Sections=["graph"], GraphName="AnimGraph"))
     assert blueprint_graph["GraphType"] == "Animgraph", blueprint_graph
+    for kind, expected in (("Statemachine", 1), ("State", 3), ("Transition", 1)):
+        section = cap_first(mcp.call("GetAssetBlueprint", AssetPath=path, Sections=["graphOverview"], GraphType=kind))
+        filtered = assert_respecting_defaults(section, "Graphs", "Graphs", required_fields=("GraphPath", "GraphType"))
+        assert len(filtered) == expected and all(graph["GraphType"] == kind for graph in filtered), section
+        if kind == "State":
+            assert state["GraphPath"] in {graph["GraphPath"] for graph in filtered}, section
 
 
 def test_manage_anim_blueprint_states_and_wires(test_ns, mcp, template_skeleton):

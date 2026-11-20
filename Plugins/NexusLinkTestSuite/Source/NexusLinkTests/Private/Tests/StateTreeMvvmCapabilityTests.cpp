@@ -69,6 +69,53 @@ static FNexusCapability* FindCapability(const TCHAR* CapName)
 
 #if WITH_STATETREE
 
+#include "Editor.h"
+#include "StateTree.h"
+#include "StateTreeEditorData.h"
+#include "StateTreeSchema.h"
+#include "StateTreeState.h"
+#include "Misc/ScopeExit.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusStateTreeTransitionTargetTest, "NexusLink.Host.StateTree.TransitionTarget",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FNexusStateTreeTransitionTargetTest::RunTest(const FString& Parameters)
+{
+	FNexusCapability* Manage = FindCapability(TEXT("ManageAssetStateTree"));
+	UClass* SchemaClass = LoadClass<UStateTreeSchema>(nullptr, TEXT("/Script/GameplayStateTreeModule.StateTreeComponentSchema"));
+	if (!TestNotNull(TEXT("ManageAssetStateTree registered"), Manage) || !TestNotNull(TEXT("Component schema"), SchemaClass)) return false;
+
+	UPackage* Package = CreatePackage(*(TEXT("/Game/_McpTest/ST_Transition_") + FGuid::NewGuid().ToString(EGuidFormats::Digits)));
+	ON_SCOPE_EXIT { Package->SetDirtyFlag(false); };
+	UStateTree* Tree = NewObject<UStateTree>(Package, TEXT("StateTree"), RF_Public | RF_Standalone);
+	UStateTreeEditorData* Data = NewObject<UStateTreeEditorData>(Tree);
+	Tree->EditorData = Data;
+	Data->Schema = NewObject<UStateTreeSchema>(Data, SchemaClass);
+	UStateTreeState& Root = Data->AddRootState();
+	UStateTreeState& Source = Root.AddChildState(TEXT("Source"));
+	UStateTreeState& Target = Root.AddChildState(TEXT("Target"));
+	auto Op = MakeArgs(TEXT("Action"), TEXT("AddTransition"));
+	Op->SetStringField(TEXT("StateName"), Source.Name.ToString());
+	Op->SetStringField(TEXT("TargetState"), Target.Name.ToString());
+	auto Args = MakeArgs(TEXT("AssetPath"), Tree->GetPathName());
+	Args->SetArrayField(TEXT("Operations"), {MakeShared<FJsonValueObject>(Op)});
+	if (!TestFalse(TEXT("AddTransition succeeds"), Manage->Run(Args).HasErrors())
+		|| !TestEqual(TEXT("One outgoing transition"), Source.Transitions.Num(), 1)) return false;
+	if (!TestTrue(TEXT("Undo AddTransition"), GEditor->UndoTransaction())
+		|| !TestEqual(TEXT("Undo restores the source transitions"), Source.Transitions.Num(), 0)) return false;
+	if (!TestFalse(TEXT("Add transition after Undo"), Manage->Run(Args).HasErrors())
+		|| !TestEqual(TEXT("One outgoing transition after retry"), Source.Transitions.Num(), 1)) return false;
+	const FStateTreeTransition& Transition = Source.Transitions[0];
+	TestEqual(TEXT("Editor target name"), Transition.State.Name, Target.Name);
+
+	Tree->CompileIfChanged();
+	if (!TestTrue(TEXT("StateTree compiles"), Tree->IsReadyToRun())) return false;
+	const FCompactStateTransition* Compiled = Tree->GetTransitionFromIndex(Tree->GetTransitionIndexFromId(Transition.ID));
+	if (!TestNotNull(TEXT("Transition has a compiled entry"), Compiled)) return false;
+	const FStateTreeStateHandle Expected = Tree->GetStateHandleFromId(Target.ID);
+	return TestTrue(TEXT("Compiled transition selects the requested state"), Expected.IsValid() && Compiled->State == Expected);
+}
+
 // ─── 1a. 元数据 ───────────────────────────────────────────────────────────────
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
