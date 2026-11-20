@@ -92,12 +92,23 @@ bool FNexusStateTreeTransitionTargetTest::RunTest(const FString& Parameters)
 	Tree->EditorData = Data;
 	Data->Schema = NewObject<UStateTreeSchema>(Data, SchemaClass);
 	UStateTreeState& Root = Data->AddRootState();
-	UStateTreeState& Source = Root.AddChildState(TEXT("Source"));
+	auto Args = MakeArgs(TEXT("AssetPath"), Tree->GetPathName());
+	auto CreateSource = MakeArgs(TEXT("Action"), TEXT("AddState"));
+	CreateSource->SetStringField(TEXT("StateName"), TEXT("Source"));
+	CreateSource->SetStringField(TEXT("ParentState"), Root.Name.ToString());
+	auto AddTask = MakeArgs(TEXT("Action"), TEXT("AddTask"));
+	AddTask->SetStringField(TEXT("StateName"), TEXT("Source"));
+	AddTask->SetStringField(TEXT("NodeType"), TEXT("StateTreeDelayTask"));
+	Args->SetArrayField(TEXT("Operations"), {MakeShared<FJsonValueObject>(CreateSource), MakeShared<FJsonValueObject>(AddTask)});
+	if (!TestFalse(TEXT("Create source state and delay task"), Manage->Run(Args).HasErrors())
+		|| !TestEqual(TEXT("Source added to root"), Root.Children.Num(), 1)) return false;
+	UStateTreeState& Source = *Root.Children[0];
+	if (!TestTrue(TEXT("Source has its structural parent"), Source.Parent == &Root)
+		|| !TestEqual(TEXT("Delay task added"), Source.Tasks.Num(), 1)) return false;
 	UStateTreeState& Target = Root.AddChildState(TEXT("Target"));
 	auto Op = MakeArgs(TEXT("Action"), TEXT("AddTransition"));
 	Op->SetStringField(TEXT("StateName"), Source.Name.ToString());
 	Op->SetStringField(TEXT("TargetState"), Target.Name.ToString());
-	auto Args = MakeArgs(TEXT("AssetPath"), Tree->GetPathName());
 	Args->SetArrayField(TEXT("Operations"), {MakeShared<FJsonValueObject>(Op)});
 	if (!TestFalse(TEXT("AddTransition succeeds"), Manage->Run(Args).HasErrors())
 		|| !TestEqual(TEXT("One outgoing transition"), Source.Transitions.Num(), 1)) return false;
@@ -110,6 +121,7 @@ bool FNexusStateTreeTransitionTargetTest::RunTest(const FString& Parameters)
 
 	Tree->CompileIfChanged();
 	if (!TestTrue(TEXT("StateTree compiles"), Tree->IsReadyToRun())) return false;
+	TestTrue(TEXT("Delay task has a compiled entry"), Tree->GetNodeIndexFromId(Source.Tasks[0].ID).IsValid());
 	const FCompactStateTransition* Compiled = Tree->GetTransitionFromIndex(Tree->GetTransitionIndexFromId(Transition.ID));
 	if (!TestNotNull(TEXT("Transition has a compiled entry"), Compiled)) return false;
 	const FStateTreeStateHandle Expected = Tree->GetStateHandleFromId(Target.ID);

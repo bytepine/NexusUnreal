@@ -40,6 +40,26 @@ def test_inherited_component_cannot_edit_shared_material(test_ns, mcp):
     assert cap_first(mcp.call("GetAssetMaterial", AssetPath=material, Sections=["Overview"])) == original
 
 
+def test_set_defaults_requires_value_before_clearing_tags(mcp, test_ns):
+    path = f"{test_ns}/BP_DefaultTags"
+    mcp.call("CreateAssetBlueprint", AssetPath=path, ParentClass="Actor")
+    op = {"Action": "SetDefaults", "PropertyPath": "Tags"}
+    mcp.call("ManageAssetBlueprint", AssetPath=path, Operations=[dict(op, Value="(Keep)")])
+
+    def tags():
+        data = cap_first(mcp.call("GetAssetBlueprint", AssetPath=path, Sections=["Defaults"], PropertyPaths=["Tags"]))
+        return data["Defaults"][0].get("Value", "")
+
+    before = tags()
+    assert "Keep" in before, before
+    for invalid in (op, dict(op, Value=None), dict(op, Value=123)):
+        result = mcp.try_call("ManageAssetBlueprint", AssetPath=path, Operations=[invalid])
+        assert result["isError"], result
+        assert tags() == before
+    mcp.call("ManageAssetBlueprint", AssetPath=path, Operations=[dict(op, Value="")])
+    assert tags() in ("", "()")
+
+
 def test_bp_variable_batch_add(mcp, bp_path):
     """4.2：新增两个变量。MyActorLabel 避开与 AActor::ActorLabel 冲突。
     新版 manage_asset_blueprint 用 Operations=[{Action=add_variable,...}]。"""

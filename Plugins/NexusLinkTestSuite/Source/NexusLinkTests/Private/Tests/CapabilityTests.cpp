@@ -16,6 +16,7 @@
 #if WITH_EDITOR
 #include "Utils/NexusAssetEditorUtils.h"
 #include "Editor.h"
+#include "Editor/Transactor.h"
 #include "Engine/Blueprint.h"
 #endif
 
@@ -492,8 +493,16 @@ bool FNexusLinkCapabilityEditorTransactionTest::RunTest(const FString& Parameter
 	{
 		TUniquePtr<INexusTransactionHandle> Tx = FNexusEditorTransaction::Begin(TEXT("EditorTransactionTest"));
 		TestTrue(TEXT("Begin 后事务进行中"), FNexusEditorTransaction::IsTransactionActive());
-		FNexusEditorTransaction::CancelAndRevert(Tx);
+		TestTrue(TEXT("空事务可取消"), FNexusEditorTransaction::CancelAndRevert(Tx));
 		TestFalse(TEXT("Cancel 后事务结束"), FNexusEditorTransaction::IsTransactionActive());
+
+		Tx = FNexusEditorTransaction::Begin(TEXT("ExpiredHandle"));
+		if (!TestTrue(TEXT("创建待失效句柄"), Tx.IsValid())) return false;
+		GEditor->CancelTransaction(0);
+		TUniquePtr<INexusTransactionHandle> Replacement = FNexusEditorTransaction::Begin(TEXT("Replacement"));
+		if (!TestTrue(TEXT("另一个事务开始"), Replacement.IsValid())) return false;
+		TestFalse(TEXT("旧句柄不会回滚另一个事务"), FNexusEditorTransaction::CancelAndRevert(Tx));
+		TestTrue(TEXT("另一个事务仍可取消"), FNexusEditorTransaction::CancelAndRevert(Replacement));
 	}
 #endif
 	return true;
@@ -556,8 +565,25 @@ bool FNexusLinkCapabilityEditorTransactionUndoTest::RunTest(const FString& Param
 	TestTrue(TEXT("AddVariable 无 Fatal"), R.FatalError.IsEmpty());
 	TestTrue(TEXT("Run 后变量数 +1"), BP->NewVariables.Num() == Before + 1);
 
-	TestTrue(TEXT("UndoTransaction"), GEditor->UndoTransaction());
+	const FGuid VariableUndoId = GEditor->Trans->GetUndoContext().TransactionId;
+	TUniquePtr<INexusTransactionHandle> Empty = FNexusEditorTransaction::Begin(TEXT("EmptyRollback"));
+	TestTrue(TEXT("空回滚成功"), FNexusEditorTransaction::CancelAndRevert(Empty));
+	TestEqual(TEXT("空回滚保留已提交的变量"), BP->NewVariables.Num(), Before + 1);
+	if (!TestTrue(TEXT("空回滚保留原撤销记录"), VariableUndoId.IsValid() && GEditor->Trans->GetUndoContext().TransactionId == VariableUndoId)) return false;
+	if (!TestTrue(TEXT("UndoTransaction"), GEditor->UndoTransaction())) return false;
 	TestEqual(TEXT("Undo 后变量数恢复"), BP->NewVariables.Num(), Before);
+
+	const FString OriginalDescription = BP->BlueprintDescription;
+	TUniquePtr<INexusTransactionHandle> Failed = FNexusEditorTransaction::Begin(TEXT("RollbackWithRedo"));
+	if (!TestTrue(TEXT("重做记录存在时可开启事务"), Failed.IsValid())) return false;
+	BP->Modify();
+	BP->BlueprintDescription += TEXT("Rollback probe");
+	TestTrue(TEXT("已修改的事务回滚成功"), FNexusEditorTransaction::CancelAndRevert(Failed));
+	TestEqual(TEXT("回滚还原蓝图描述"), BP->BlueprintDescription, OriginalDescription);
+	if (!TestTrue(TEXT("回滚保留原重做记录"), GEditor->Trans->GetRedoContext().TransactionId == VariableUndoId)) return false;
+	TestTrue(TEXT("重做原变量操作"), GEditor->RedoTransaction());
+	TestEqual(TEXT("重做后原变量仍存在"), BP->NewVariables.Num(), Before + 1);
+	if (GEditor->Trans->GetUndoContext().TransactionId == VariableUndoId) GEditor->UndoTransaction(false);
 #endif
 	return true;
 }

@@ -65,6 +65,46 @@ def test_related_level_actor_properties_and_reset(mcp, require_tools, test_ns):
     assert reset["Value"] == reset["DefaultValue"] and not reset["bDiffersFromDefault"], reset
 
 
+def test_world_settings_failed_batch_restores_world_to_meters(mcp, require_tools, test_ns):
+    require_tools("CreateAssetLevel", "ManageAssetLevel", "GetAssetLevel")
+    level = f"{test_ns}/LV_SettingsRollback"
+    mcp.call("CreateAssetLevel", AssetPath=level)
+    actors = cap_first(mcp.call("GetAssetLevel", AssetPath=level, Sections=["Actors"], ClassFilter="WorldSettings"))
+    actor = actors["Actors"][0]["Name"]
+    update = {"Action": "SetProperty", "PropertyPath": "WorldToMeters", "Value": "117"}
+    initial = cap_first(mcp.call("ManageAssetLevel", AssetPath=level, Operations=[update]))
+    assert float(initial["NewValue"]) == 117, initial
+
+    result = mcp.try_call("CallCapability", Calls=[
+        {"Capability": "ManageAssetLevel", "Arguments": {"AssetPath": level, "Operations": [dict(update, Value=value)]}}
+        for value in ("231", "invalid")
+    ])
+    assert result["isError"] and result["structuredContent"]["bRolledBack"], result
+    properties = cap_first(mcp.call("GetAssetLevel", AssetPath=level, Sections=["ActorProperties"],
+                                    ActorName=actor, PropertyPaths=["WorldToMeters"]))["Properties"]
+    assert float(properties[0]["Value"]) == 117, properties
+
+
+def test_world_settings_cannot_edit_shared_sound_mix(mcp, require_tools, test_ns):
+    require_tools("CreateAssetLevel", "ManageAssetLevel", "ExecPython")
+    level, mix = f"{test_ns}/LV_SharedSoundMix", f"{test_ns}/Mix_Shared"
+    mcp.call("CreateAssetLevel", AssetPath=level)
+    mcp.call("ExecPython", Code=f"""import unreal
+mix = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+    'Mix_Shared', {test_ns!r}, unreal.SoundMix, unreal.SoundMixFactory())
+mix.set_editor_property('fade_in_time', 0.25)
+""")
+    reference = {"Action": "SetProperty", "PropertyPath": "DefaultBaseSoundMix", "Value": f"{mix}.Mix_Shared"}
+    assigned = cap_first(mcp.call("ManageAssetLevel", AssetPath=level, Operations=[reference]))
+    assert mix in assigned["NewValue"], assigned
+    result = mcp.try_call("ManageAssetLevel", AssetPath=level, Operations=[
+        dict(reference, PropertyPath="DefaultBaseSoundMix.FadeInTime", Value="9")
+    ])
+    assert result["isError"] and "owned subobjects" in str(result), result
+    mcp.call("ExecPython", Code=f"import unreal\nassert unreal.load_asset({mix!r}).get_editor_property('fade_in_time') == 0.25")
+    mcp.call("ManageAssetLevel", AssetPath=level, Operations=[dict(reference, Value="None")])
+
+
 def test_level_set_elements_keep_hash_and_value(mcp, require_tools, test_ns):
     require_tools("CreateAssetBlueprint", "ManageAssetBlueprint", "CreateAssetLevel", "ManageAssetLevel", "GetAssetLevel")
     component = f"{test_ns}/BP_SetElementComponent"
