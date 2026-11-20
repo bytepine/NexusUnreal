@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from _framework.assertions import assert_success_count
+from _framework.assertions import assert_respecting_defaults, assert_success_count
 from _framework.mcp_client import MCPError, cap_first
 
 pytestmark = pytest.mark.l3_asset
@@ -202,11 +202,11 @@ def test_widget_graph_overview(mcp, wbp_path):
     )
     entry = cap_first(r)
     assert not entry.get("Error"), entry
-    graphs = entry.get("Graphs") or []
-    assert isinstance(graphs, list), entry
-    names = [g.get("Name") or g.get("GraphName") for g in graphs if isinstance(g, dict)]
-    joined = " ".join(n or "" for n in names)
-    assert "EventGraph" in joined or graphs, f"expected EventGraph in graphOverview: {entry!r}"
+    graphs = assert_respecting_defaults(entry, "Graphs", "Graphs", required_fields=(
+        "GraphName", "GraphPath", "GraphType", "EnabledNodeCount", "DisabledNodeCount",
+    ))
+    assert any(g["GraphName"] == "EventGraph" and g["GraphType"] == "Event" for g in graphs), graphs
+    assert "GetAssetBlueprint" in entry["Hint"] and "ManageAssetBlueprint" in entry["Hint"], entry
 
 
 def test_widget_animation_bind_and_remove_key(mcp, wbp_path):

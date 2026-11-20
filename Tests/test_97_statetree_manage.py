@@ -40,6 +40,25 @@ def test_get_asset_state_tree(st_path, mcp):
     assert not entry.get("Error"), r
 
 
+def test_get_state_tree_linked_asset_type(test_ns, mcp, require_tools):
+    require_tools("CreateAssetStateTree", "ManageAssetStateTree", "GetAssetStateTree", "ExecPython")
+    path = f"{test_ns}/ST_LinkedAssetType"
+    mcp.call("CreateAssetStateTree", AssetPath=path)
+    mcp.call("ManageAssetStateTree", AssetPath=path, bSaveToDisk=True,
+             Operations=[{"Action": "AddState", "StateName": "External"}])
+    # AddState 未开放 LinkedAsset；用编辑器原生属性准备读回用的节点。
+    setup = f"""import unreal
+tree = unreal.load_asset({path!r})
+state = next(s for s in unreal.ObjectIterator(unreal.StateTreeState) if s.get_outermost().get_name() == {path!r})
+state.set_editor_property("type", type(state.get_editor_property("type")).LINKED_ASSET)
+assert unreal.EditorAssetLibrary.save_loaded_asset(tree)
+del state, tree
+"""
+    mcp.call("ExecPython", Code=setup)
+    entry = cap_first(mcp.call("GetAssetStateTree", AssetPath=path))
+    assert [(state["Name"], state["Type"]) for state in entry["SubTrees"]] == [("External", "LinkedAsset")], entry
+
+
 def test_manage_state_tree_add_state(st_path, mcp):
     r = mcp.call_capability(
         "ManageAssetStateTree",

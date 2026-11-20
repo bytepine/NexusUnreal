@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from _framework.assertions import assert_tool_error
+from _framework.assertions import assert_respecting_defaults, assert_tool_error
 from _framework.asset_helpers import resolve_skeleton, first_asset_path
 from _framework.mcp_client import MCPError, cap_first
 
@@ -216,7 +216,10 @@ def test_get_asset_anim_blueprint_graph_overview(test_ns, mcp, template_skeleton
     )
     entry = cap_first(r)
     assert not entry.get("Error"), entry
-    assert isinstance(entry.get("Graphs"), list), f"expected graphs[]: {entry!r}"
+    graphs = assert_respecting_defaults(entry, "Graphs", "Graphs", required_fields=(
+        "GraphName", "GraphPath", "GraphType", "EnabledNodeCount", "DisabledNodeCount",
+    ))
+    assert any(g["GraphName"] == "AnimGraph" and g["GraphType"] == "Animgraph" for g in graphs), graphs
 
 
 def test_anim_montage_create(test_ns, mcp, template_skeleton):
@@ -541,6 +544,30 @@ def test_manage_blackboard_rename_remove_parent(test_ns, mcp):
     for e in (r.get("Results") or [cap_first(r)]):
         if isinstance(e, dict) and e.get("Error"):
             pytest.skip(f"blackboard remaining 跳过: {e}")
+
+
+def test_anim_blueprint_nested_graph_paths(test_ns, mcp, template_skeleton):
+    path = f"{test_ns}/ABP_NestedGraphPaths"
+    mcp.call("CreateAssetAnimBlueprint", AssetPath=path, SkeletonPath=template_skeleton)
+    mcp.call("ManageAssetAnimBlueprint", AssetPath=path, Operations=[
+        {"Action": "AddStateMachine", "StateMachineName": "Locomotion"},
+        {"Action": "AddState", "StateMachineName": "Locomotion", "StateName": "AnimGraph"},
+    ])
+
+    inventory = cap_first(mcp.call("GetEditorGraph", AssetPath=path))
+    graphs = assert_respecting_defaults(inventory, "Graphs", "Graphs", required_fields=("GraphName", "GraphPath"))
+    root = next(g for g in graphs if g["GraphName"] == "AnimGraph")
+    state = next(g for g in graphs if g["GraphName"].endswith(".AnimGraph"))
+    added = cap_first(mcp.call("ManageAssetAnimBlueprint", AssetPath=path, Operations=[{
+        "Action": "AddNode", "NodeClass": "SequencePlayer", "GraphName": state["GraphName"],
+    }]))
+    node_id = added["NodeId"]
+    for graph_name, expected in ((state["GraphName"], True), (state["GraphPath"], True), (root["GraphPath"], False)):
+        graph = cap_first(mcp.call("GetAssetAnimBlueprint", AssetPath=path, Sections=["graph"], GraphName=graph_name))
+        assert any(node["NodeId"] == node_id for node in graph["Nodes"]) == expected, graph
+    assert_tool_error(mcp.try_call("GetAssetAnimBlueprint", AssetPath=path, Sections=["graph"], GraphName="AnimGraph"))
+    blueprint_graph = cap_first(mcp.call("GetAssetBlueprint", AssetPath=path, Sections=["graph"], GraphName="AnimGraph"))
+    assert blueprint_graph["GraphType"] == "Animgraph", blueprint_graph
 
 
 def test_manage_anim_blueprint_states_and_wires(test_ns, mcp, template_skeleton):

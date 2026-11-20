@@ -134,5 +134,5 @@ def test_manage_asset_texture_set_property(mcp, require_tools, test_ns):
         Operations=[{"Action": "SetProperty", "PropertyPath": "SRGB", "Value": "true"}],
     )
     entry = cap_first(r)
-    if entry.get("Error"):
-        pytest.skip(f"manage_asset_texture 跳过: {entry}")
+    assert entry["PropertyPath"] == "SRGB" and entry["NewValue"].lower() == "true", entry
+    assert "OldValue" in entry and "reimport" in entry["Note"], entry

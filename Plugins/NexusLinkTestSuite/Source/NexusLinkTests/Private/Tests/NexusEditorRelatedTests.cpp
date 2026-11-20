@@ -213,6 +213,50 @@ bool FNexusFeedbackRetargetTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusBlueprintDefaultMapPathTest, "NexusLink.EditorRelated.BlueprintDefaultMapPath", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FNexusBlueprintDefaultMapPathTest::RunTest(const FString& Parameters)
+{
+	TStrongObjectPtr<UBlueprint> Blueprint(RelatedBlueprint(UNexusRelatedDataAsset::StaticClass()));
+	if (!TestNotNull(TEXT("Blueprint with map defaults"), Blueprint.Get())) return false;
+	ON_SCOPE_EXIT { Blueprint->GetOutermost()->SetDirtyFlag(false); };
+	if (!TestTrue(TEXT("Generated class"), Blueprint->GeneratedClass != nullptr)) return false;
+	auto* Defaults = CastChecked<UNexusRelatedDataAsset>(Blueprint->GeneratedClass->GetDefaultObject());
+	Defaults->Values.Add(TEXT("a.b"), 3);
+	Defaults->Values.Add(TEXT("a"), 5);
+	const FString Path = TEXT("Values[\"a.b\"]");
+	auto Operation = RelatedOperation(TEXT("SetDefaults"));
+	Operation->SetStringField(TEXT("PropertyPath"), Path);
+	Operation->SetStringField(TEXT("Value"), TEXT("8"));
+	const auto WriteArgs = RelatedArgs(Blueprint.Get(), Operation);
+	if (!TestFalse(TEXT("Write dotted map key"), RelatedCall(TEXT("ManageAssetBlueprint"), WriteArgs).HasErrors())) return false;
+	TestEqual(TEXT("Exact key changed"), Defaults->Values.FindRef(TEXT("a.b")), 8);
+	TestEqual(TEXT("Other key is unchanged"), Defaults->Values.FindRef(TEXT("a")), 5);
+
+	auto Read = MakeShared<FJsonObject>();
+	Read->SetStringField(TEXT("AssetPath"), Blueprint->GetPathName());
+	Read->SetArrayField(TEXT("Sections"), {MakeShared<FJsonValueString>(TEXT("Defaults"))});
+	Read->SetArrayField(TEXT("PropertyPaths"), {MakeShared<FJsonValueString>(Path)});
+	const auto Result = RelatedCall(TEXT("GetAssetBlueprint"), Read);
+	if (!TestFalse(TEXT("Read dotted map key"), Result.HasErrors()) || !TestEqual(TEXT("One asset"), Result.Entries.Num(), 1)) return false;
+	const auto& Rows = Result.Entries[0]->AsObject()->GetArrayField(TEXT("Defaults"));
+	if (!TestEqual(TEXT("One property"), Rows.Num(), 1)) return false;
+	TestEqual(TEXT("Key readback"), Rows[0]->AsObject()->GetStringField(TEXT("Value")), FString(TEXT("8")));
+
+	Operation->SetStringField(TEXT("Value"), TEXT("9"));
+	WriteArgs->SetStringField(TEXT("Capability"), TEXT("ManageAssetBlueprint"));
+	TestTrue(TEXT("Preview still rejects container element edits"), RelatedCall(TEXT("GetAssetEditPreview"), WriteArgs).HasErrors());
+	WriteArgs->RemoveField(TEXT("Capability"));
+	WriteArgs->SetBoolField(TEXT("bVerify"), true);
+	TestTrue(TEXT("Verified write still rejects container element edits"), RelatedCall(TEXT("ManageAssetBlueprint"), WriteArgs).HasErrors());
+	TestEqual(TEXT("Rejected writes preserve map"), Defaults->Values.FindRef(TEXT("a.b")), 8);
+	Defaults->Values.Add(TEXT("owner's"), 1);
+	WriteArgs->RemoveField(TEXT("bVerify"));
+	Operation->SetStringField(TEXT("PropertyPath"), TEXT("Values[owner's]."));
+	TestFalse(TEXT("Bare apostrophe key and trailing empty segment remain valid"), RelatedCall(TEXT("ManageAssetBlueprint"), WriteArgs).HasErrors());
+	TestEqual(TEXT("Bare key changed"), Defaults->Values.FindRef(TEXT("owner's")), 9);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusRelatedTypesTest, "NexusLink.EditorRelated.VariableTypes", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FNexusRelatedTypesTest::RunTest(const FString& Parameters)
 {

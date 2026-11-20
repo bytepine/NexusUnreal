@@ -62,6 +62,7 @@
 - test(plugin): L1 `NexusLink.Utils.Runtime.RequirePlayWorld`（未开 PIE 时拒绝 Editor World）与 `NexusLink.Host.RegistryScope.All`（全表宿主可见性）
 - test(plugin): `NexusLink.Trace` 覆盖 UE 4.26+ 文件不存在、四个 Sections、有限耗时与默认时间窗、默认值、时间窗口和重复读取；优先用独立录制进程生成的已关闭文件，避免旧引擎停录写线程错误；UE4 另验证 Store 无路径条目、TraceId 回读与缓存，以及快照边界和提前断流。
 - test(plugin): 增加 `NexusLink.Reliability` 回归，覆盖 MCP 标准字段、双入口 Capability 调用准入、section 枚举、业务错误聚合、批量回滚与延迟保存、DataTable 字段及临时行析构、重复读取不阻断；L2 回滚用例检查错误信封与结构化失败详情。
+- 新增资产编辑回归，覆盖蓝图默认值中带点的 Map 键、动画子图相对路径与重名拒绝、各引擎版本支持的 GameplayEffect 修改器、StateTree 的 `LinkedAsset` 类型读取，以及 Texture、SoundWave、Font 和两种 CommonUI 样式的 `SetProperty` 结果。
 
 ### Changed
 

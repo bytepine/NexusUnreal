@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from _framework.assertions import assert_tool_error
+from _framework.assertions import assert_tool_error, merge_with_defaults
 from _framework.capability_probe import is_capability_available
 from _framework.mcp_client import MCPError, cap_first
 
@@ -68,30 +68,28 @@ def test_ga_set_tags_roundtrip(test_ns, mcp):
     assert unchanged["ActivationOwnedTags"] == tags["ActivationOwnedTags"], unchanged
 
 
-def test_ga_manage_set_policy(test_ns, mcp):
-    path = f"{test_ns}/GA_TestAbility"
-    r = mcp.call(
-        "ManageAssetGameplayAbility",
-        AssetPath=path,
-        Operations=[{
-            "Action": "SetPolicy",
-            "InstancingPolicy": "InstancedPerActor",
-        }],
-    )
-    entry = cap_first(r)
-    assert not entry.get("Error") and entry.get("bSuccess") is not False, (
-        f"manage_asset_gameplay_ability set_policy 返回: {r!r}"
-    )
-
-
 def test_ga_policy_readback(test_ns, mcp):
-    """确认 set_policy 写入后可读回。"""
-    path = f"{test_ns}/GA_TestAbility"
-    r = mcp.call("GetAssetGameplayAbility", AssetPath=path, Sections=["metadata"])
-    entry = cap_first(r)
-    assert entry.get("InstancingPolicy") == "InstancedPerActor", (
-        f"期望 InstancedPerActor，实际: {entry.get('InstancingPolicy')!r}"
-    )
+    path = f"{test_ns}/GA_PolicyRoundtrip"
+    mcp.call("CreateAssetGameplayAbility", AssetPath=path)
+    for instancing, execution in (
+        ("InstancedPerActor", "LocalOnly"),
+        ("NonInstanced", "ServerInitiated"),
+        ("InstancedPerExecution", "LocalPredicted"),
+        ("InstancedPerActor", "ServerOnly"),
+    ):
+        mcp.call("ManageAssetGameplayAbility", AssetPath=path, Operations=[{
+            "Action": "SetPolicy", "InstancingPolicy": instancing, "NetExecutionPolicy": execution,
+        }])
+        entry = cap_first(mcp.call("GetAssetGameplayAbility", AssetPath=path, Sections=["metadata"]))
+        assert (entry["InstancingPolicy"], entry["NetExecutionPolicy"]) == (instancing, execution), entry
+
+    for field in ("InstancingPolicy", "NetExecutionPolicy"):
+        operation = {"Action": "SetPolicy", "InstancingPolicy": "InstancedPerExecution", "NetExecutionPolicy": "LocalOnly"}
+        operation[field] = "UnknownPolicy"
+        error = assert_tool_error(mcp.try_call("ManageAssetGameplayAbility", AssetPath=path, Operations=[operation]))
+        assert error.get("ErrorKind") == "ArgInvalid" and f"Operations[0].{field}" in error["Error"], error
+    unchanged = cap_first(mcp.call("GetAssetGameplayAbility", AssetPath=path, Sections=["metadata"]))
+    assert (unchanged["InstancingPolicy"], unchanged["NetExecutionPolicy"]) == ("InstancedPerActor", "ServerOnly"), unchanged
 
 
 def test_ga_manage_blueprint_set_defaults_non_actor(test_ns, mcp):
@@ -167,6 +165,29 @@ def test_ge_get_modifiers_empty(test_ns, mcp):
     path = f"{test_ns}/GE_TestEffect"
     r = mcp.call("GetAssetGameplayEffect", AssetPath=path, Sections=["Modifiers"])
     assert isinstance(r, dict), r
+
+
+def test_ge_modifier_operations_roundtrip(test_ns, mcp):
+    path = f"{test_ns}/GE_ModifierOperations"
+    mcp.call("CreateAssetGameplayEffect", AssetPath=path)
+    version = cap_first(mcp.call("GetEditorInfo"))["EngineVersion"].split(".")
+    operations = ["Add", "Multiply", "Divide", "Override"]
+    extended = ["MultiplyCompound", "AddFinal"]
+    if tuple(map(int, version[:2])) >= (5, 5):
+        operations.extend(extended)
+    else:
+        for name in extended:
+            error = assert_tool_error(mcp.try_call("ManageAssetGameplayEffect", AssetPath=path, Operations=[{
+                "Action": "AddModifier", "Attribute": "Mana", "ModifierOp": name, "Magnitude": 1,
+            }]))
+            assert error.get("ErrorKind") == "ArgInvalid" and "ModifierOp" in error["Error"], error
+
+    mcp.call("ManageAssetGameplayEffect", AssetPath=path, Operations=[
+        {"Action": "AddModifier", "Attribute": "Mana", "ModifierOp": name, "Magnitude": 1} for name in operations
+    ])
+    entry = cap_first(mcp.call("GetAssetGameplayEffect", AssetPath=path, Sections=["Modifiers"]))
+    modifiers = merge_with_defaults(entry["Modifiers"], entry.get("Modifiers_defaults", {}))
+    assert [item["ModifierOp"] for item in modifiers] == operations, modifiers
 
 
 def test_ge_manage_tags(test_ns, mcp):

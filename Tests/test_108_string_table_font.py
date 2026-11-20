@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pytest
 
+from _framework.asset_helpers import first_asset_path
 from _framework.mcp_client import MCPError, cap_first
 
 pytestmark = pytest.mark.l3_asset
@@ -56,27 +57,20 @@ def test_string_table_roundtrip(test_ns, mcp):
     assert bad.get("Error"), bad
 
 
-def test_font_get_manage(mcp):
-    r = mcp.call_capability("SearchAsset", AssetType="Font", PathFilter="/Engine/", Limit=1)
-    payload = r if isinstance(r, dict) else {}
-    assets = payload.get("Assets") or payload.get("Results") or []
-    if not assets:
-        r = mcp.call_capability("SearchAsset", AssetType="Font", PathFilter="/Game/", Limit=1)
-        payload = r if isinstance(r, dict) else {}
-        assets = payload.get("Assets") or payload.get("Results") or []
-    if not assets:
-        pytest.skip("未找到 Font 资产")
-    first = assets[0] if isinstance(assets[0], dict) else {}
-    path = first.get("AssetPath") or first.get("Path") or ""
+def test_font_get_manage(mcp, test_ns):
+    path = first_asset_path(mcp, "Font", path_filter="/Engine/") or first_asset_path(mcp, "Font")
     if not path:
-        pytest.skip("Font 路径为空")
-    got = cap_first(mcp.call_capability("GetAssetFont", AssetPath=path))
-    assert "ScalingFactor" in got or "CharacterCount" in got, got
+        pytest.skip("未找到 Font 资产")
+    copy = f"{test_ns}/Font_SetProperty"
+    mcp.call("DuplicateAsset", AssetPath=path, DestAssetPath=copy)
+    before = cap_first(mcp.call("GetAssetFont", AssetPath=copy))["ScalingFactor"]
+    value = 1.25 if before != 1.25 else 1.5
     man = cap_first(
         mcp.call_capability(
             "ManageAssetFont",
-            AssetPath=path,
-            Operations=[{"Action": "SetProperty", "PropertyPath": "ScalingFactor", "Value": "1.0"}],
+            AssetPath=copy,
+            Operations=[{"Action": "SetProperty", "PropertyPath": "ScalingFactor", "Value": str(value)}],
         )
     )
-    assert isinstance(man, dict), man
+    assert man["PropertyPath"] == "ScalingFactor" and float(man["OldValue"]) == pytest.approx(before), man
+    assert float(man["NewValue"]) == cap_first(mcp.call("GetAssetFont", AssetPath=copy))["ScalingFactor"] == value

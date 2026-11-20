@@ -256,15 +256,17 @@ class TestSoundCueManage:
 
 
 class TestSoundWaveManage:
-    def test_set_property(self, mcp):
-        path = first_asset_path(mcp, "SoundWave")
+    def test_set_property(self, mcp, test_ns):
+        path = first_asset_path(mcp, "SoundWave") or first_asset_path(mcp, "SoundWave", path_filter="/Engine/")
         if not path:
             pytest.skip("无 SoundWave 样本")
+        copy = f"{test_ns}/SW_SetProperty"
+        mcp.call("DuplicateAsset", AssetPath=path, DestAssetPath=copy)
         r = mcp.call_capability(
             "ManageAssetSoundWave",
-            AssetPath=path,
+            AssetPath=copy,
             Operations=[{"Action": "SetProperty", "PropertyPath": "Volume", "Value": "0.9"}],
         )
         first = cap_first(r)
-        if first.get("Error"):
-            pytest.skip(f"manage_asset_sound_wave 跳过: {first}")
+        assert first["PropertyPath"] == "Volume" and float(first["NewValue"]) == pytest.approx(0.9), first
+        assert "OldValue" in first and first["Note"] == "persist with SaveAsset", first
