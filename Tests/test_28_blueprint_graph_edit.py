@@ -157,6 +157,59 @@ def test_blueprint_set_node_rejects_bad_pin_before_edit(mcp, require_tools, test
     assert not cap_first(mcp.call("GetEditorGraph", AssetPath=path))["bDirty"]
 
 
+def test_blueprint_set_node_validates_typed_defaults_before_edit(mcp, require_tools, test_ns):
+    path = create_blueprint(mcp, require_tools, test_ns, "TypedPinDefaults")
+    require_tools("SaveAsset", "GetEditorGraph")
+    setters = {}
+    for name, variable_type, literal in (
+        ("Count", "int", "42"),
+        ("ActorType", "ClassReference</Script/Engine.Actor>", "Class'/Script/Engine.Character'"),
+        ("Label", "text", 'INVTEXT("Round trip")'),
+    ):
+        edit(mcp, path, Action="AddVariable", VariableName=name, VariableType=variable_type)
+        setters[name] = add_variable_node(mcp, path, name, setter=True)
+        edit(mcp, path, Action="SetNode", GraphName="EventGraph", NodeId=setters[name],
+             PinName=name, PinDefaultValue=literal)
+    nodes = graph_nodes(mcp, path)
+    assert pin(nodes[setters["Count"]], "Count")["DefaultValue"] == "42"
+    assert pin(nodes[setters["ActorType"]], "ActorType")["DefaultObject"] == "/Script/Engine.Character"
+    assert 'Round trip' in pin(nodes[setters["Label"]], "Label")["DefaultValue"]
+    mcp.call("SaveAsset", AssetPath=path)
+    for name, invalid in (("Count", "abc"), ("ActorType", None), ("ActorType", "/Script/Engine.Texture2D"),
+                          ("ActorType", f"{test_ns}/MissingClass.MissingClass_C")):
+        assert_rejected_without_changes(mcp, path, dict(Action="SetNode", GraphName="EventGraph", NodeId=setters[name],
+                                                        PinName=name, PinDefaultValue=invalid, Comment="rejected", PosX=317))
+        assert not cap_first(mcp.call("GetEditorGraph", AssetPath=path))["bDirty"]
+    edit(mcp, path, Action="SetNode", GraphName="EventGraph", NodeId=setters["ActorType"],
+         PinName="ActorType", PinDefaultValue="None")
+    assert not pin(graph_nodes(mcp, path)[setters["ActorType"]], "ActorType").get("DefaultObject")
+
+
+def test_anim_blueprint_validates_player_asset_before_edit(mcp, require_tools, test_ns):
+    require_tools("CreateAssetAnimBlueprint", "CreateAssetBlendSpace", "ManageAssetAnimBlueprint",
+                  "GetAssetBlueprint", "SaveAsset", "GetEditorGraph")
+    path, blend = f"{test_ns}/ABP_PlayerAsset", f"{test_ns}/BS_PlayerAsset"
+    skeleton = resolve_skeleton(mcp)
+    mcp.call("CreateAssetAnimBlueprint", AssetPath=path, SkeletonPath=skeleton)
+    mcp.call("CreateAssetBlendSpace", AssetPath=blend, SkeletonPath=skeleton)
+    add = dict(Action="AddNode", NodeClass="SequencePlayer", GraphName="AnimGraph")
+    player = cap_first(mcp.call("ManageAssetAnimBlueprint", AssetPath=path, Operations=[add]))["NodeId"]
+    mcp.call("SaveAsset", AssetPath=path)
+    before = graph_nodes(mcp, path, "AnimGraph")
+    for operation in (dict(add, SequencePath=blend),
+                      dict(Action="SetNode", GraphName="AnimGraph", NodeId=player, SequencePath=blend, PosX=317)):
+        rejected = mcp.try_call("ManageAssetAnimBlueprint", AssetPath=path, Operations=[operation])
+        assert rejected.get("isError") and "does not support" in str(rejected), rejected
+        assert graph_nodes(mcp, path, "AnimGraph") == before
+        assert not cap_first(mcp.call("GetEditorGraph", AssetPath=path))["bDirty"]
+    blend_player = cap_first(mcp.call("ManageAssetAnimBlueprint", AssetPath=path, Operations=[
+        dict(add, NodeClass="BlendSpacePlayer")]))["NodeId"]
+    mcp.call("ManageAssetAnimBlueprint", AssetPath=path, Operations=[
+        dict(Action="SetNode", GraphName="AnimGraph", NodeId=blend_player, SequencePath=blend, PosX=317)])
+    node = graph_nodes(mcp, path, "AnimGraph")[blend_player]
+    assert blend.rsplit("/", 1)[1] in node["NodeTitle"] and node["PosX"] == 317, node
+
+
 def test_anim_blueprint_remove_node_protects_root(mcp, require_tools, test_ns):
     require_tools("CreateAssetAnimBlueprint", "ManageAssetAnimBlueprint", "GetAssetBlueprint")
     path = f"{test_ns}/ABP_ProtectedRoot"
@@ -233,12 +286,12 @@ def test_blueprint_struct_pin_rejects_connected_scalar_and_foreign_nodes(mcp, re
     ):
         assert_rejected_without_changes(mcp, path, invalid)
 
-    # SetNode 可直接写原始文本；SplitPin 必须在原生分量数 check 前拒绝非法默认值。
-    for invalid_default in ("1,2,3,4", "nan,2,3", "1e400,2,3", "oops,2,3"):
-        edit(mcp, path, Action="SetNode", GraphName="EventGraph", NodeId=write_vector,
-             PinName="GraphVector", PinDefaultValue=invalid_default)
-        rejected = assert_rejected_without_changes(mcp, path, base)
-        assert "default" in str(rejected).lower(), rejected
+    for invalid_default in ("1,2,3,4", "nan,2,3", "oops,2,3"):
+        assert_rejected_without_changes(mcp, path, dict(base, Action="SetNode", PinDefaultValue=invalid_default))
+    # K2 接受指数语法；SplitPin 仍须在拆分前拒绝超出分量范围的值。
+    edit(mcp, path, **dict(base, Action="SetNode", PinDefaultValue="1e400,2,3"))
+    rejected = assert_rejected_without_changes(mcp, path, base)
+    assert "default" in str(rejected).lower(), rejected
     edit(mcp, path, Action="SetNode", GraphName="EventGraph", NodeId=write_vector, PinName="GraphVector", PinDefaultValue="1,2,3")
 
     edit(mcp, path, Action="Connect", GraphName="EventGraph", SourceNodeId=read_vector, SourcePinName="GraphVector",
@@ -308,7 +361,7 @@ def test_blueprint_struct_pin_preserves_component_precision(mcp, require_tools, 
     # 合并必须采用当前子值，保留大坐标与细小小数，不能复用旧父值或先转成 float。
     for child_name, value in zip(child_names, edited_values):
         edit(mcp, path, Action="SetNode", GraphName="EventGraph", NodeId=node_id, PinName=child_name, PinDefaultValue=value)
-    edit(mcp, path, Action="SetNode", GraphName="EventGraph", NodeId=node_id, PinName=child_names[0], PinDefaultValue="nan")
+    edit(mcp, path, Action="SetNode", GraphName="EventGraph", NodeId=node_id, PinName=child_names[0], PinDefaultValue="1e400")
     assert_rejected_without_changes(mcp, path, dict(Action="RecombinePin", **operation))
     edit(mcp, path, Action="SetNode", GraphName="EventGraph", NodeId=node_id, PinName=child_names[0], PinDefaultValue=edited_values[0])
     recombined = edit(mcp, path, Action="RecombinePin", **operation)["Node"]

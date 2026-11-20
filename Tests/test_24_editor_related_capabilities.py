@@ -85,6 +85,44 @@ def test_world_settings_failed_batch_restores_world_to_meters(mcp, require_tools
     assert float(properties[0]["Value"]) == 117, properties
 
 
+@pytest.mark.parametrize(("field", "value"), [
+    ("ActorGuid.A", "197"),
+    pytest.param("bShowInstancedFoliageGrid", "True", marks=pytest.mark.skipif_ue_below("5.4")),
+    pytest.param("LevelInstanceType", "LevelInstance", marks=pytest.mark.skipif_ue_below("5.5")),
+])
+def test_world_settings_rejects_excluded_transaction_fields(mcp, require_tools, test_ns, field, value):
+    require_tools("CreateAssetLevel", "ManageAssetLevel", "GetAssetLevel")
+    level = f"{test_ns}/LV_Transaction_{field.split('.')[0]}"
+    mcp.call("CreateAssetLevel", AssetPath=level)
+    actors = cap_first(mcp.call("GetAssetLevel", AssetPath=level, Sections=["Actors"], ClassFilter="WorldSettings"))
+    query = dict(AssetPath=level, Sections=["ActorProperties"], ActorName=actors["Actors"][0]["Name"],
+                 PropertyPaths=["WorldToMeters", field])
+    before = cap_first(mcp.call("GetAssetLevel", **query))["Properties"]
+    result = mcp.try_call("CallCapability", Calls=[
+        {"Capability": "ManageAssetLevel", "Arguments": {"AssetPath": level, "Operations": [
+            {"Action": "SetProperty", "PropertyPath": path, "Value": text}]}}
+        for path, text in (("WorldToMeters", "231"), (field, value))
+    ])
+    assert result["isError"] and result["structuredContent"]["bRolledBack"], result
+    assert "excluded from editor transactions" in str(result), result
+    assert cap_first(mcp.call("GetAssetLevel", **query))["Properties"] == before
+
+
+def test_world_settings_reports_editor_clamped_value(mcp, require_tools, test_ns):
+    require_tools("CreateAssetLevel", "ManageAssetLevel", "GetAssetLevel")
+    level = f"{test_ns}/LV_WorldSettingsLightmass"
+    mcp.call("CreateAssetLevel", AssetPath=level)
+    path = "LightmassSettings.NumIndirectLightingBounces"
+    result = cap_first(mcp.call("ManageAssetLevel", AssetPath=level, Operations=[
+        {"Action": "SetProperty", "PropertyPath": path, "Value": "-2"},
+    ]))
+    assert int(result["NewValue"]) == 0, result
+    actors = cap_first(mcp.call("GetAssetLevel", AssetPath=level, Sections=["Actors"], ClassFilter="WorldSettings"))
+    properties = cap_first(mcp.call("GetAssetLevel", AssetPath=level, Sections=["ActorProperties"],
+                                    ActorName=actors["Actors"][0]["Name"], PropertyPaths=[path]))["Properties"]
+    assert int(properties[0]["Value"]) == 0, properties
+
+
 def test_world_settings_cannot_edit_shared_sound_mix(mcp, require_tools, test_ns):
     require_tools("CreateAssetLevel", "ManageAssetLevel", "ExecPython")
     level, mix = f"{test_ns}/LV_SharedSoundMix", f"{test_ns}/Mix_Shared"

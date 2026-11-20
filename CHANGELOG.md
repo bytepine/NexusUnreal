@@ -63,7 +63,7 @@
 - test(plugin): `NexusLink.Trace` 覆盖 UE 4.26+ 文件不存在、四个 Sections、有限耗时与默认时间窗、默认值、时间窗口和重复读取；优先用独立录制进程生成的已关闭文件，避免旧引擎停录写线程错误；UE4 另验证 Store 无路径条目、TraceId 回读与缓存，以及快照边界和提前断流。
 - test(plugin): 增加 `NexusLink.Reliability` 回归，覆盖 MCP 标准字段、双入口 Capability 调用准入、section 枚举、业务错误聚合、批量回滚与延迟保存、DataTable 字段及临时行析构、重复读取不阻断；L2 回滚用例检查错误信封与结构化失败详情。
 - 新增资产编辑回归，覆盖蓝图默认值中带点的 Map 键、动画子图相对路径与重名拒绝、各引擎版本支持的 GameplayEffect 修改器、StateTree 的 `LinkedAsset` 类型读取，以及 Texture、SoundWave、Font 和两种 CommonUI 样式的 `SetProperty` 结果。
-- 图编辑回归覆盖只读图、必需节点、完整路径预览、图类型过滤、无效引脚的零写入和复合节点子图清理。资产测试核对默认值缺参、组件所有权与撤销、含点 Map 键、Set 元素、构造脚本属性和 WorldSettings 批次回滚。StateTree 回归验证任务和转移编译、状态树增删回滚、重名拒绝和改名后的读取。
+- 图编辑回归覆盖只读图、必需节点、完整路径预览、图类型过滤、引脚和动画资产类型校验、预览时保留 Actor 委托、删除回滚后的调试状态，以及复合节点和动画过渡的子图清理。资产测试核对默认值缺参、组件所有权与撤销、含点 Map 键、Set 元素、构造脚本属性，以及 WorldSettings 的批次回滚、事务字段过滤和编辑器钳制。StateTree 回归验证 Schema 对任务类型的限制、任务和转移编译、状态树增删回滚、重名拒绝和改名后的读取。
 
 ### Changed
 

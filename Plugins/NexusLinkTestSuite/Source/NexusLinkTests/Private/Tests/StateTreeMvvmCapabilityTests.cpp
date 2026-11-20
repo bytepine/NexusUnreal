@@ -105,6 +105,12 @@ bool FNexusStateTreeTransitionTargetTest::RunTest(const FString& Parameters)
 	UStateTreeState& Source = *Root.Children[0];
 	if (!TestTrue(TEXT("Source has its structural parent"), Source.Parent == &Root)
 		|| !TestEqual(TEXT("Delay task added"), Source.Tasks.Num(), 1)) return false;
+	AddTask->SetStringField(TEXT("NodeType"), TEXT("StateTreeMoveToTask"));
+	Args->SetArrayField(TEXT("Operations"), {MakeShared<FJsonValueObject>(AddTask)});
+	const FCapabilityResult Rejected = Manage->Run(Args);
+	if (!TestTrue(TEXT("Component schema rejects an AI-only task"), Rejected.HasErrors() && Rejected.Entries.Num() == 1
+		&& Rejected.Entries[0]->AsObject()->GetStringField(TEXT("Error")).Contains(TEXT("schema")))
+		|| !TestEqual(TEXT("Rejected task preserves the original tasks"), Source.Tasks.Num(), 1)) return false;
 	UStateTreeState& Target = Root.AddChildState(TEXT("Target"));
 	auto Op = MakeArgs(TEXT("Action"), TEXT("AddTransition"));
 	Op->SetStringField(TEXT("StateName"), Source.Name.ToString());

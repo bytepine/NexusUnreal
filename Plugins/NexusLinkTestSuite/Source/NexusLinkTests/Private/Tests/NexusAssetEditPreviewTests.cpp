@@ -9,6 +9,7 @@
 #include "Utils/NexusVersionCompat.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
+#include "Serialization/JsonSerializer.h"
 #include "Engine/DataTable.h"
 #include "Engine/BlueprintGeneratedClass.h"
 #include "GameFramework/Actor.h"
@@ -28,6 +29,24 @@
 #include "EdGraph/EdGraphNode.h"
 #include "EdGraphSchema_K2.h"
 #include "K2Node_VariableGet.h"
+#include "K2Node_ActorBoundEvent.h"
+#include "K2Node_CallFunction.h"
+#include "K2Node_CustomEvent.h"
+#include "Kismet2/KismetDebugUtilities.h"
+#if !NX_UE_HAS_BLUEPRINT_PIN_WATCH_SETTINGS
+#include "Engine/Breakpoint.h"
+#endif
+#include "Engine/Level.h"
+#include "Engine/LevelScriptActor.h"
+#include "Engine/World.h"
+#include "Animation/AnimBlueprint.h"
+#include "Animation/AnimBlueprintGeneratedClass.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/Skeleton.h"
+#include "AnimationStateMachineGraph.h"
+#include "AnimStateTransitionNode.h"
+#include "Utils/NexusAnimGraphUtils.h"
+#include "Utils/NexusEditorTransaction.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "GraphEditAction.h"
 #include "Misc/ScopeExit.h"
@@ -269,9 +288,174 @@ static TSharedPtr<FJsonObject> AssetStructureArgs(UObject* Asset, const TCHAR* C
 {
 	TSharedPtr<FJsonObject> Args = MakeShared<FJsonObject>();
 	Args->SetStringField(TEXT("AssetPath"), Asset->GetPathName());
-	Args->SetStringField(TEXT("Capability"), Capability);
+	if (Capability) Args->SetStringField(TEXT("Capability"), Capability);
 	Args->SetArrayField(TEXT("Operations"), {MakeShared<FJsonValueObject>(Operation)});
 	return Args;
+}
+
+static bool CheckGraphEdit(FAutomationTestBase& Test, const TCHAR* Label, const FCapabilityResult& Result)
+{
+	if (!Result.HasErrors()) return true;
+	auto Error = MakeShared<FJsonObject>();
+	Error->SetStringField(TEXT("FatalError"), Result.FatalError);
+	Error->SetArrayField(TEXT("Entries"), Result.Entries);
+	if (Result.TopFields.IsValid()) Error->SetObjectField(TEXT("TopFields"), Result.TopFields);
+	FString Details;
+	FJsonSerializer::Serialize(Error, TJsonWriterFactory<>::Create(&Details));
+	Test.AddError(FString::Printf(TEXT("%s: %s"), Label, *Details));
+	return false;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusActorBoundEventPreviewTest, "NexusLink.AssetEdit.ActorBoundEventPreview",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FNexusActorBoundEventPreviewTest::RunTest(const FString& Parameters)
+{
+	UPackage* Package = AssetEditPackage();
+	UBlueprint* Blueprint = FKismetEditorUtilities::CreateBlueprint(AActor::StaticClass(), Package,
+		TEXT("Blueprint"), BPTYPE_Normal, UBlueprint::StaticClass(), UBlueprintGeneratedClass::StaticClass());
+	UEdGraph* Graph = FBlueprintEditorUtils::CreateNewGraph(Blueprint, TEXT("ActorEvents"), UEdGraph::StaticClass(), UEdGraphSchema_K2::StaticClass());
+	Blueprint->UbergraphPages.Add(Graph);
+	ULevel* Level = NewObject<ULevel>(NewObject<UWorld>());
+	ALevelScriptActor* ScriptActor = NewObject<ALevelScriptActor>(Level);
+	Level->LevelScriptActor = ScriptActor;
+	AActor* Owner = NewObject<AActor>(Level);
+	UK2Node_ActorBoundEvent* Event = NewObject<UK2Node_ActorBoundEvent>(Graph);
+	Event->InitializeActorBoundEventParams(Owner, FindFProperty<FMulticastDelegateProperty>(AActor::StaticClass(), TEXT("OnDestroyed")));
+	Event->CustomFunctionName = TEXT("ReceiveActorBeginOverlap");
+	Event->CreateNewGuid();
+	Graph->AddNode(Event);
+	FScriptDelegate Delegate;
+	Delegate.BindUFunction(ScriptActor, Event->CustomFunctionName);
+	Owner->OnDestroyed.Add(Delegate);
+	ON_SCOPE_EXIT { Owner->OnDestroyed.Remove(Delegate); Package->SetDirtyFlag(false); };
+
+	auto Op = MakeShared<FJsonObject>();
+	Op->SetStringField(TEXT("Action"), TEXT("RemoveNode"));
+	Op->SetStringField(TEXT("GraphName"), Graph->GetName());
+	Op->SetStringField(TEXT("NodeId"), Event->NodeGuid.ToString());
+	auto Args = AssetStructureArgs(Blueprint, TEXT("ManageAssetBlueprint"), Op);
+	if (!CheckGraphEdit(*this, TEXT("Actor event preview"), AssetEditCall(TEXT("GetAssetEditPreview"), Args))) return false;
+	TestTrue(TEXT("Preview preserves the real delegate"), Owner->OnDestroyed.Contains(Delegate));
+	TestTrue(TEXT("Preview preserves the real node"), Graph->Nodes.Contains(Event));
+	Args->RemoveField(TEXT("Capability"));
+	if (!CheckGraphEdit(*this, TEXT("Real removal"), AssetEditCall(TEXT("ManageAssetBlueprint"), Args))) return false;
+	TestFalse(TEXT("Real removal unregisters the delegate"), Owner->OnDestroyed.Contains(Delegate));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusGraphDebugRollbackTest, "NexusLink.AssetEdit.GraphDebugRollback",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FNexusGraphDebugRollbackTest::RunTest(const FString& Parameters)
+{
+	UPackage* Package = AssetEditPackage();
+	UBlueprint* Blueprint = FKismetEditorUtilities::CreateBlueprint(AActor::StaticClass(), Package,
+		TEXT("Blueprint"), BPTYPE_Normal, UBlueprint::StaticClass(), UBlueprintGeneratedClass::StaticClass());
+	UEdGraph* Graph = FBlueprintEditorUtils::CreateNewGraph(Blueprint, TEXT("WatchGraph"), UEdGraph::StaticClass(), UEdGraphSchema_K2::StaticClass());
+	Blueprint->UbergraphPages.Add(Graph);
+	UK2Node_CustomEvent* Event = NewObject<UK2Node_CustomEvent>(Graph, NAME_None, RF_Transactional);
+	Event->CustomFunctionName = TEXT("WatchEvent");
+	Event->CreateNewGuid();
+	Graph->AddNode(Event);
+	Event->AllocateDefaultPins();
+	UK2Node_CallFunction* Node = NewObject<UK2Node_CallFunction>(Graph, NAME_None, RF_Transactional);
+	Node->SetFromFunction(AActor::StaticClass()->FindFunctionByName(TEXT("K2_SetActorLocation")));
+	Node->CreateNewGuid();
+	Graph->AddNode(Node);
+	Node->AllocateDefaultPins();
+	Event->FindPinChecked(UEdGraphSchema_K2::PN_Then)->MakeLinkTo(Node->GetExecPin());
+	FKismetEditorUtilities::CompileBlueprint(Blueprint);
+	UEdGraphPin* Pin = Node->FindPinChecked(UEdGraphSchema_K2::PN_ReturnValue);
+	FKismetDebugUtilities::TogglePinWatch(Blueprint, Pin);
+#if NX_UE_HAS_BLUEPRINT_PIN_WATCH_SETTINGS
+	FKismetDebugUtilities::CreateBreakpoint(Blueprint, Node);
+	auto HasBreakpoint = [&]() { return FKismetDebugUtilities::FindBreakpointForNode(Node, Blueprint) != nullptr; };
+#else
+	UBreakpoint* Breakpoint = NewObject<UBreakpoint>(Blueprint);
+	FKismetDebugUtilities::SetBreakpointEnabled(Breakpoint, true);
+	FKismetDebugUtilities::SetBreakpointLocation(Breakpoint, Node);
+	Blueprint->Breakpoints.Add(Breakpoint);
+	auto HasBreakpoint = [&]() { return FKismetDebugUtilities::FindBreakpointForNode(Blueprint, Node) != nullptr; };
+#endif
+	ON_SCOPE_EXIT
+	{
+		FKismetDebugUtilities::ClearPinWatches(Blueprint);
+		FKismetDebugUtilities::ClearBreakpoints(Blueprint);
+		Package->SetDirtyFlag(false);
+	};
+	if (!TestTrue(TEXT("Pin is watched before the batch"), FKismetDebugUtilities::IsPinBeingWatched(Blueprint, Pin))) return false;
+	if (!TestTrue(TEXT("Node has a breakpoint before the batch"), HasBreakpoint())) return false;
+	auto Op = MakeShared<FJsonObject>();
+	Op->SetStringField(TEXT("Action"), TEXT("RemoveNode"));
+	Op->SetStringField(TEXT("GraphName"), Graph->GetName());
+	Op->SetStringField(TEXT("NodeId"), Node->NodeGuid.ToString());
+	auto Args = AssetStructureArgs(Blueprint, nullptr, Op);
+	auto Tx = FNexusEditorTransaction::Begin(TEXT("Rollback watched node deletion"));
+	if (!TestTrue(TEXT("Batch transaction started"), Tx.IsValid())) return false;
+	if (!CheckGraphEdit(*this, TEXT("First delete"), AssetEditCall(TEXT("ManageAssetBlueprint"), Args))) return false;
+	TestFalse(TEXT("Real deletion clears the watch"), FKismetDebugUtilities::IsPinBeingWatched(Blueprint, Pin));
+	TestFalse(TEXT("Real deletion clears the breakpoint"), HasBreakpoint());
+	TestTrue(TEXT("Second delete fails"), AssetEditCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+	if (!TestTrue(TEXT("Failed batch reverts"), FNexusEditorTransaction::CancelAndRevert(Tx))) return false;
+	TestTrue(TEXT("Graph contains the restored node"), Graph->Nodes.Contains(Node));
+	UEdGraphPin* Restored = Node->FindPin(UEdGraphSchema_K2::PN_ReturnValue);
+	if (!TestNotNull(TEXT("Restored pin"), Restored)) return false;
+	TestTrue(TEXT("Restored pin has its original watch"), FKismetDebugUtilities::IsPinBeingWatched(Blueprint, Restored));
+	TestTrue(TEXT("Restored node has its original breakpoint"), HasBreakpoint());
+	if (!CheckGraphEdit(*this, TEXT("Subsequent delete"), AssetEditCall(TEXT("ManageAssetBlueprint"), Args))) return false;
+	TestFalse(TEXT("Committed deletion clears the watch"), FKismetDebugUtilities::IsPinBeingWatched(Blueprint, Restored));
+	TestFalse(TEXT("Committed deletion clears the breakpoint"), HasBreakpoint());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusSharedTransitionDeletionTest, "NexusLink.AssetEdit.SharedTransitionDeletion",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FNexusSharedTransitionDeletionTest::RunTest(const FString& Parameters)
+{
+	UPackage* Package = AssetEditPackage();
+	ON_SCOPE_EXIT { Package->SetDirtyFlag(false); };
+	UAnimBlueprint* Blueprint = CastChecked<UAnimBlueprint>(FKismetEditorUtilities::CreateBlueprint(UAnimInstance::StaticClass(),
+		Package, TEXT("AnimBP"), BPTYPE_Normal, UAnimBlueprint::StaticClass(), UAnimBlueprintGeneratedClass::StaticClass()));
+	Blueprint->TargetSkeleton = NewObject<USkeleton>(Package);
+	auto Edit = [&](const TCHAR* Action, const TCHAR* State = TEXT(""), const TCHAR* Target = TEXT(""))
+	{
+		auto Op = MakeShared<FJsonObject>();
+		Op->SetStringField(TEXT("Action"), Action);
+		Op->SetStringField(TEXT("StateMachineName"), TEXT("Machine"));
+		Op->SetStringField(TEXT("StateName"), State);
+		Op->SetStringField(TEXT("TargetStateName"), Target);
+		return CheckGraphEdit(*this, Action, AssetEditCall(TEXT("ManageAssetAnimBlueprint"), AssetStructureArgs(Blueprint, nullptr, Op)));
+	};
+	if (!Edit(TEXT("AddStateMachine"))) return false;
+	for (const TCHAR* State : {TEXT("A"), TEXT("B"), TEXT("C")}) if (!Edit(TEXT("AddState"), State)) return false;
+	if (!Edit(TEXT("AddTransition"), TEXT("A"), TEXT("B")) || !Edit(TEXT("AddTransition"), TEXT("B"), TEXT("C"))
+		|| !Edit(TEXT("AddTransition"), TEXT("C"), TEXT("A"))) return false;
+	auto* Machine = Cast<UAnimationStateMachineGraph>(FNexusAnimGraphUtils::FindAnimGraph(Blueprint, TEXT("Machine")));
+	if (!TestNotNull(TEXT("State machine"), Machine)) return false;
+	auto* AB = FNexusAnimGraphUtils::FindTransition(Machine, TEXT("A"), TEXT("B"));
+	auto* BC = FNexusAnimGraphUtils::FindTransition(Machine, TEXT("B"), TEXT("C"));
+	auto* CA = FNexusAnimGraphUtils::FindTransition(Machine, TEXT("C"), TEXT("A"));
+	if (!TestTrue(TEXT("All transitions exist"), AB && BC && CA)) return false;
+	AB->MakeRulesShareable(TEXT("Shared"));
+	BC->UseSharedRules(AB);
+	CA->UseSharedRules(AB);
+	UEdGraph* Shared = AB->BoundGraph;
+	FPropertyChangedEvent Changed(FindFProperty<FProperty>(AB->GetClass(), TEXT("LogicType")));
+	AB->LogicType = ETransitionLogicType::TLT_Custom;
+	AB->PostEditChangeProperty(Changed);
+	UEdGraph* Custom = AB->CustomTransitionGraph;
+	if (!TestTrue(TEXT("Custom blend graph registered"), Custom && Machine->SubGraphs.Contains(Custom))) return false;
+	if (!Edit(TEXT("RemoveTransition"), TEXT("A"), TEXT("B"))) return false;
+	TestFalse(TEXT("Private blend graph removed with transition"), Machine->SubGraphs.Contains(Custom));
+	TestTrue(TEXT("Deleting a transition preserves shared rule"), Machine->SubGraphs.Contains(Shared) && BC->BoundGraph == Shared && CA->BoundGraph == Shared);
+	if (!Edit(TEXT("RemoveState"), TEXT("B"))) return false;
+	TestFalse(TEXT("State removal removes the incident transition"), Machine->Nodes.Contains(BC));
+	TestTrue(TEXT("Unrelated transition retains shared rule"), Machine->Nodes.Contains(CA) && Machine->SubGraphs.Contains(Shared) && CA->BoundGraph == Shared);
+	if (!Edit(TEXT("RemoveTransition"), TEXT("C"), TEXT("A"))) return false;
+	TestFalse(TEXT("Last transition releases shared rule"), Machine->SubGraphs.Contains(Shared));
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusAssetInterfaceStructurePreviewTest, "NexusLink.AssetEdit.InterfaceStructurePreview",
@@ -291,7 +475,10 @@ bool FNexusAssetInterfaceStructurePreviewTest::RunTest(const FString& Parameters
 	if (!TestEqual(TEXT("带返回值的接口生成实现图"), Blueprint->ImplementedInterfaces[0].Graphs.Num(), 1)) return false;
 	UEdGraph* InterfaceGraph = Blueprint->ImplementedInterfaces[0].Graphs[0];
 	if (!TestTrue(TEXT("接口图有实现节点"), InterfaceGraph->Nodes.Num() > 0)) return false;
-	UEdGraphNode* InterfaceNode = InterfaceGraph->Nodes[0];
+	// Keep the required function entry and use a deletable node to exercise interface graph lookup.
+	UEdGraphNode* InterfaceNode = NewObject<UEdGraphNode>(InterfaceGraph);
+	InterfaceNode->CreateNewGuid();
+	InterfaceGraph->AddNode(InterfaceNode);
 	const int32 InterfaceNodeCount = InterfaceGraph->Nodes.Num();
 	UEdGraph* EventGraph = FBlueprintEditorUtils::CreateNewGraph(Blueprint.Get(), TEXT("PreviewEventGraph"), UEdGraph::StaticClass(), UEdGraphSchema_K2::StaticClass());
 	Blueprint->UbergraphPages.Add(EventGraph);
