@@ -1,5 +1,6 @@
 # Copyright byteyang. All Rights Reserved.
 """编辑器工具：会话隔离、输出契约与 GUI 只读闭环。"""
+import json
 import time
 import pytest
 from _framework.mcp_client import cap_first
@@ -13,6 +14,15 @@ def operation_result(mcp, result):
     assert result["State"] == "Completed", result
     assert result["bCanCancel"] is False
     return result["Result"]
+
+
+def test_editor_operation_wire_content(mcp, require_tools):
+    require_tools("GetEditorOperation")
+    result = mcp.try_call("GetEditorOperation", Limit=1)
+    assert not result.get("isError"), result
+    assert result["content"][0]["type"] == "text"
+    assert json.loads(result["content"][0]["text"]) == result["structuredContent"]
+    assert result["structuredContent"]["TtlSeconds"] == 0
 
 
 def test_editor_operation_unknown_id(mcp, require_tools):
@@ -37,6 +47,7 @@ def test_editor_slate_read_and_capture(mcp, require_tools):
 
 @pytest.mark.parametrize("name", [
     "NexusLink.EditorOperations.OwnerAndContract",
+    "NexusLink.Reliability.ToolContent",
     "NexusLink.Review.ScsReattachAndCopy",
     "NexusLink.Review.TransformValidation",
     "NexusLink.Review.DirtyLevelProtection",

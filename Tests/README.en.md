@@ -16,6 +16,8 @@ Feedback regressions: `NexusLink.Review.FeedbackVariableTypesAndRename`, `NexusL
 
 `NexusLink.AssetEdit.AutomatedExport` verifies automated T3D export, output content, and file-free failure for unsupported extensions. Component preview also verifies rejection of null and external object references.
 
+MCP result formats: `NexusLink.Reliability.ToolContent` exercises ordinary and schema-backed tools in both content modes. `test_editor_operation_wire_content` reads the raw HTTP tool result and compares the JSON text with the structured object.
+
 PascalCase contracts: `NexusLink.Reliability.PascalCasePayload` verifies actually registered input Schema, creation-result Name fields, and GetAsset/ManageAsset path deduplication. `NexusLink.Feedback.RoundTrip` verifies Call* classification in drafts and summary reports; `NexusLinkExt.Smoke.LuaCaps` and `NexusLinkExt.Lua.ValueToJsonStackBalance` verify Lua capability names and table-field Type metadata. Python cases and behavior-tree retest tools use the same field naming.
 
 Review-fix regressions: UE Automation `NexusLink.Review` verifies dirty-level/external-Actor-package protection, SCS reattachment cycle rejection/root consistency, copied inherited-component override templates, and complete transform-argument preflight with side-effect-free failures. `NexusLink.Runtime.Widget.ExactInteraction` also verifies WidgetComponent list-path interaction/property read-write and rejection after hiding/unregistration. Run both in isolated Editor-Cmd with `-ExecCmds="Automation RunTests NexusLink.Review+NexusLink.Runtime.Widget.ExactInteraction" -TestExit="Automation Test Queue Empty" -unattended -nullrhi`.

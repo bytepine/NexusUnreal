@@ -51,6 +51,7 @@
 - Add asset-editing regression coverage for dotted Map keys in Blueprint defaults, relative paths and ambiguous names for nested animation graphs, GameplayEffect modifier operations by engine version, `LinkedAsset` state reads, and `SetProperty` results for Texture, SoundWave, Font, and both CommonUI style assets.
 - Graph editing tests cover read-only graphs, required nodes, full paths in previews, graph type filters, pin defaults and animation asset types, actor delegate bindings during preview, debugger state after rollback, and child graph cleanup for composite nodes and animation transitions. Asset tests cover missing default values, component ownership and undo, dotted Map keys, Set elements, construction script properties, WorldSettings batch rollback, transaction-excluded fields, and editor clamping. StateTree tests check schema restrictions on task types, task and transition compilation, rollback of additions and removals, ambiguous names, and readback after a rename.
 - The example project explicitly enables optional NexusLink extensions. Isolated builds select extensions whose dependencies exist in the selected engine, and L1 tests link the SDKs configured by those extensions.
+- Regression coverage for MCP text and structured output modes, including schema-backed results and snapshot metadata.
 
 ### Changed
 

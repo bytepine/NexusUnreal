@@ -18,6 +18,7 @@ int32 FNexusReliabilityTestRow::DestructionCount = 0;
 #include "NexusMcpSchemaBuilder.h"
 #include "NexusMcpTool.h"
 #include "NexusMcpToolRegistry.h"
+#include "Utils/NexusJsonUtils.h"
 #include "NexusCapabilityRegistry.h"
 #include "NexusEditorServices.h"
 #include "Utils/NexusCapResultAdapter.h"
@@ -45,6 +46,41 @@ static bool HasExactReliabilityField(const TSharedPtr<FJsonObject>& Object, cons
 		if (FString(*Pair.Key).Equals(Name, ESearchCase::CaseSensitive)) return true;
 	}
 	return false;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusToolContentTest, "NexusLink.Reliability.ToolContent",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FNexusToolContentTest::RunTest(const FString& Parameters)
+{
+	auto* Settings = GetMutableDefault<UNexusLinkSettings>();
+	TGuardValue<ENexusToolsListMode> Tools(Settings->ToolsListMode, ENexusToolsListMode::MultiTool);
+	FNexusMcpDispatcher Dispatcher([](const FString&) {});
+	for (const auto Mode : { ENexusContentMode::Content, ENexusContentMode::StructuredContent })
+	{
+		TGuardValue<ENexusContentMode> ModeGuard(Settings->ContentMode, Mode);
+		for (const FString Name : { FString(TEXT("GetEditorInfo")), FString(TEXT("GetEditorOperation")) })
+		{
+			TSharedPtr<FJsonObject> Reply;
+			const FString Request = FString::Printf(TEXT(R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"%s","arguments":{}}})"), *Name);
+			Dispatcher.DispatchDirect(Request, [&](const FString& Json) { Reply = ParseReliabilityResponse(Json); });
+			const TSharedPtr<FJsonObject>* Result = nullptr;
+			if (!TestTrue(TEXT("工具调用成功"), Reply && Reply->TryGetObjectField(TEXT("result"), Result) && !(*Result)->GetBoolField(TEXT("isError")))) return false;
+			const TArray<TSharedPtr<FJsonValue>>* Content = nullptr;
+			if (!TestTrue(TEXT("返回一个文本块"), (*Result)->TryGetArrayField(TEXT("content"), Content) && Content->Num() == 1)) return false;
+			const auto Block = (*Content)[0]->AsObject();
+			if (!TestTrue(TEXT("文本块为有效 JSON"), Block && Block->GetStringField(TEXT("type")) == TEXT("text"))) return false;
+			const FString Text = Block->GetStringField(TEXT("text"));
+			const auto Payload = ParseReliabilityResponse(Text);
+			if (!TestTrue(TEXT("文本取自注入时间戳后的对象"), Payload && Payload->HasField(TEXT("SnapshotAt")))) return false;
+			const bool bExpected = Mode == ENexusContentMode::StructuredContent || Name == TEXT("GetEditorOperation");
+			const TSharedPtr<FJsonObject>* Structured = nullptr;
+			const bool bGotStructured = (*Result)->TryGetObjectField(TEXT("structuredContent"), Structured);
+			TestEqual(TEXT("输出契约或原生模式附带对象"), bGotStructured, bExpected);
+			if (bGotStructured) TestEqual(TEXT("文本与原生对象一致"), Text, FNexusJsonUtils::SerializeCondensed(*Structured));
+		}
+	}
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNexusProtocolContractTest,

@@ -17,6 +17,8 @@ def payload(raw):
 
 def assert_image(raw, mime):
     assert not raw.get("isError"), "Capture returned a tool error"
+    if "structuredContent" in raw:
+        assert json.loads(raw["content"][0]["text"]) == raw["structuredContent"]
     images = [item for item in raw.get("content", []) if item.get("type") == "image"]
     assert len(images) == 1, f"Expected one inline image, got {len(images)}"
     assert images[0]["mimeType"] == mime
