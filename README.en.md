@@ -59,7 +59,7 @@ Plugin version: `Plugins/NexusLink/VERSION` or [NexusLink Releases](https://gith
 |------|---------|
 | Cross-version project builds | `py Script/build_test.py` (builds `Nexus.uproject` with locally installed engines in isolated temporary directories without modifying the project; one engine at a time, no `-MaxParallelActions`, leaving concurrency to UBT; automatically retries C3859/C1076 with a single action; supports `--editor-only` / `--game-only`) |
 | Game targets only | `py Script/build_test_game.py --versions UE_5.7` |
-| Package for any platform | `py Script/package.py` (defaults to the host platform + Development; `--platform Win64 Linux`; `--config Shipping`; arguments after `--` pass through to UAT) |
+| Package for any platform | `py Script/package.py` (defaults to the host platform + Development; use `--version` to select the engine, with incompatible extensions and modules filtered in a temporary project when needed; `--platform Win64 Linux`; `--config Shipping`; arguments after `--` pass through to UAT) |
 | L2 MCP regression, daily/headless | `py Script/run_e2e.py` |
 | Full L2 MCP regression, GUI including PIE/Lua | `py Script/run_e2e.py --gui` or `--full` |
 | Controlled UE 5.7 CI | Manually dispatch [UE 5.7 Validation](.github/workflows/ue-validation.yml) with a full commit SHA already merged into the default branch; see [test guide](Tests/README.en.md#controlled-ue-57-validation) for Windows runner and environment setup |

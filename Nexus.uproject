@@ -3,6 +3,7 @@
 	"EngineAssociation": "5.7",
 	"Category": "",
 	"Description": "",
+	"AdditionalPluginDirectories": [ "Plugins/NexusLink/OptionalPlugins" ],
 	"Modules": [
 		{
 			"Name": "Nexus",
@@ -77,6 +78,96 @@
 		{
 			"Name": "NexusLink",
 			"Enabled": true
+		},
+		{
+			"Name": "NexusLinkCommonUI",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "NexusLinkControlRig",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "NexusLinkDataRegistry",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "NexusLinkEnhancedInput",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "NexusLinkGameFeatures",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "NexusLinkGameplayAbilities",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "NexusLinkGameplayTagsEditor",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "NexusLinkGeometryCollection",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "NexusLinkIKRig",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "NexusLinkMetasound",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "NexusLinkModelViewViewModel",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "NexusLinkMovieRenderPipeline",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "NexusLinkNiagara",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "NexusLinkPCG",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "NexusLinkPaper2D",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "NexusLinkPoseSearch",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "NexusLinkPythonScriptPlugin",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "NexusLinkStateTree",
+			"Enabled": true,
+			"Optional": true
 		},
 		{
 			"Name": "NexusLinkExt",

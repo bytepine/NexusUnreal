@@ -669,9 +669,20 @@ bool FNexusRelatedSpecializedTest::RunTest(const FString& Parameters)
 	{
 		TStrongObjectPtr<UBlueprint> Asset(RelatedBlueprint(Ability, AbilityBlueprint));
 		TStrongObjectPtr<UBlueprint> Parent(RelatedBlueprint(Ability, AbilityBlueprint));
+		if (!TestNotNull(TEXT("Native GameplayAbilityBlueprint fixture"), Asset.Get()) ||
+			!TestNotNull(TEXT("Native GameplayAbilityBlueprint parent fixture"), Parent.Get())) return false;
 		ON_SCOPE_EXIT { Asset->GetOutermost()->SetDirtyFlag(false); Parent->GetOutermost()->SetDirtyFlag(false); };
-		Operation->SetStringField(TEXT("ParentClass"), Parent->GetPathName()); Args->SetStringField(TEXT("AssetPath"), Asset->GetPathName()); Args->SetBoolField(TEXT("bCompile"), true);
-		TestFalse(TEXT("Native GameplayAbilityBlueprint reparent"), RelatedCall(TEXT("ManageAssetBlueprint"), Args).HasErrors());
+		auto AbilityOperation = RelatedOperation(TEXT("Reparent"));
+		AbilityOperation->SetStringField(TEXT("ParentClass"), Parent->GetPathName());
+		auto AbilityArgs = RelatedArgs(Asset.Get(), AbilityOperation);
+		AbilityArgs->SetStringField(TEXT("Capability"), TEXT("ManageAssetBlueprint"));
+		TestFalse(TEXT("Preview accepts a valid parent for the native GameplayAbilityBlueprint"), RelatedCall(TEXT("GetAssetEditPreview"), AbilityArgs).HasErrors());
+		TestTrue(TEXT("Preview preserves the native parent"), Asset->ParentClass == Ability);
+		AbilityArgs->RemoveField(TEXT("Capability"));
+		AbilityArgs->SetBoolField(TEXT("bCompile"), true);
+		TestFalse(TEXT("Native GameplayAbilityBlueprint reparent"), RelatedCall(TEXT("ManageAssetBlueprint"), AbilityArgs).HasErrors());
+		TestTrue(TEXT("Reparent applies the new parent and preserves the specialized type"),
+			Asset->ParentClass == Parent->GeneratedClass && Asset->GetClass() == AbilityBlueprint);
 	}
 #endif
 	return true;

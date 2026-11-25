@@ -21,8 +21,11 @@ import json
 import os
 import platform
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -68,6 +71,11 @@ _CONFIG_ALIASES = {
 
 sys.path.insert(0, str(SCRIPT_DIR))
 from engine_discovery import discover_engines_auto  # noqa: E402
+from project_extensions import (  # noqa: E402
+    EXTENSIONS_DIRECTORY,
+    filter_project_descriptor,
+    remove_extensions_directory,
+)
 
 
 def _runuat_path(ue_root: Path) -> Path:
@@ -175,9 +183,54 @@ def _resolve_engine(ue_root: Optional[str], version: Optional[str]) -> Tuple[str
     sys.exit("已发现引擎但都缺少 RunUAT")
 
 
+@contextmanager
+def _package_project(ue_root: Path, dry_run: bool, iterative: bool):
+    project_root = UPROJECT_PATH.parent
+    descriptor = json.loads(UPROJECT_PATH.read_text(encoding="utf-8-sig"))
+    extensions = sorted((project_root / EXTENSIONS_DIRECTORY).glob("*/*.uplugin"))
+    disabled_extensions, removed_modules = filter_project_descriptor(descriptor, extensions, ue_root)
+    if not disabled_extensions and not removed_modules:
+        yield UPROJECT_PATH
+        return
+
+    if disabled_extensions:
+        print(f"[package] 隔离工程将禁用所选引擎不支持的扩展 {', '.join(disabled_extensions)}", flush=True)
+    if removed_modules:
+        print(f"[package] 隔离工程将移除所选引擎未编译的工程模块 {', '.join(removed_modules)}", flush=True)
+    # Windows 的系统临时目录可能太深，旧版 UBT 的生成路径会超过限制。
+    saved = project_root / "Saved"
+    if dry_run:
+        yield saved / "NexusPkg-dry-run" / UPROJECT_PATH.name
+        return
+    if iterative:
+        print("[package] 隔离工程只在本次打包期间保留，增量 cook 无法复用上次产物。", flush=True)
+
+    def ignore_generated(directory, names):
+        ignored = {"Intermediate", "Binaries", "Saved", "DerivedDataCache", ".git", "obj"}
+        if Path(directory) == (project_root / EXTENSIONS_DIRECTORY).parent:
+            ignored.add("OptionalPlugins")
+        return ignored.intersection(names)
+
+    saved.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="NexusPkg-", dir=saved) as folder:
+        isolated = Path(folder)
+        for name in ("Build", "Config", "Content", "Platforms", "Plugins", "Shaders", "Source"):
+            source = project_root / name
+            if source.is_dir():
+                shutil.copytree(source, isolated / name, ignore=ignore_generated)
+        # 与跨版本编译使用相同的并列布局，缩短旧引擎生成文件的路径。
+        remove_extensions_directory(descriptor)
+        for extension in extensions:
+            shutil.copytree(extension.parent, isolated / "Plugins" / extension.stem, ignore=ignore_generated)
+        project = isolated / UPROJECT_PATH.name
+        project.write_text(json.dumps(descriptor, indent="\t") + "\n", encoding="utf-8")
+        yield project
+
+
 def _uat_command(
     uat: Path,
     *,
+    project: Path,
     platform_name: str,
     config: str,
     target: str,
@@ -189,7 +242,7 @@ def _uat_command(
     args = [
         str(uat),
         "BuildCookRun",
-        f"-project={UPROJECT_PATH}",
+        f"-project={project}",
         "-noP4",
         f"-platform={platform_name}",
         f"-clientconfig={config}",
@@ -302,23 +355,25 @@ def main() -> int:
     print(f"[package] archive={archive_dir}", flush=True)
 
     failed: List[str] = []
-    for plat in platforms:
-        cmd = _uat_command(
-            uat,
-            platform_name=plat,
-            config=config,
-            target=args.target,
-            archive_dir=archive_dir,
-            iterative=args.iterative,
-            maps=args.maps,
-            extra=extra,
-        )
-        code = _package_one(cmd, args.dry_run)
-        if code != 0:
-            print(f"[package] FAIL {plat} exit={code}", flush=True)
-            failed.append(plat)
-        else:
-            print(f"[package] OK {plat}", flush=True)
+    with _package_project(ue_root, args.dry_run, args.iterative) as project:
+        for plat in platforms:
+            cmd = _uat_command(
+                uat,
+                project=project,
+                platform_name=plat,
+                config=config,
+                target=args.target,
+                archive_dir=archive_dir,
+                iterative=args.iterative,
+                maps=args.maps,
+                extra=extra,
+            )
+            code = _package_one(cmd, args.dry_run)
+            if code != 0:
+                print(f"[package] FAIL {plat} exit={code}", flush=True)
+                failed.append(plat)
+            else:
+                print(f"[package] OK {plat}", flush=True)
 
     if failed:
         print(f"[package] 失败平台：{failed}", flush=True)

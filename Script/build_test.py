@@ -91,6 +91,11 @@ from engine_discovery import (  # noqa: E402
     discover_engines_auto,
     discover_engines_from_root,
 )
+from project_extensions import (  # noqa: E402
+    EXTENSIONS_DIRECTORY,
+    filter_project_descriptor,
+    remove_extensions_directory,
+)
 
 # ---------------------------------------------------------------------------
 # Process registry & cleanup
@@ -427,7 +432,7 @@ def _mirror_plugins_tree(src: Path, dst: Path) -> None:
     except OSError:
         return
     for item in children:
-        if item.name in _SKIP_DIR_NAMES:
+        if item.name in _SKIP_DIR_NAMES or (src.name == "NexusLink" and item.name == "OptionalPlugins"):
             continue
         dest = dst / item.name
         if item.is_symlink() and not item.is_dir():
@@ -476,11 +481,18 @@ def _reset_temp_workspace() -> None:
             raise last_err
 
 
-def _prepare_isolated_project(ver: str) -> Path:
+def _prepare_isolated_project(ver: str, engine_path: str) -> Path:
     dest = TEMP_BASE / ver / "Project"
     uproject = dest / "Nexus.uproject"
     dest.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(UPROJECT_PATH, uproject)
+    descriptor = json.loads(UPROJECT_PATH.read_text(encoding="utf-8-sig"))
+    # 与发布包一样并列安装扩展，避免隔离目录的额外层级超过 Windows 路径上限。
+    extensions = sorted((NEXUS_UNREAL_DIR / EXTENSIONS_DIRECTORY).glob("*/*.uplugin"))
+    remove_extensions_directory(descriptor)
+    filter_project_descriptor(descriptor, extensions, Path(engine_path), include_unlisted=True)
+    for extension in extensions:
+        _mirror_plugins_tree(extension.parent, dest / "Plugins" / extension.stem)
+    uproject.write_text(json.dumps(descriptor, indent="\t") + "\n", encoding="utf-8")
     src_source = NEXUS_UNREAL_DIR / "Source"
     if src_source.is_dir():
         _copy_tree(src_source, dest / "Source")
@@ -494,12 +506,12 @@ def _prepare_isolated_project(ver: str) -> Path:
     return uproject
 
 
-def _isolated_uproject(ver: str) -> Path:
+def _isolated_uproject(ver: str, engine_path: str) -> Path:
     with _isolated_lock:
         cached = _isolated_ready.get(ver)
         if cached is not None and cached.is_file():
             return cached
-    path = _prepare_isolated_project(ver)
+    path = _prepare_isolated_project(ver, engine_path)
     with _isolated_lock:
         _isolated_ready[ver] = path
     return path
@@ -687,7 +699,7 @@ def _build_one(engine: dict, target: str, line_idx: int, total: int,
     )
 
     try:
-        uproject = _isolated_uproject(ver)
+        uproject = _isolated_uproject(ver, eng_path)
     except Exception as exc:
         msg = f"failed to prepare isolated project: {exc}"
         _update_status_line(f"[{ver}] {phase_label}: FAIL ({msg})", line_idx, total, print_lock, is_tty)

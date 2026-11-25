@@ -31,6 +31,36 @@ public class NexusLinkTests : ModuleRules
 			}
 		);
 
+
+		string ProjectRoot = NexusLinkOptionalPlugins.FindProjectRoot(ModuleDirectory);
+		var SearchDirs = NexusLinkOptionalPlugins.CollectPluginSearchDirs(ProjectRoot, this);
+		foreach (var Config in NexusLinkOptionalPlugins.BuildFullTable())
+		{
+			string Domain = System.IO.Path.GetFileNameWithoutExtension(Config.UpluginFiles[0]);
+			string Integration = "NexusLink" + Domain;
+			if (Domain != "GameplayAbilities" && Domain != "Niagara" && Domain != "StateTree" &&
+				Domain != "ModelViewViewModel" && Domain != "Paper2D" && Domain != "CommonUI" &&
+				Domain != "MovieRenderPipeline")
+				continue;
+			bool RuntimeDomain = Domain == "GameplayAbilities" || Domain == "Niagara";
+			if ((Target.bBuildEditor || RuntimeDomain) &&
+				NexusLinkOptionalPlugins.GetProjectPluginEnabled(ProjectRoot, Integration) == true &&
+				NexusLinkOptionalPlugins.Apply(this, Target, Config, SearchDirs, ProjectRoot, Target.bBuildEditor, false, true))
+			{
+				PrivateDefinitions.Add(Config.Define + "=1");
+				if (RuntimeDomain)
+					PrivateDependencyModuleNames.Add(Integration);
+				if (Target.bBuildEditor)
+					PrivateDependencyModuleNames.Add(Integration + "Editor");
+				NexusLinkOptionalPlugins.MarkOptionalPluginLinked(this, Integration);
+			}
+			else
+			{
+				PrivateDefinitions.Add(Config.Define + "=0");
+			}
+		}
+
+
 		if (Target.bBuildEditor)
 		{
 			PrivateDependencyModuleNames.Add(NexusLinkOptionalPlugins.MeetsMinEngineVersion(Target,5,0) ? "ToolWidgets" : "EditorWidgets");
@@ -38,8 +68,6 @@ public class NexusLinkTests : ModuleRules
             var RegistrySearchDirs = NexusLinkOptionalPlugins.CollectPluginSearchDirs(RegistryProjectRoot, this);
             var RegistryConfig = NexusLinkOptionalPlugins.Opt(new[] { "DataRegistry.uplugin" }, "WITH_NEXUS_TEST_DATA_REGISTRY", "NEXUS_TEST_DATA_REGISTRY", 5, 0, rt: new[] { "DataRegistry" }, uproj: "DataRegistry");
             NexusLinkOptionalPlugins.Apply(this, Target, RegistryConfig, RegistrySearchDirs, RegistryProjectRoot, false);
-            var stateTree = System.Array.Find(NexusLinkOptionalPlugins.BuildFullTable(), config => config.Define == "WITH_STATETREE");
-            NexusLinkOptionalPlugins.Apply(this, Target, stateTree, RegistrySearchDirs, RegistryProjectRoot, true, false);
 			var PCGDocuments = NexusLinkOptionalPlugins.Opt(new[] { "PCG.uplugin" }, "WITH_NEXUS_TEST_PCG_DOCUMENTS", "WITH_PCG", 5, 8,
 				rt: new[] { "PCG" }, ed: new[] { "PCGEditor" }, uproj: "PCG");
 			if (NexusLinkOptionalPlugins.Apply(this, Target, PCGDocuments, RegistrySearchDirs, RegistryProjectRoot, true))
@@ -71,16 +99,6 @@ public class NexusLinkTests : ModuleRules
 		{
 			PrivateDefinitions.Add("WITH_NEXUS_TEST_DATA_REGISTRY=0");
 			PrivateDefinitions.Add("WITH_NEXUS_TEST_PCG_DOCUMENTS=0");
-			// Game 目标不链接 NexusLinkEditor，WITH_STATETREE 等 Editor 域可选插件宏没有
-			// 定义来源；测试文件里直接 #if WITH_STATETREE 检测（非 #ifdef），未定义时 MSVC 报
-			// C4668。这里兜底置 0。WITH_GAS/WITH_NIAGARA/WITH_ENHANCED_INPUT 由 NexusLink 定义。
-			foreach (var C in NexusLinkOptionalPlugins.BuildFullTable())
-			{
-				if (C.Define != "WITH_GAS" && C.Define != "WITH_NIAGARA" && C.Define != "WITH_ENHANCED_INPUT")
-				{
-					PublicDefinitions.Add(C.Define + "=0");
-				}
-			}
 		}
 
 		PrivateIncludePaths.AddRange(
