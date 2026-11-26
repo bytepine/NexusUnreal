@@ -91,11 +91,7 @@ from engine_discovery import (  # noqa: E402
     discover_engines_auto,
     discover_engines_from_root,
 )
-from project_extensions import (  # noqa: E402
-    EXTENSIONS_DIRECTORY,
-    filter_project_descriptor,
-    remove_extensions_directory,
-)
+from project_extensions import filter_project_descriptor  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Process registry & cleanup
@@ -432,7 +428,7 @@ def _mirror_plugins_tree(src: Path, dst: Path) -> None:
     except OSError:
         return
     for item in children:
-        if item.name in _SKIP_DIR_NAMES or (src.name == "NexusLink" and item.name == "OptionalPlugins"):
+        if item.name in _SKIP_DIR_NAMES:
             continue
         dest = dst / item.name
         if item.is_symlink() and not item.is_dir():
@@ -486,12 +482,7 @@ def _prepare_isolated_project(ver: str, engine_path: str) -> Path:
     uproject = dest / "Nexus.uproject"
     dest.mkdir(parents=True, exist_ok=True)
     descriptor = json.loads(UPROJECT_PATH.read_text(encoding="utf-8-sig"))
-    # 与发布包一样并列安装扩展，避免隔离目录的额外层级超过 Windows 路径上限。
-    extensions = sorted((NEXUS_UNREAL_DIR / EXTENSIONS_DIRECTORY).glob("*/*.uplugin"))
-    remove_extensions_directory(descriptor)
-    filter_project_descriptor(descriptor, extensions, Path(engine_path), include_unlisted=True)
-    for extension in extensions:
-        _mirror_plugins_tree(extension.parent, dest / "Plugins" / extension.stem)
+    filter_project_descriptor(descriptor, Path(engine_path))
     uproject.write_text(json.dumps(descriptor, indent="\t") + "\n", encoding="utf-8")
     src_source = NEXUS_UNREAL_DIR / "Source"
     if src_source.is_dir():

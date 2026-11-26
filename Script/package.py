@@ -71,11 +71,7 @@ _CONFIG_ALIASES = {
 
 sys.path.insert(0, str(SCRIPT_DIR))
 from engine_discovery import discover_engines_auto  # noqa: E402
-from project_extensions import (  # noqa: E402
-    EXTENSIONS_DIRECTORY,
-    filter_project_descriptor,
-    remove_extensions_directory,
-)
+from project_extensions import filter_project_descriptor  # noqa: E402
 
 
 def _runuat_path(ue_root: Path) -> Path:
@@ -187,14 +183,13 @@ def _resolve_engine(ue_root: Optional[str], version: Optional[str]) -> Tuple[str
 def _package_project(ue_root: Path, dry_run: bool, iterative: bool):
     project_root = UPROJECT_PATH.parent
     descriptor = json.loads(UPROJECT_PATH.read_text(encoding="utf-8-sig"))
-    extensions = sorted((project_root / EXTENSIONS_DIRECTORY).glob("*/*.uplugin"))
-    disabled_extensions, removed_modules = filter_project_descriptor(descriptor, extensions, ue_root)
-    if not disabled_extensions and not removed_modules:
+    disabled_plugins, removed_modules = filter_project_descriptor(descriptor, ue_root)
+    if not disabled_plugins and not removed_modules:
         yield UPROJECT_PATH
         return
 
-    if disabled_extensions:
-        print(f"[package] 隔离工程将禁用所选引擎不支持的扩展 {', '.join(disabled_extensions)}", flush=True)
+    if disabled_plugins:
+        print(f"[package] 隔离工程将禁用与示例模块冲突的引擎插件 {', '.join(disabled_plugins)}", flush=True)
     if removed_modules:
         print(f"[package] 隔离工程将移除所选引擎未编译的工程模块 {', '.join(removed_modules)}", flush=True)
     # Windows 的系统临时目录可能太深，旧版 UBT 的生成路径会超过限制。
@@ -205,11 +200,7 @@ def _package_project(ue_root: Path, dry_run: bool, iterative: bool):
     if iterative:
         print("[package] 隔离工程只在本次打包期间保留，增量 cook 无法复用上次产物。", flush=True)
 
-    def ignore_generated(directory, names):
-        ignored = {"Intermediate", "Binaries", "Saved", "DerivedDataCache", ".git", "obj"}
-        if Path(directory) == (project_root / EXTENSIONS_DIRECTORY).parent:
-            ignored.add("OptionalPlugins")
-        return ignored.intersection(names)
+    ignore_generated = shutil.ignore_patterns("Intermediate", "Binaries", "Saved", "DerivedDataCache", ".git", "obj")
 
     saved.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="NexusPkg-", dir=saved) as folder:
@@ -218,10 +209,6 @@ def _package_project(ue_root: Path, dry_run: bool, iterative: bool):
             source = project_root / name
             if source.is_dir():
                 shutil.copytree(source, isolated / name, ignore=ignore_generated)
-        # 与跨版本编译使用相同的并列布局，缩短旧引擎生成文件的路径。
-        remove_extensions_directory(descriptor)
-        for extension in extensions:
-            shutil.copytree(extension.parent, isolated / "Plugins" / extension.stem, ignore=ignore_generated)
         project = isolated / UPROJECT_PATH.name
         project.write_text(json.dumps(descriptor, indent="\t") + "\n", encoding="utf-8")
         yield project

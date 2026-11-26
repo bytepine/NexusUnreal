@@ -21,9 +21,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CAP_ROOTS = tuple(
-    ROOT / "Plugins" / plugin / "Source" / module / "Private" / "Capabilities"
+    root
     for plugin in ("NexusLink", "NexusLinkExt")
-    for module in (plugin, plugin + "Editor")
+    for root in (ROOT / "Plugins" / plugin / "Source").glob("*/Private/Capabilities")
 )
 TESTS = ROOT / "Tests"
 

@@ -64,7 +64,7 @@
 - test(plugin): 增加 `NexusLink.Reliability` 回归，覆盖 MCP 标准字段、双入口 Capability 调用准入、section 枚举、业务错误聚合、批量回滚与延迟保存、DataTable 字段及临时行析构、重复读取不阻断；L2 回滚用例检查错误信封与结构化失败详情。
 - 新增资产编辑回归，覆盖蓝图默认值中带点的 Map 键、动画子图相对路径与重名拒绝、各引擎版本支持的 GameplayEffect 修改器、StateTree 的 `LinkedAsset` 类型读取，以及 Texture、SoundWave、Font 和两种 CommonUI 样式的 `SetProperty` 结果。
 - 图编辑回归覆盖只读图、必需节点、完整路径预览、图类型过滤、引脚和动画资产类型校验、预览时保留 Actor 委托、删除回滚后的调试状态，以及复合节点和动画过渡的子图清理。资产测试核对默认值缺参、组件所有权与撤销、含点 Map 键、Set 元素、构造脚本属性，以及 WorldSettings 的批次回滚、事务字段过滤和编辑器钳制。StateTree 回归验证 Schema 对任务类型的限制、任务和转移编译、状态树增删回滚、重名拒绝和改名后的读取。
-- 示例工程显式启用 NexusLink 的可选扩展。隔离编译按所选引擎实际提供的依赖启用扩展，L1 测试按扩展配置链接对应 SDK。
+- 示例工程在 `Nexus.uproject` 中启用所需的引擎插件。NexusLink 自动加载对应工具，L1 测试按宿主配置链接 SDK。
 - 增加 MCP 文本与结构化输出模式的回归测试，覆盖带输出契约的结果和快照元数据。
 
 ### Changed
@@ -91,7 +91,7 @@
 
 ### Fixed
 
-- 为旧版引擎打包示例工程时，在临时工程中禁用不兼容的 NexusLink 扩展，并在 UE 5.6 以下移除仅在较新引擎编译的 `NexusGameplay` 模块声明。
+- 为旧版引擎构建或打包示例工程时，临时工程在 UE 5.6 以下移除 `NexusGameplay` 模块声明，在 UE4 禁用与 `NexusInputStubs` 同名类型冲突的 EnhancedInput 插件。
 
 - 显式指定跨版本编译矩阵时，缺失的引擎版本或 UBT 入口会导致失败。Ubuntu CI 运行整套无需 UE 的宿主脚本回归。
 

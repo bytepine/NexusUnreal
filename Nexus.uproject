@@ -3,7 +3,6 @@
 	"EngineAssociation": "5.7",
 	"Category": "",
 	"Description": "",
-	"AdditionalPluginDirectories": [ "Plugins/NexusLink/OptionalPlugins" ],
 	"Modules": [
 		{
 			"Name": "Nexus",
@@ -80,92 +79,59 @@
 			"Enabled": true
 		},
 		{
-			"Name": "NexusLinkCommonUI",
+			"Name": "EditorScriptingUtilities",
+			"Enabled": true,
+			"Optional": true,
+			"WhitelistTargets": [ "Editor" ]
+		},
+		{
+			"Name": "SequencerScripting",
+			"Enabled": true,
+			"Optional": true,
+			"WhitelistTargets": [ "Editor" ]
+		},
+		{
+			"Name": "ControlRig",
 			"Enabled": true,
 			"Optional": true
 		},
 		{
-			"Name": "NexusLinkControlRig",
+			"Name": "DataRegistry",
 			"Enabled": true,
 			"Optional": true
 		},
 		{
-			"Name": "NexusLinkDataRegistry",
+			"Name": "EnhancedInput",
 			"Enabled": true,
 			"Optional": true
 		},
 		{
-			"Name": "NexusLinkEnhancedInput",
+			"Name": "GameFeatures",
 			"Enabled": true,
 			"Optional": true
 		},
 		{
-			"Name": "NexusLinkGameFeatures",
+			"Name": "GameplayTagsEditor",
 			"Enabled": true,
 			"Optional": true
 		},
 		{
-			"Name": "NexusLinkGameplayAbilities",
+			"Name": "GeometryCollectionPlugin",
 			"Enabled": true,
 			"Optional": true
 		},
 		{
-			"Name": "NexusLinkGameplayTagsEditor",
+			"Name": "IKRig",
 			"Enabled": true,
 			"Optional": true
 		},
 		{
-			"Name": "NexusLinkGeometryCollection",
+			"Name": "Metasound",
 			"Enabled": true,
 			"Optional": true
 		},
 		{
-			"Name": "NexusLinkIKRig",
-			"Enabled": true,
-			"Optional": true
-		},
-		{
-			"Name": "NexusLinkMetasound",
-			"Enabled": true,
-			"Optional": true
-		},
-		{
-			"Name": "NexusLinkModelViewViewModel",
-			"Enabled": true,
-			"Optional": true
-		},
-		{
-			"Name": "NexusLinkMovieRenderPipeline",
-			"Enabled": true,
-			"Optional": true
-		},
-		{
-			"Name": "NexusLinkNiagara",
-			"Enabled": true,
-			"Optional": true
-		},
-		{
-			"Name": "NexusLinkPCG",
-			"Enabled": true,
-			"Optional": true
-		},
-		{
-			"Name": "NexusLinkPaper2D",
-			"Enabled": true,
-			"Optional": true
-		},
-		{
-			"Name": "NexusLinkPoseSearch",
-			"Enabled": true,
-			"Optional": true
-		},
-		{
-			"Name": "NexusLinkPythonScriptPlugin",
-			"Enabled": true,
-			"Optional": true
-		},
-		{
-			"Name": "NexusLinkStateTree",
+			"Name": "Paper2D",
 			"Enabled": true,
 			"Optional": true
 		},

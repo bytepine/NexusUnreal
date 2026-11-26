@@ -50,7 +50,7 @@
 - test(plugin): Add `NexusLink.Reliability` regressions for MCP standard fields, Capability call access in both tool modes, section enumeration, business-error aggregation, batch rollback/deferred save, DataTable fields/temporary-row destruction, and nonblocking repeated reads. L2 rollback checks the error envelope and structured failure details.
 - Add asset-editing regression coverage for dotted Map keys in Blueprint defaults, relative paths and ambiguous names for nested animation graphs, GameplayEffect modifier operations by engine version, `LinkedAsset` state reads, and `SetProperty` results for Texture, SoundWave, Font, and both CommonUI style assets.
 - Graph editing tests cover read-only graphs, required nodes, full paths in previews, graph type filters, pin defaults and animation asset types, actor delegate bindings during preview, debugger state after rollback, and child graph cleanup for composite nodes and animation transitions. Asset tests cover missing default values, component ownership and undo, dotted Map keys, Set elements, construction script properties, WorldSettings batch rollback, transaction-excluded fields, and editor clamping. StateTree tests check schema restrictions on task types, task and transition compilation, rollback of additions and removals, ambiguous names, and readback after a rename.
-- The example project explicitly enables optional NexusLink extensions. Isolated builds select extensions whose dependencies exist in the selected engine, and L1 tests link the SDKs configured by those extensions.
+- The sample enables the engine plugins it uses in `Nexus.uproject`. NexusLink loads their tools automatically, and L1 tests link the SDKs selected for the host.
 - Regression coverage for MCP text and structured output modes, including schema-backed results and snapshot metadata.
 
 ### Changed
@@ -77,7 +77,7 @@
 
 ### Fixed
 
-- When packaging the sample project with older engines, disable incompatible NexusLink extensions in a temporary project. Below UE 5.6, also omit the `NexusGameplay` module declaration because the target only builds it on newer engines.
+- When building or packaging the sample with older engines, the temporary project omits the `NexusGameplay` module declaration before UE 5.6. On UE4 it disables EnhancedInput because its types conflict with `NexusInputStubs`.
 
 - Explicit cross-version build matrices fail when any requested engine or UBT entry point is missing. Ubuntu CI runs the full set of host-script regressions that require no Unreal Engine installation.
 

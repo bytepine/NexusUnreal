@@ -21,7 +21,17 @@
 		},
 		{
 			"Name": "PCG",
-			"Enabled": true,
+			"Enabled": false,
+			"Optional": true
+		},
+		{
+			"Name": "DataRegistry",
+			"Enabled": false,
+			"Optional": true
+		},
+		{
+			"Name": "StateTree",
+			"Enabled": false,
 			"Optional": true
 		}
 	],

@@ -90,7 +90,9 @@ def test_calls(mcp):
             actions, sections = audit.collect_cpp(roots)
             self.assertEqual(len(actions), 4)
             self.assertEqual(sections, {"GetExample": ["Details"]})
-        self.assertEqual(len(audit.CAP_ROOTS), 4)
+        modules = {root.parents[1].name for root in audit.CAP_ROOTS}
+        self.assertTrue({"NexusLink", "NexusLinkEditor", "NexusLinkNiagaraEditor",
+                         "NexusLinkExt", "NexusLinkExtEditor"}.issubset(modules))
 
     def test_only_actual_call_arguments_count(self):
         visitor = self.parse('''

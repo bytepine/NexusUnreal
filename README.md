@@ -54,7 +54,7 @@ git submodule update --init --recursive
 
 ## MCP 接入
 
-1. 确保 NexusLink 子模块已初始化，或从 [NexusLink Releases](https://github.com/bytepine/NexusLink/releases) 下载 zip 放入 `Plugins/NexusLink`
+1. 初始化 NexusLink 子模块，或从 [NexusLink Releases](https://github.com/bytepine/NexusLink/releases) 下载 ZIP 放入 `Plugins/NexusLink`。工程启用 NexusLink 后，Niagara、GameplayAbilities 等工具会随相应引擎插件自动加载。
 2. 启用：**Editor Preferences → Plugins → NexusLink → 启用 MCP 服务器**（默认关）→ HTTP `:45000` / WS `:55000`。PIE / 独立 Development 包也可 `~` 后执行 `NexusLink.Mcp on`；`NexusLink.Mcp panel` 打开游戏内调试面板（会话级，不写盘）
 3. IDE 代理：[NexusVSCode](https://github.com/bytepine/NexusVSCode)（`:6900`）或 [NexusRider](https://github.com/bytepine/NexusRider)（`:6800`）
 4. 完整配置：[NexusLink 使用指南](https://github.com/bytepine/NexusLink/blob/master/docs/usage-guide.md)
@@ -67,7 +67,7 @@ git submodule update --init --recursive
 |------|------|
 | 跨版本工程编译 | `py Script/build_test.py`（本机已装引擎编 `Nexus.uproject`；临时目录隔离、不改工程；一次只编一套引擎，不传 `-MaxParallelActions`，并行度交给 UBT；C3859/C1076 自动改为单 action 重试；`--editor-only` / `--game-only`） |
 | 仅 Game 目标 | `py Script/build_test_game.py --versions UE_5.7` |
-| 打包（任意平台） | `py Script/package.py`（默认本机平台 + Development；使用 `--version` 选择引擎，按需在临时工程中过滤不兼容的扩展和模块；`--platform Win64 Linux`；`--config Shipping`；`--` 后参数转给 UAT） |
+| 打包（任意平台） | `py Script/package.py` 默认打本机平台的 Development 包。用 `--version` 选引擎，`--platform Win64 Linux` 选平台，`--config Shipping` 打发行包，`--` 后的参数转给 UAT。旧引擎会使用临时工程适配示例游戏模块。 |
 | L2 MCP 回归（日常，headless） | `py Script/run_e2e.py` |
 | L2 MCP 全量（GUI，含 PIE/Lua） | `py Script/run_e2e.py --gui` 或 `--full` |
 | UE 5.7 受控 CI | 手动触发 [UE 5.7 Validation](.github/workflows/ue-validation.yml)，指定已合入默认分支的完整提交 SHA；Windows Runner 和环境配置见 [测试指南](Tests/README.md#ue-57-受控验证) |

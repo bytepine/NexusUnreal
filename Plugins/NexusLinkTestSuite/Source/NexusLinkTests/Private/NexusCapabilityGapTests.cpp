@@ -1,6 +1,7 @@
 // Copyright byteyang. All Rights Reserved.
 
 #include "Misc/AutomationTest.h"
+#include "Interfaces/IPluginManager.h"
 #include "NexusCapabilityRegistry.h"
 #include "NexusSchemaTestUtils.h"
 
@@ -29,41 +30,40 @@ bool FNexusCapabilityGapNewCapsRegistered::RunTest(const FString& Parameters)
 		}
 	};
 
-#if WITH_NIAGARA
-	ExpectPresent(TEXT("create_asset_niagara_system"), true);
-	ExpectPresent(TEXT("interact_runtime_actor_niagara"), true);
-	TestTrue(TEXT("Niagara set_emitter_enabled"), NexusSchemaActionContains(TEXT("manage_asset_niagara_system"), TEXT("set_emitter_enabled"), *this));
-#else
-	ExpectPresent(TEXT("create_asset_niagara_system"), false);
-#endif
+	const TSharedPtr<IPlugin> Niagara = IPluginManager::Get().FindPlugin(TEXT("Niagara"));
+	const bool bExpectNiagara = WITH_NIAGARA && Niagara.IsValid() && Niagara->IsEnabled();
+	ExpectPresent(TEXT("CreateAssetNiagaraSystem"), bExpectNiagara);
+	ExpectPresent(TEXT("InteractRuntimeActorNiagara"), bExpectNiagara);
+	if (bExpectNiagara)
+		TestTrue(TEXT("Niagara SetEmitterEnabled"), NexusSchemaActionContains(TEXT("ManageAssetNiagaraSystem"), TEXT("SetEmitterEnabled"), *this));
 #if WITH_STATETREE
-	ExpectPresent(TEXT("create_asset_state_tree"), true);
-	TestTrue(TEXT("ST add_task"), NexusSchemaActionContains(TEXT("manage_asset_state_tree"), TEXT("add_task"), *this));
+	ExpectPresent(TEXT("CreateAssetStateTree"), true);
+	TestTrue(TEXT("ST AddTask"), NexusSchemaActionContains(TEXT("ManageAssetStateTree"), TEXT("AddTask"), *this));
 #endif
 #if WITH_GAS
-	ExpectPresent(TEXT("create_asset_gameplay_cue_notify"), true);
-	TestTrue(TEXT("GCNotify set_cue_name"), NexusSchemaActionContains(TEXT("manage_asset_gameplay_cue_notify"), TEXT("set_cue_name"), *this));
+	ExpectPresent(TEXT("CreateAssetGameplayCueNotify"), true);
+	TestTrue(TEXT("GCNotify SetCueName"), NexusSchemaActionContains(TEXT("ManageAssetGameplayCueNotify"), TEXT("SetCueName"), *this));
 #else
-	ExpectPresent(TEXT("create_asset_gameplay_cue_notify"), false);
+	ExpectPresent(TEXT("CreateAssetGameplayCueNotify"), false);
 #endif
 #if WITH_PAPER2D
-	ExpectPresent(TEXT("create_asset_paper_sprite"), true);
+	ExpectPresent(TEXT("CreateAssetPaperSprite"), true);
 #else
-	ExpectPresent(TEXT("create_asset_paper_sprite"), false);
+	ExpectPresent(TEXT("CreateAssetPaperSprite"), false);
 #endif
 #if WITH_COMMON_UI
-	ExpectPresent(TEXT("create_asset_common_button_style"), true);
+	ExpectPresent(TEXT("CreateAssetCommonButtonStyle"), true);
 #else
-	ExpectPresent(TEXT("create_asset_common_button_style"), false);
+	ExpectPresent(TEXT("CreateAssetCommonButtonStyle"), false);
 #endif
 #if WITH_MOVIE_RENDER_PIPELINE
-	ExpectPresent(TEXT("create_asset_movie_pipeline_config"), true);
+	ExpectPresent(TEXT("CreateAssetMoviePipelineConfig"), true);
 #else
-	ExpectPresent(TEXT("create_asset_movie_pipeline_config"), false);
+	ExpectPresent(TEXT("CreateAssetMoviePipelineConfig"), false);
 #endif
 
-	TestTrue(TEXT("BP add_macro"), NexusSchemaActionContains(TEXT("manage_asset_blueprint"), TEXT("add_macro"), *this));
-	TestTrue(TEXT("WBP add_animation"), NexusSchemaActionContains(TEXT("manage_asset_user_widget"), TEXT("add_animation"), *this));
+	TestTrue(TEXT("BP AddMacro"), NexusSchemaActionContains(TEXT("ManageAssetBlueprint"), TEXT("AddMacro"), *this));
+	TestTrue(TEXT("WBP AddAnimation"), NexusSchemaActionContains(TEXT("ManageAssetUserWidget"), TEXT("AddAnimation"), *this));
 	return true;
 }
 

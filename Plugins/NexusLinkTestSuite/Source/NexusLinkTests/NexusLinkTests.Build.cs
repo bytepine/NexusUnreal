@@ -32,45 +32,32 @@ public class NexusLinkTests : ModuleRules
 		);
 
 
-		string ProjectRoot = NexusLinkOptionalPlugins.FindProjectRoot(ModuleDirectory);
-		var SearchDirs = NexusLinkOptionalPlugins.CollectPluginSearchDirs(ProjectRoot, this);
 		foreach (var Config in NexusLinkOptionalPlugins.BuildFullTable())
 		{
 			string Domain = System.IO.Path.GetFileNameWithoutExtension(Config.UpluginFiles[0]);
-			string Integration = "NexusLink" + Domain;
 			if (Domain != "GameplayAbilities" && Domain != "Niagara" && Domain != "StateTree" &&
 				Domain != "ModelViewViewModel" && Domain != "Paper2D" && Domain != "CommonUI" &&
-				Domain != "MovieRenderPipeline")
-				continue;
-			bool RuntimeDomain = Domain == "GameplayAbilities" || Domain == "Niagara";
-			if ((Target.bBuildEditor || RuntimeDomain) &&
-				NexusLinkOptionalPlugins.GetProjectPluginEnabled(ProjectRoot, Integration) == true &&
-				NexusLinkOptionalPlugins.Apply(this, Target, Config, SearchDirs, ProjectRoot, Target.bBuildEditor, false, true))
-			{
-				PrivateDefinitions.Add(Config.Define + "=1");
-				if (RuntimeDomain)
-					PrivateDependencyModuleNames.Add(Integration);
-				if (Target.bBuildEditor)
-					PrivateDependencyModuleNames.Add(Integration + "Editor");
-				NexusLinkOptionalPlugins.MarkOptionalPluginLinked(this, Integration);
-			}
-			else
+				Domain != "MovieRenderPipeline") continue;
+
+			if (!Target.bBuildEditor && Domain != "GameplayAbilities" && Domain != "Niagara")
 			{
 				PrivateDefinitions.Add(Config.Define + "=0");
+				continue;
 			}
+			// 只有 StateTree 夹具直接使用 SDK；注册表断言通过工具名查询，无需链接集成模块。
+			NexusLinkOptionalPlugins.ConfigureIntegration(this, Target, Config, Target.bBuildEditor,
+				bRequireEnabledHost: Domain != "Niagara", bLinkModules: Domain == "StateTree");
 		}
-
 
 		if (Target.bBuildEditor)
 		{
 			PrivateDependencyModuleNames.Add(NexusLinkOptionalPlugins.MeetsMinEngineVersion(Target,5,0) ? "ToolWidgets" : "EditorWidgets");
-            string RegistryProjectRoot = NexusLinkOptionalPlugins.FindProjectRoot(ModuleDirectory);
-            var RegistrySearchDirs = NexusLinkOptionalPlugins.CollectPluginSearchDirs(RegistryProjectRoot, this);
-            var RegistryConfig = NexusLinkOptionalPlugins.Opt(new[] { "DataRegistry.uplugin" }, "WITH_NEXUS_TEST_DATA_REGISTRY", "NEXUS_TEST_DATA_REGISTRY", 5, 0, rt: new[] { "DataRegistry" }, uproj: "DataRegistry");
-            NexusLinkOptionalPlugins.Apply(this, Target, RegistryConfig, RegistrySearchDirs, RegistryProjectRoot, false);
+			var Registry = NexusLinkOptionalPlugins.Opt(new[] { "DataRegistry.uplugin" }, "WITH_NEXUS_TEST_DATA_REGISTRY",
+				"NEXUS_TEST_DATA_REGISTRY", 5, 0, rt: new[] { "DataRegistry" });
+			NexusLinkOptionalPlugins.ConfigureIntegration(this, Target, Registry, false, bRequireEnabledHost: true);
 			var PCGDocuments = NexusLinkOptionalPlugins.Opt(new[] { "PCG.uplugin" }, "WITH_NEXUS_TEST_PCG_DOCUMENTS", "WITH_PCG", 5, 8,
-				rt: new[] { "PCG" }, ed: new[] { "PCGEditor" }, uproj: "PCG");
-			if (NexusLinkOptionalPlugins.Apply(this, Target, PCGDocuments, RegistrySearchDirs, RegistryProjectRoot, true))
+				rt: new[] { "PCG" }, ed: new[] { "PCGEditor" });
+			if (NexusLinkOptionalPlugins.ConfigureIntegration(this, Target, PCGDocuments, true, bRequireEnabledHost: true))
 				PrivateDependencyModuleNames.AddRange(new[] { "AssetRegistry", "AssetDefinition", "GraphEditor" });
 
 			PrivateDependencyModuleNames.AddRange(

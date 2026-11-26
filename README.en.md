@@ -48,7 +48,7 @@ Plugin version: `Plugins/NexusLink/VERSION` or [NexusLink Releases](https://gith
 
 ## MCP access
 
-1. Initialize the NexusLink submodule, or download its ZIP from [NexusLink Releases](https://github.com/bytepine/NexusLink/releases) into `Plugins/NexusLink`.
+1. Initialize the NexusLink submodule, or download its ZIP from [NexusLink Releases](https://github.com/bytepine/NexusLink/releases) into `Plugins/NexusLink`. With NexusLink enabled, tools for Niagara, GameplayAbilities, and other integrations load automatically when the project enables their engine plugins.
 2. Enable **Editor Preferences → Plugins → NexusLink → Enable MCP Server** (off by default), exposing HTTP `:45000` / WS `:55000`. In PIE / standalone Development packages, open the console with `~` and run `NexusLink.Mcp on`; `NexusLink.Mcp panel` opens the in-game debug panel. These switches apply to the current session and do not write configuration files.
 3. IDE proxies: [NexusVSCode](https://github.com/bytepine/NexusVSCode) (`:6900`) or [NexusRider](https://github.com/bytepine/NexusRider) (`:6800`).
 4. Full configuration: [NexusLink usage guide](https://github.com/bytepine/NexusLink/blob/master/docs/usage-guide.md).
@@ -59,7 +59,7 @@ Plugin version: `Plugins/NexusLink/VERSION` or [NexusLink Releases](https://gith
 |------|---------|
 | Cross-version project builds | `py Script/build_test.py` (builds `Nexus.uproject` with locally installed engines in isolated temporary directories without modifying the project; one engine at a time, no `-MaxParallelActions`, leaving concurrency to UBT; automatically retries C3859/C1076 with a single action; supports `--editor-only` / `--game-only`) |
 | Game targets only | `py Script/build_test_game.py --versions UE_5.7` |
-| Package for any platform | `py Script/package.py` (defaults to the host platform + Development; use `--version` to select the engine, with incompatible extensions and modules filtered in a temporary project when needed; `--platform Win64 Linux`; `--config Shipping`; arguments after `--` pass through to UAT) |
+| Package for any platform | `py Script/package.py` defaults to a Development package for the host platform. Use `--version` to select the engine, `--platform Win64 Linux` to select platforms, and `--config Shipping` for a shipping build. Arguments after `--` pass through to UAT. Older engines use a temporary project to adapt the sample game modules. |
 | L2 MCP regression, daily/headless | `py Script/run_e2e.py` |
 | Full L2 MCP regression, GUI including PIE/Lua | `py Script/run_e2e.py --gui` or `--full` |
 | Controlled UE 5.7 CI | Manually dispatch [UE 5.7 Validation](.github/workflows/ue-validation.yml) with a full commit SHA already merged into the default branch; see [test guide](Tests/README.en.md#controlled-ue-57-validation) for Windows runner and environment setup |
