@@ -26,15 +26,14 @@ def test_proxy_discovery_status(_ue_url):
     assert "token" not in status and "authToken" not in status
 
 
-def test_tools_list_contains_meta_tools(mcp, tool_names):
-    """在 SearchMode（默认）下 tools/list 只包含 3 个元工具；
-    在 MultiTool 模式下还包含所有 Capability。
-    无论何种模式，3 个元工具必须始终存在。"""
+def test_tools_list_contains_meta_tools(mcp):
+    """SearchMode 的工具列表公布三个元工具及按动作查询的可选参数。"""
+    tools = {tool["name"]: tool for tool in mcp.list_tools()}
     for required in ["SearchCapabilities", "CallCapability", "SubmitFeedback"]:
-        assert required in tool_names, (
-            f"meta-tool missing from tools/list: {required}\n"
-            f"actual tools: {tool_names!r}"
-        )
+        assert required in tools, required
+    schema = tools["SearchCapabilities"]["inputSchema"]
+    assert schema["properties"]["Action"]["type"] == "string"
+    assert not {"Action", "Query"} & set(schema.get("required", []))
 
 
 def test_search_capabilities_roundtrip(mcp):
@@ -54,6 +53,86 @@ def test_search_capabilities_nested_widget_action_enum(mcp):
     action = by_name.get("Operations[].Action")
     assert action is not None, f"Operations[].Action missing in parameters: {by_name.keys()!r}"
     assert action.get("type") == "string (enum)" or action.get("enum"), action
+
+
+def test_search_capabilities_blueprint_action_schema(mcp):
+    def lookup(**filters):
+        return mcp.call("SearchCapabilities", CapabilityName="ManageAssetBlueprint", **filters)["Capability"]
+
+    full = lookup()
+    full_actions = next(p["enum"] for p in full["Parameters"] if p["name"] == "Operations[].Action")
+    assert {"DuplicateNodes", "AddVariable"} <= set(full_actions)
+
+    for action, required, optional in [
+        ("DuplicateNodes", {"GraphName", "NodeIds"}, {"OffsetX", "OffsetY"}),
+        ("AddVariable", {"VariableName", "VariableType"}, {"DefaultValue", "Category", "bIsPublic"}),
+    ]:
+        detail = lookup(Action=action)
+        assert detail["Action"] == action and detail["ParameterScope"] == "ActionSpecific"
+        schema = detail["inputSchema"]
+        assert {"AssetPath", "Operations"} <= set(schema["required"])
+        assert {"bSaveToDisk", "bCompile"} <= schema["properties"].keys()
+        item = schema["properties"]["Operations"]["items"]
+        assert set(item["required"]) == required | {"Action"}
+        props = item["properties"]
+        assert set(props) == required | optional | {"Action"}
+        assert props["Action"]["enum"] == [action]
+        if action == "DuplicateNodes":
+            assert props["NodeIds"]["minItems"] == 1 and props["NodeIds"]["maxItems"] == 64
+            assert props["NodeIds"]["uniqueItems"] is True
+            assert props["OffsetX"]["default"] == 64
+
+    # 分片不可修改注册表里的共享 schema，否则下一次完整查询会丢动作。
+    assert lookup()["Parameters"] == full["Parameters"]
+
+
+def test_search_capabilities_action_shared_schema(mcp):
+    detail = mcp.call("SearchCapabilities", CapabilityName="ControlEditorLevel", Action="Show")["Capability"]
+    assert detail["ParameterScope"] == "Shared" and detail["Action"] == "Show"
+    props = detail["inputSchema"]["properties"]
+    assert props["Action"]["enum"] == ["Show"]
+    assert props["Action"].get("default", "Show") == "Show"
+    assert "AssetPath" in props
+
+
+def test_search_capabilities_nested_editor_action(mcp, require_tools):
+    require_tools("GetEditorAnimation")
+    detail = mcp.call("SearchCapabilities", CapabilityName="GetEditorAnimation", Action="GetOutlinerChildren")["Capability"]
+    assert isinstance(detail["bSupported"], bool) and detail["MinimumVersion"]
+    assert detail["ParameterScope"] == "ActionSpecific"
+    schema = detail["inputSchema"]
+    assert set(schema["required"]) == {"Action", "Parameters"}
+    parameters = schema["properties"]["Parameters"]
+    assert parameters["required"] == ["node"] and "type_filter" in parameters["properties"]
+
+
+def test_search_capabilities_gas_activation_action(mcp, require_tools):
+    require_tools("InteractRuntimeActorAbilitySystem")
+    detail = mcp.call("SearchCapabilities", CapabilityName="InteractRuntimeActorAbilitySystem",
+                      Action="TryActivateGrantedAbility")["Capability"]
+    schema = detail["inputSchema"]
+    assert set(schema["required"]) == {"Action", "ActorName"}
+    assert set(schema["properties"]) == {"Action", "ActorName", "SpecHandle", "AbilityPath"}
+    assert "SpecHandle" in detail["ActionHint"] and "AbilityPath" in detail["ActionHint"]
+    assert "StartActivationCapture" in detail["description"] and "bRequestAccepted" in detail["description"]
+
+
+@pytest.mark.parametrize(("arguments", "error_kind"), [
+    ({"Query": "blueprint graph", "Action": "DuplicateNodes"}, "InvalidAction"),
+    ({"CapabilityName": "ManageAssetBlueprint", "Action": "  "}, "InvalidAction"),
+    ({"CapabilityName": "ManageAssetBlueprint", "Action": []}, "InvalidAction"),
+    ({"CapabilityName": "ManageAssetBlueprint", "Action": "MissingAction"}, "UnknownAction"),
+    ({"CapabilityName": "ManageAssetBlueprint", "Action": "duplicatenodes"}, "UnknownAction"),
+    ({"CapabilityName": "GetEditorContext", "Action": "MissingAction"}, "ActionNotSupported"),
+    ({"CapabilityName": "__nexus_unknown_cap__", "Action": "MissingAction"}, "NotFound"),
+])
+def test_search_capabilities_action_error(mcp, arguments, error_kind):
+    result = mcp.try_call("SearchCapabilities", **arguments)
+    payload = result.get("structuredContent") or json.loads(result["content"][0]["text"])
+    assert payload["ErrorKind"] == error_kind, payload
+    assert "Capability" not in payload
+    if error_kind == "UnknownAction":
+        assert "DuplicateNodes" in payload["AvailableActions"]
 
 
 def test_search_capabilities_array_sections_enum(mcp):

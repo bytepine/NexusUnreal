@@ -32,6 +32,8 @@ NexusLink 与 NexusLinkTestSuite 自身不直接链接或调用官方 Toolset/Re
 
 `test_00_smoke.py::test_proxy_discovery_status` 检查真实 HTTP `/status` 的既有发现协议字段（含 `server`、`wsPort`、`authRequired`），避免 Capability 命名迁移破坏 Desktop / Rider / VSCode 的实例扫描。
 
+`test_00_smoke.py` 的 `test_search_capabilities_*` 用例还覆盖按动作查询的必填项和字段约束、独立编辑器的嵌套参数、运行时 GAS 的条件提示、共享字段回退、无效动作和完整查询兼容性。
+
 ## 动画、Niagara 与独立能力回归
 
 UE Automation 的 `NexusLink.AssetEdit` 覆盖接口实现图、Unicode 结构 Hash、控件变量引用删除，以及部分成功后结构回读失败禁止保存；`NexusLink.Toolsets.Compatibility` 用真实宿主通道/类型与既有 PCG 实例验证关键帧、Niagara 向量、图参数传播和 UE 5.6 UIComponent 排序；`NexusLink.Import.MultiTakeConflicts` 自建双 take FBX，验证 Fail/Unique 不覆盖及 Replace 全产物读回；`NexusLink.Registry.AllDefinitionsValid` 验证真实注册定义符合启动期命名与资产路由约束。均可用 Editor-Cmd 的 `-ExecCmds="Automation RunTests <prefix>" -TestExit="Automation Test Queue Empty" -unattended -nullrhi` 执行，版本相关场景按宿主裁剪。

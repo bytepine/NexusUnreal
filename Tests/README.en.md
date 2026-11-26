@@ -32,6 +32,8 @@ Performance-comparison acceptance: run UE Automation `NexusLink.Trace.GetTrace` 
 
 `test_00_smoke.py::test_proxy_discovery_status` checks actual HTTP `/status` discovery fields, including `server`, `wsPort`, and `authRequired`, so capability-name migrations do not break Desktop / Rider / VSCode instance scans.
 
+The `test_search_capabilities_*` cases in `test_00_smoke.py` also cover action-specific required fields and constraints, nested editor parameters, runtime GAS conditions, shared fields, invalid actions and compatibility with full capability lookups.
+
 ## Animation, Niagara, and independent-capability regressions
 
 UE Automation `NexusLink.AssetEdit` covers interface-implementation graphs, Unicode structural Hash, widget-variable-reference deletion, and refusing to save after partial success followed by structural-readback failure. `NexusLink.Toolsets.Compatibility` uses real host channels/types and existing PCG instances for keyframes, Niagara vectors, graph-parameter propagation, and UE 5.6 UIComponent ordering. `NexusLink.Import.MultiTakeConflicts` builds two-take FBX fixtures to verify no overwrite for Fail/Unique and readback of every Replace output. `NexusLink.Registry.AllDefinitionsValid` checks real registered definitions against startup naming/asset-routing constraints. Run with Editor-Cmd `-ExecCmds="Automation RunTests <prefix>" -TestExit="Automation Test Queue Empty" -unattended -nullrhi`; version-dependent cases adapt to the host.
